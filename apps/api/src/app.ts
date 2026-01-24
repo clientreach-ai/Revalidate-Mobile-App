@@ -1,24 +1,51 @@
 import express from 'express';
 import cors from 'cors';
+import { SERVER_CONFIG } from './config/env';
+import { errorHandler, notFoundHandler } from './common/middleware/error-handler';
+import { logger } from './common/logger';
 
 const app = express();
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: SERVER_CONFIG.corsOrigin,
+  credentials: true,
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Routes
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'API is running' });
+// Request logging
+app.use((req, res, next) => {
+  logger.debug(`${req.method} ${req.path}`);
+  next();
 });
 
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Revalidation Tracker API is running',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// API routes
+import apiRoutes from './routes';
+app.use(apiRoutes);
+
+// Root endpoint
 app.get('/', (req, res) => {
-  res.json({ message: 'Hello API - Revalidation Tracker' });
+  res.json({ 
+    message: 'Revalidation Tracker API',
+    version: '1.0.0',
+    docs: '/api/docs', // TODO: Add API documentation
+  });
 });
 
 // 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
+app.use(notFoundHandler);
+
+// Error handler (must be last)
+app.use(errorHandler);
 
 export default app;

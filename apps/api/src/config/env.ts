@@ -28,3 +28,16 @@ export const MYSQL_CONFIG = {
 if (!MYSQL_CONFIG.user || !MYSQL_CONFIG.password || !MYSQL_CONFIG.database) {
   console.warn('⚠️  MySQL configuration is incomplete. Some environment variables may be missing.');
 }
+
+// JWT Configuration
+export const JWT_CONFIG = {
+  secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+  expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+};
+
+// Server Configuration
+export const SERVER_CONFIG = {
+  port: parseInt(process.env.PORT || '3000', 10),
+  nodeEnv: process.env.NODE_ENV || 'development',
+  corsOrigin: process.env.CORS_ORIGIN || '*',
+};
