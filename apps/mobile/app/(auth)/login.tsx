@@ -21,6 +21,8 @@ export default function Login() {
     const handleSubmit = () => {
         // Handle form submission
         console.log({ email, password });
+        // Redirect to onboarding
+        router.replace("/(onboarding)");
     };
 
     return (
