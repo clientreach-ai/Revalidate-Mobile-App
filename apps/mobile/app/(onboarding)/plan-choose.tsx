@@ -3,6 +3,13 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { Resolver, SubmitHandler } from "react-hook-form";
+import {
+    onboardingPlanSchema,
+    type OnboardingPlanInput,
+} from "@/validation/schema";
 import "../global.css";
 
 // Plan selection component
@@ -31,47 +38,50 @@ const premiumFeatures = [
 ];
 
 export default function PlanChoose() {
-    // Get router - this should work fine with Expo Router
     const router = useRouter();
     const [isDark] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState<"free" | "premium">("free");
-    const [trialSelected, setTrialSelected] = useState(false);
     const [isNavigating, setIsNavigating] = useState(false);
 
-    const handleContinue = useCallback(() => {
-        if (isNavigating) return;
-        
-        try {
+    const {
+        handleSubmit,
+        setValue,
+        watch,
+    } = useForm<OnboardingPlanInput>({
+        resolver: zodResolver(onboardingPlanSchema) as Resolver<OnboardingPlanInput>,
+        defaultValues: {
+            selectedPlan: "free",
+            trialSelected: false,
+        },
+    });
+
+    const watchedPlan = watch("selectedPlan");
+    const watchedTrial = watch("trialSelected");
+
+    const onSubmit: SubmitHandler<OnboardingPlanInput> = useCallback(
+        (data) => {
+            if (isNavigating) return;
+            console.log("Onboarding plan submitted:", data);
             setIsNavigating(true);
-            // Use setTimeout to ensure state updates complete before navigation
             setTimeout(() => {
                 try {
-                    // Navigate to dashboard - using replace to prevent going back to onboarding
                     router.replace("/(tabs)/dashboard");
                 } catch (error) {
                     console.error("Navigation error:", error);
                     setIsNavigating(false);
                 }
             }, 0);
-        } catch (error) {
-            console.error("Error in handleContinue:", error);
-            setIsNavigating(false);
-        }
-    }, [router, isNavigating]);
+        },
+        [router, isNavigating]
+    );
+
+    const onFormSubmit = handleSubmit(onSubmit);
 
     const handleSelectPlan = useCallback((plan: "free" | "premium") => {
-        // Wrap in try-catch to prevent any errors from propagating
-        try {
-            // Direct state update - no navigation context needed
-            setSelectedPlan(plan);
-            if (plan === "free") {
-                setTrialSelected(false);
-            }
-        } catch (error) {
-            // Silently handle any errors - this shouldn't happen but just in case
-            console.warn("Error in handleSelectPlan:", error);
+        setValue("selectedPlan", plan);
+        if (plan === "free") {
+            setValue("trialSelected", false);
         }
-    }, []);
+    }, [setValue]);
 
     return (
         <SafeAreaView
@@ -111,7 +121,6 @@ export default function PlanChoose() {
                         {/* Free Plan */}
                         <TouchableOpacity
                             onPress={(e) => {
-                                // Prevent any default behavior and handle the press
                                 e?.preventDefault?.();
                                 handleSelectPlan("free");
                             }}
@@ -121,28 +130,28 @@ export default function PlanChoose() {
                                 borderRadius: 16,
                                 borderWidth: 2,
                                 padding: 24,
-                                backgroundColor: selectedPlan === "free" 
+                                backgroundColor: watchedPlan === "free" 
                                     ? "rgba(30, 90, 243, 0.1)" 
                                     : isDark 
                                     ? "rgba(30, 41, 59, 0.9)" 
                                     : "#ffffff",
-                                borderColor: selectedPlan === "free" 
+                                borderColor: watchedPlan === "free" 
                                     ? "#1E5AF3" 
                                     : isDark 
                                     ? "rgba(51, 65, 85, 0.5)" 
                                     : "#e5e7eb",
-                                shadowColor: selectedPlan === "free" ? "#1E5AF3" : isDark ? "#000" : "#000",
+                                shadowColor: watchedPlan === "free" ? "#1E5AF3" : isDark ? "#000" : "#000",
                                 shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: selectedPlan === "free" ? 0.15 : isDark ? 0.1 : 0.05,
+                                shadowOpacity: watchedPlan === "free" ? 0.15 : isDark ? 0.1 : 0.05,
                                 shadowRadius: 4,
-                                elevation: selectedPlan === "free" ? 4 : 2,
+                                elevation: watchedPlan === "free" ? 4 : 2,
                             }}
                         >
                             <View className="flex-row items-center justify-between mb-4">
                                 <View className="flex-1">
                                     <Text
                                         className={`text-2xl font-bold mb-1 ${
-                                            selectedPlan === "free"
+                                            watchedPlan === "free"
                                                 ? "text-primary"
                                                 : isDark
                                                 ? "text-white"
@@ -153,7 +162,7 @@ export default function PlanChoose() {
                                     </Text>
                                     <Text
                                         className={`text-3xl font-bold ${
-                                            selectedPlan === "free"
+                                            watchedPlan === "free"
                                                 ? "text-primary"
                                                 : isDark
                                                 ? "text-white"
@@ -166,14 +175,14 @@ export default function PlanChoose() {
                                 </View>
                                 <View
                                     className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                        selectedPlan === "free"
+                                        watchedPlan === "free"
                                             ? "bg-primary border-primary"
                                             : isDark
                                             ? "border-slate-600 bg-slate-800"
                                             : "border-gray-300 bg-white"
                                     }`}
                                 >
-                                    {selectedPlan === "free" && (
+                                    {watchedPlan === "free" && (
                                         <MaterialIcons name="check" size={16} color="white" />
                                     )}
                                 </View>
@@ -184,7 +193,7 @@ export default function PlanChoose() {
                                         <MaterialIcons
                                             name="check-circle"
                                             size={20}
-                                            color={selectedPlan === "free" ? "#1E5AF3" : isDark ? "#9CA3AF" : "#6B7280"}
+                                            color={watchedPlan === "free" ? "#1E5AF3" : isDark ? "#9CA3AF" : "#6B7280"}
                                         />
                                         <Text
                                             className={`flex-1 text-sm ${
@@ -201,7 +210,6 @@ export default function PlanChoose() {
                         {/* Premium Plan */}
                         <TouchableOpacity
                             onPress={(e) => {
-                                // Prevent any default behavior and handle the press
                                 e?.preventDefault?.();
                                 handleSelectPlan("premium");
                             }}
@@ -212,21 +220,21 @@ export default function PlanChoose() {
                                 borderWidth: 2,
                                 padding: 24,
                                 position: 'relative',
-                                backgroundColor: selectedPlan === "premium" 
+                                backgroundColor: watchedPlan === "premium" 
                                     ? "rgba(30, 90, 243, 0.1)" 
                                     : isDark 
                                     ? "rgba(30, 41, 59, 0.9)" 
                                     : "#ffffff",
-                                borderColor: selectedPlan === "premium" 
+                                borderColor: watchedPlan === "premium" 
                                     ? "#1E5AF3" 
                                     : isDark 
                                     ? "rgba(51, 65, 85, 0.5)" 
                                     : "#e5e7eb",
-                                shadowColor: selectedPlan === "premium" ? "#1E5AF3" : isDark ? "#000" : "#000",
+                                shadowColor: watchedPlan === "premium" ? "#1E5AF3" : isDark ? "#000" : "#000",
                                 shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: selectedPlan === "premium" ? 0.15 : isDark ? 0.1 : 0.05,
+                                shadowOpacity: watchedPlan === "premium" ? 0.15 : isDark ? 0.1 : 0.05,
                                 shadowRadius: 4,
-                                elevation: selectedPlan === "premium" ? 4 : 2,
+                                elevation: watchedPlan === "premium" ? 4 : 2,
                             }}
                         >
                             {/* Popular Badge */}
@@ -238,7 +246,7 @@ export default function PlanChoose() {
                                 <View className="flex-1">
                                     <Text
                                         className={`text-2xl font-bold mb-1 ${
-                                            selectedPlan === "premium"
+                                            watchedPlan === "premium"
                                                 ? "text-primary"
                                                 : isDark
                                                 ? "text-white"
@@ -250,7 +258,7 @@ export default function PlanChoose() {
                                     <View className="flex-row items-baseline gap-1">
                                         <Text
                                             className={`text-3xl font-bold ${
-                                                selectedPlan === "premium"
+                                                watchedPlan === "premium"
                                                     ? "text-primary"
                                                     : isDark
                                                     ? "text-white"
@@ -270,14 +278,14 @@ export default function PlanChoose() {
                                 </View>
                                 <View
                                     className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                        selectedPlan === "premium"
+                                        watchedPlan === "premium"
                                             ? "bg-primary border-primary"
                                             : isDark
                                             ? "border-slate-600 bg-slate-800"
                                             : "border-gray-300 bg-white"
                                     }`}
                                 >
-                                    {selectedPlan === "premium" && (
+                                    {watchedPlan === "premium" && (
                                         <MaterialIcons name="check" size={16} color="white" />
                                     )}
                                 </View>
@@ -288,7 +296,7 @@ export default function PlanChoose() {
                                         <MaterialIcons
                                             name="check-circle"
                                             size={20}
-                                            color={selectedPlan === "premium" ? "#1E5AF3" : isDark ? "#9CA3AF" : "#6B7280"}
+                                            color={watchedPlan === "premium" ? "#1E5AF3" : isDark ? "#9CA3AF" : "#6B7280"}
                                         />
                                         <Text
                                             className={`flex-1 text-sm ${
@@ -303,10 +311,10 @@ export default function PlanChoose() {
                         </TouchableOpacity>
 
                         {/* Free Trial Option */}
-                        {selectedPlan === "premium" && (
+                        {watchedPlan === "premium" && (
                             <View
                                 className={`rounded-2xl p-4 border ${
-                                    trialSelected
+                                    watchedTrial
                                         ? "bg-primary/10 border-primary"
                                         : isDark
                                         ? "bg-slate-800/50 border-slate-700/50"
@@ -314,20 +322,20 @@ export default function PlanChoose() {
                                 }`}
                             >
                                 <TouchableOpacity
-                                    onPress={() => setTrialSelected(!trialSelected)}
+                                    onPress={() => setValue("trialSelected", !watchedTrial)}
                                     activeOpacity={0.8}
                                     className="flex-row items-center gap-3"
                                 >
                                     <View
                                         className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                                            trialSelected
+                                            watchedTrial
                                                 ? "bg-primary border-primary"
                                                 : isDark
                                                 ? "border-slate-600 bg-slate-800"
                                                 : "border-gray-300 bg-white"
                                         }`}
                                     >
-                                        {trialSelected && (
+                                        {watchedTrial && (
                                             <MaterialIcons name="check" size={14} color="white" />
                                         )}
                                     </View>
@@ -357,7 +365,7 @@ export default function PlanChoose() {
             {/* Continue Button */}
             <View className={`px-6 pb-8 pt-4 border-t ${isDark ? "border-slate-700/50" : "border-gray-200"}`}>
                 <TouchableOpacity
-                    onPress={handleContinue}
+                    onPress={onFormSubmit}
                     activeOpacity={0.8}
                     disabled={isNavigating}
                     className={`w-full bg-primary py-4 rounded-2xl flex-row items-center justify-center ${
@@ -372,15 +380,15 @@ export default function PlanChoose() {
                     }}
                 >
                     <Text className="text-white font-semibold text-base">
-                        {selectedPlan === "premium" && trialSelected
+                        {watchedPlan === "premium" && watchedTrial
                             ? "Start Free Trial"
-                            : selectedPlan === "premium"
+                            : watchedPlan === "premium"
                             ? "Subscribe to Premium"
                             : "Continue with Free Plan"}
                     </Text>
                     <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
                 </TouchableOpacity>
-                {selectedPlan === "free" && (
+                {watchedPlan === "free" && (
                     <Text
                         className={`text-center text-xs mt-3 ${
                             isDark ? "text-gray-400" : "text-gray-500"

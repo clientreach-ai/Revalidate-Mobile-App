@@ -3,6 +3,13 @@ import { View, Text, TextInput, Pressable, ScrollView, Modal, TouchableOpacity }
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { Resolver, SubmitHandler } from "react-hook-form";
+import {
+    onboardingProfessionalDetailsSchema,
+    type OnboardingProfessionalDetailsInput,
+} from "@/validation/schema";
 import "../global.css";
 
 const roleConfig = {
@@ -108,12 +115,8 @@ export default function ProfessionalDetails() {
     const params = useLocalSearchParams();
     const role = (params.role as string) || "other";
     const config = roleConfig[role as keyof typeof roleConfig] || roleConfig.other;
-    
+
     const [isDark] = useState(false);
-    const [registrationNumber, setRegistrationNumber] = useState("");
-    const [revalidationDate, setRevalidationDate] = useState<Date | null>(null);
-    const [workSetting, setWorkSetting] = useState<string | null>(null);
-    const [scope, setScope] = useState<string | null>(null);
     const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
     const [showScopeModal, setShowScopeModal] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
@@ -122,10 +125,27 @@ export default function ProfessionalDetails() {
     const [showMonthPicker, setShowMonthPicker] = useState(false);
     const [showYearPicker, setShowYearPicker] = useState(false);
 
-    const selectedWorkSetting = config.workSettings.find((w) => w.value === workSetting)?.label || "Select work setting";
-    const selectedScope = config.scopeOfPractice.find((s) => s.value === scope)?.label || "Select scope of practice";
+    const {
+        control,
+        handleSubmit,
+        setValue,
+        watch,
+        formState: { errors },
+    } = useForm<OnboardingProfessionalDetailsInput>({
+        resolver: zodResolver(onboardingProfessionalDetailsSchema) as Resolver<OnboardingProfessionalDetailsInput>,
+        defaultValues: {
+            registrationNumber: "",
+        },
+    });
 
-    const formatDate = (date: Date | null): string => {
+    const watchedDate = watch("revalidationDate");
+    const watchedWorkSetting = watch("workSetting");
+    const watchedScope = watch("scope");
+
+    const selectedWorkSetting = config.workSettings.find((w) => w.value === watchedWorkSetting)?.label ?? "Select work setting";
+    const selectedScope = config.scopeOfPractice.find((s) => s.value === watchedScope)?.label ?? "Select scope of practice";
+
+    const formatDate = (date: Date | undefined): string => {
         if (!date) return "";
         const day = date.getDate().toString().padStart(2, "0");
         const month = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -143,7 +163,7 @@ export default function ProfessionalDetails() {
 
     const handleDateSelect = (day: number) => {
         const newDate = new Date(selectedYear, selectedMonth, day);
-        setRevalidationDate(newDate);
+        setValue("revalidationDate", newDate);
         setShowDatePicker(false);
     };
 
@@ -187,10 +207,10 @@ export default function ProfessionalDetails() {
 
         // Days of the month
         for (let day = 1; day <= daysInMonth; day++) {
-            const isSelected = revalidationDate &&
-                revalidationDate.getDate() === day &&
-                revalidationDate.getMonth() === selectedMonth &&
-                revalidationDate.getFullYear() === selectedYear;
+            const isSelected = watchedDate &&
+                watchedDate.getDate() === day &&
+                watchedDate.getMonth() === selectedMonth &&
+                watchedDate.getFullYear() === selectedYear;
 
             days.push(
                 <Pressable
@@ -222,17 +242,12 @@ export default function ProfessionalDetails() {
         return days;
     };
 
-    const handleContinue = () => {
-        // Validate required fields
-        if (!registrationNumber || !revalidationDate || !workSetting || !scope) {
-            // Show error or validation message
-            return;
-        }
-        // Navigate to plan selection
+    const onSubmit: SubmitHandler<OnboardingProfessionalDetailsInput> = (data) => {
+        console.log("Onboarding professional details submitted:", data);
         router.push("/(onboarding)/plan-choose");
     };
 
-    const isFormValid = registrationNumber && revalidationDate !== null && workSetting && scope;
+    const onFormSubmit = handleSubmit(onSubmit);
 
     return (
         <SafeAreaView
@@ -276,35 +291,47 @@ export default function ProfessionalDetails() {
                             >
                                 {config.registrationLabel}
                             </Text>
-                            <View className="relative">
-                                <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
-                                    <MaterialIcons
-                                        name="badge"
-                                        size={22}
-                                        color={isDark ? "#6B7280" : "#9CA3AF"}
-                                    />
-                                </View>
-                                <TextInput
-                                    className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                        isDark
-                                            ? "bg-slate-800/90 text-white border border-slate-700/50"
-                                            : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                    }`}
-                                    style={{
-                                        shadowColor: isDark ? "#000" : "#000",
-                                        shadowOffset: { width: 0, height: 2 },
-                                        shadowOpacity: isDark ? 0.1 : 0.05,
-                                        shadowRadius: 4,
-                                        elevation: 2,
-                                    }}
-                                    placeholder={config.registrationPlaceholder}
-                                    placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                                    value={registrationNumber}
-                                    onChangeText={setRegistrationNumber}
-                                    autoCapitalize="characters"
-                                    autoCorrect={false}
-                                />
-                            </View>
+                            <Controller
+                                control={control}
+                                name="registrationNumber"
+                                render={({ field: { value, onChange, onBlur } }) => (
+                                    <View className="relative">
+                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                            <MaterialIcons
+                                                name="badge"
+                                                size={22}
+                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                            />
+                                        </View>
+                                        <TextInput
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                isDark
+                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                            } ${errors.registrationNumber ? "border-red-500" : ""}`}
+                                            style={{
+                                                shadowColor: isDark ? "#000" : "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                            }}
+                                            placeholder={config.registrationPlaceholder}
+                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                            value={value}
+                                            onChangeText={onChange}
+                                            onBlur={onBlur}
+                                            autoCapitalize="characters"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                )}
+                            />
+                            {errors.registrationNumber && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.registrationNumber.message}
+                                </Text>
+                            )}
                         </View>
 
                         {/* Revalidation Date */}
@@ -316,9 +343,9 @@ export default function ProfessionalDetails() {
                             </Text>
                             <Pressable
                                 onPress={() => {
-                                    if (revalidationDate) {
-                                        setSelectedMonth(revalidationDate.getMonth());
-                                        setSelectedYear(revalidationDate.getFullYear());
+                                    if (watchedDate) {
+                                        setSelectedMonth(watchedDate.getMonth());
+                                        setSelectedYear(watchedDate.getFullYear());
                                     }
                                     setShowDatePicker(true);
                                 }}
@@ -326,7 +353,7 @@ export default function ProfessionalDetails() {
                                     isDark
                                         ? "bg-slate-800/90 border border-slate-700/50"
                                         : "bg-white border border-gray-200 shadow-sm"
-                                }`}
+                                } ${errors.revalidationDate ? "border-red-500" : ""}`}
                                 style={{
                                     shadowColor: isDark ? "#000" : "#000",
                                     shadowOffset: { width: 0, height: 2 },
@@ -344,7 +371,7 @@ export default function ProfessionalDetails() {
                                 </View>
                                 <Text
                                     className={`flex-1 ${
-                                        revalidationDate
+                                        watchedDate
                                             ? isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
@@ -353,7 +380,7 @@ export default function ProfessionalDetails() {
                                             : "text-gray-400"
                                     }`}
                                 >
-                                    {revalidationDate ? formatDate(revalidationDate) : "Select date (DD/MM/YYYY)"}
+                                    {watchedDate ? formatDate(watchedDate) : "Select date (DD/MM/YYYY)"}
                                 </Text>
                                 <MaterialIcons
                                     name="calendar-today"
@@ -361,6 +388,11 @@ export default function ProfessionalDetails() {
                                     color={isDark ? "#6B7280" : "#9CA3AF"}
                                 />
                             </Pressable>
+                            {errors.revalidationDate && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.revalidationDate.message}
+                                </Text>
+                            )}
                         </View>
 
                         {/* Work Setting */}
@@ -376,7 +408,7 @@ export default function ProfessionalDetails() {
                                     isDark
                                         ? "bg-slate-800/90 border border-slate-700/50"
                                         : "bg-white border border-gray-200 shadow-sm"
-                                }`}
+                                } ${errors.workSetting ? "border-red-500" : ""}`}
                                 style={{
                                     shadowColor: isDark ? "#000" : "#000",
                                     shadowOffset: { width: 0, height: 2 },
@@ -394,7 +426,7 @@ export default function ProfessionalDetails() {
                                 </View>
                                 <Text
                                     className={`flex-1 ${
-                                        workSetting
+                                        watchedWorkSetting
                                             ? isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
@@ -411,6 +443,11 @@ export default function ProfessionalDetails() {
                                     color={isDark ? "#6B7280" : "#9CA3AF"}
                                 />
                             </Pressable>
+                            {errors.workSetting && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.workSetting.message}
+                                </Text>
+                            )}
                         </View>
 
                         {/* Scope of Practice */}
@@ -426,7 +463,7 @@ export default function ProfessionalDetails() {
                                     isDark
                                         ? "bg-slate-800/90 border border-slate-700/50"
                                         : "bg-white border border-gray-200 shadow-sm"
-                                }`}
+                                } ${errors.scope ? "border-red-500" : ""}`}
                                 style={{
                                     shadowColor: isDark ? "#000" : "#000",
                                     shadowOffset: { width: 0, height: 2 },
@@ -444,7 +481,7 @@ export default function ProfessionalDetails() {
                                 </View>
                                 <Text
                                     className={`flex-1 ${
-                                        scope
+                                        watchedScope
                                             ? isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
@@ -461,6 +498,11 @@ export default function ProfessionalDetails() {
                                     color={isDark ? "#6B7280" : "#9CA3AF"}
                                 />
                             </Pressable>
+                            {errors.scope && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.scope.message}
+                                </Text>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -469,22 +511,15 @@ export default function ProfessionalDetails() {
             {/* Continue Button */}
             <View className={`px-6 pb-8 pt-4 border-t ${isDark ? "border-slate-700/50" : "border-gray-200"}`}>
                 <Pressable
-                    onPress={handleContinue}
-                    disabled={!isFormValid}
-                    className={`w-full py-4 rounded-2xl flex-row items-center justify-center ${
-                        isFormValid ? "bg-primary" : "bg-gray-300"
-                    } active:opacity-90`}
-                    style={
-                        isFormValid
-                            ? {
-                                  shadowColor: "#1E5AF3",
-                                  shadowOffset: { width: 0, height: 8 },
-                                  shadowOpacity: 0.25,
-                                  shadowRadius: 12,
-                                  elevation: 8,
-                              }
-                            : {}
-                    }
+                    onPress={onFormSubmit}
+                    className="w-full py-4 rounded-2xl flex-row items-center justify-center bg-primary active:opacity-90"
+                    style={{
+                        shadowColor: "#1E5AF3",
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 12,
+                        elevation: 8,
+                    }}
                 >
                     <Text className="text-white font-semibold text-base">Complete Setup</Text>
                     <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
@@ -519,11 +554,11 @@ export default function ProfessionalDetails() {
                                 <TouchableOpacity
                                     key={setting.value}
                                     onPress={() => {
-                                        setWorkSetting(setting.value);
+                                        setValue("workSetting", setting.value as OnboardingProfessionalDetailsInput["workSetting"]);
                                         setShowWorkSettingModal(false);
                                     }}
                                     className={`py-4 px-4 rounded-xl mb-2 ${
-                                        workSetting === setting.value
+                                        watchedWorkSetting === setting.value
                                             ? "bg-primary/10"
                                             : isDark
                                             ? "bg-slate-700"
@@ -532,7 +567,7 @@ export default function ProfessionalDetails() {
                                 >
                                     <Text
                                         className={`${
-                                            workSetting === setting.value
+                                            watchedWorkSetting === setting.value
                                                 ? "text-primary font-semibold"
                                                 : isDark
                                                 ? "text-white"
@@ -584,11 +619,11 @@ export default function ProfessionalDetails() {
                                 <TouchableOpacity
                                     key={item.value}
                                     onPress={() => {
-                                        setScope(item.value);
+                                        setValue("scope", item.value as OnboardingProfessionalDetailsInput["scope"]);
                                         setShowScopeModal(false);
                                     }}
                                     className={`py-4 px-4 rounded-xl mb-2 ${
-                                        scope === item.value
+                                        watchedScope === item.value
                                             ? "bg-primary/10"
                                             : isDark
                                             ? "bg-slate-700"
@@ -597,7 +632,7 @@ export default function ProfessionalDetails() {
                                 >
                                     <Text
                                         className={`${
-                                            scope === item.value
+                                            watchedScope === item.value
                                                 ? "text-primary font-semibold"
                                                 : isDark
                                                 ? "text-white"
@@ -712,10 +747,10 @@ export default function ProfessionalDetails() {
                                     Cancel
                                 </Text>
                             </Pressable>
-                            {revalidationDate && (
+                            {watchedDate && (
                                 <Pressable
                                     onPress={() => {
-                                        setRevalidationDate(null);
+                                        setValue("revalidationDate", undefined as unknown as Date);
                                         setShowDatePicker(false);
                                     }}
                                     className={`flex-1 py-3 rounded-xl ${isDark ? "bg-slate-700" : "bg-gray-100"}`}

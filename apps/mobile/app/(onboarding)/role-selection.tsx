@@ -3,54 +3,49 @@ import { View, Text, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { Resolver, SubmitHandler } from "react-hook-form";
+import {
+    onboardingRoleSchema,
+    type OnboardingRoleInput,
+    type Role,
+} from "@/validation/schema";
 import "../global.css";
 
-const roles = [
-    { 
-        value: "doctor", 
-        label: "Doctor / GP",
-        icon: "healing",
-        description: "General practitioners and medical doctors"
-    },
-    { 
-        value: "nurse", 
-        label: "Nurse / Midwife",
-        icon: "local-hospital",
-        description: "Registered nurses and midwives"
-    },
-    { 
-        value: "pharmacist", 
-        label: "Pharmacist",
-        icon: "science",
-        description: "Registered pharmacists"
-    },
-    { 
-        value: "dentist", 
-        label: "Dentist",
-        icon: "health-and-safety",
-        description: "Dental practitioners"
-    },
-    { 
-        value: "other", 
-        label: "Other Healthcare Professional",
-        icon: "person",
-        description: "Other regulated healthcare roles"
-    },
+const roles: { value: Role; label: string; icon: string; description: string }[] = [
+    { value: "doctor", label: "Doctor / GP", icon: "healing", description: "General practitioners and medical doctors" },
+    { value: "nurse", label: "Nurse / Midwife", icon: "local-hospital", description: "Registered nurses and midwives" },
+    { value: "pharmacist", label: "Pharmacist", icon: "science", description: "Registered pharmacists" },
+    { value: "dentist", label: "Dentist", icon: "health-and-safety", description: "Dental practitioners" },
+    { value: "other", label: "Other Healthcare Professional", icon: "person", description: "Other regulated healthcare roles" },
 ];
 
 export default function RoleSelection() {
     const router = useRouter();
     const [isDark] = useState(false);
-    const [selectedRole, setSelectedRole] = useState<string | null>(null);
 
-    const handleContinue = () => {
-        if (selectedRole) {
-            router.push({
-                pathname: "/(onboarding)/professional-details",
-                params: { role: selectedRole },
-            });
-        }
+    const {
+        handleSubmit,
+        setValue,
+        watch,
+        formState: { errors },
+    } = useForm<OnboardingRoleInput>({
+        resolver: zodResolver(onboardingRoleSchema) as Resolver<OnboardingRoleInput>,
+        defaultValues: {},
+    });
+
+    const watchedRole = watch("role");
+
+    const onSubmit: SubmitHandler<OnboardingRoleInput> = (data) => {
+        console.log("Onboarding role submitted:", data);
+        router.push({
+            pathname: "/(onboarding)/professional-details",
+            params: { role: data.role },
+        });
     };
+
+    const onFormSubmit = handleSubmit(onSubmit);
 
     return (
         <SafeAreaView
@@ -88,11 +83,11 @@ export default function RoleSelection() {
                     {/* Role Cards */}
                     <View className="gap-4 mb-6">
                         {roles.map((role) => {
-                            const isSelected = selectedRole === role.value;
+                            const isSelected = watchedRole === role.value;
                             return (
                                 <Pressable
                                     key={role.value}
-                                    onPress={() => setSelectedRole(role.value)}
+                                    onPress={() => setValue("role", role.value)}
                                     className={`w-full rounded-2xl border-2 p-5 flex-row items-center gap-4 ${
                                         isSelected
                                             ? "bg-primary/10 border-primary"
@@ -165,28 +160,26 @@ export default function RoleSelection() {
                             );
                         })}
                     </View>
+                    {errors.role && (
+                        <Text className="text-red-500 text-sm mt-2 mb-2">
+                            {errors.role.message}
+                        </Text>
+                    )}
                 </View>
             </ScrollView>
 
             {/* Continue Button */}
             <View className={`px-6 pb-8 pt-4 border-t ${isDark ? "border-slate-700/50" : "border-gray-200"}`}>
                 <Pressable
-                    onPress={handleContinue}
-                    disabled={!selectedRole}
-                    className={`w-full py-4 rounded-2xl flex-row items-center justify-center ${
-                        selectedRole ? "bg-primary" : "bg-gray-300"
-                    } active:opacity-90`}
-                    style={
-                        selectedRole
-                            ? {
-                                  shadowColor: "#1E5AF3",
-                                  shadowOffset: { width: 0, height: 8 },
-                                  shadowOpacity: 0.25,
-                                  shadowRadius: 12,
-                                  elevation: 8,
-                              }
-                            : {}
-                    }
+                    onPress={onFormSubmit}
+                    className="w-full py-4 rounded-2xl flex-row items-center justify-center bg-primary active:opacity-90"
+                    style={{
+                        shadowColor: "#1E5AF3",
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 12,
+                        elevation: 8,
+                    }}
                 >
                     <Text className="text-white font-semibold text-base">Continue</Text>
                     <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
