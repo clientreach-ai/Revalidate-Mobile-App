@@ -228,8 +228,8 @@ export default function ProfessionalDetails() {
             // Show error or validation message
             return;
         }
-        // Navigate to main app (dashboard)
-        router.replace("/(tabs)/dashboard");
+        // Navigate to plan selection
+        router.push("/(onboarding)/plan-choose");
     };
 
     const isFormValid = registrationNumber && revalidationDate !== null && workSetting && scope;
