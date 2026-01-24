@@ -2,6 +2,7 @@ import { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
+  sdkVersion: '54.0.0',
   name: 'Revalidation Tracker',
   slug: 'revalidation-tracker',
   version: '1.0.0',

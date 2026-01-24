@@ -1,22 +1,466 @@
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from "react";
+import {
+    View,
+    Text,
+    TextInput,
+    Pressable,
+    ScrollView,
+    Modal,
+    TouchableOpacity,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import "../global.css";
 
-export default function RegisterScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Register</Text>
-    </View>
-  );
+const roles = [
+    { value: "doctor", label: "Doctor / GP" },
+    { value: "nurse", label: "Nurse / Midwife" },
+    { value: "pharmacist", label: "Pharmacist" },
+    { value: "dentist", label: "Dentist" },
+    { value: "other", label: "Other Healthcare Professional" },
+];
+
+export default function Register() {
+    const router = useRouter();
+    const [isDark, setIsDark] = useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [selectedRole, setSelectedRole] = useState<string | null>(null);
+    const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [marketingOptIn, setMarketingOptIn] = useState(false);
+
+    const handleSubmit = () => {
+        // Handle form submission
+        console.log({ email, password, role: selectedRole, termsAccepted, marketingOptIn });
+    };
+
+    const selectedRoleLabel = roles.find((r) => r.value === selectedRole)?.label || "Choose your profession";
+
+    return (
+        <SafeAreaView
+            className={`flex-1 ${isDark ? "bg-background-dark dark" : "bg-background-light"}`}
+        >
+            {/* Background decorative elements */}
+            <View className="absolute -top-32 -right-32 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
+            <View className="absolute -bottom-32 -left-32 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+
+            {/* Dark mode toggle */}
+            <Pressable
+                className={`absolute top-10 right-4 p-3 rounded-full z-50 ${
+                    isDark 
+                        ? "bg-slate-800/80 border border-slate-700" 
+                        : "bg-white/80 border border-gray-200"
+                } shadow-lg`}
+                onPress={() => setIsDark(!isDark)}
+            >
+                <MaterialIcons
+                    name="dark-mode"
+                    size={22}
+                    color={isDark ? "#D1D5DB" : "#4B5563"}
+                />
+            </Pressable>
+
+            <ScrollView
+                className="flex-1"
+                contentContainerStyle={{ paddingBottom: 16, flexGrow: 1, justifyContent: 'space-between' }}
+                showsVerticalScrollIndicator={false}
+            >
+                <View className="h-16" />
+
+                <View className="flex-1 px-5 pb-4 w-full justify-between">
+                    {/* Header */}
+                    <View className="mt-6 mb-8">
+                        <View className="mb-3">
+                            <Text
+                                className={`text-4xl font-bold mb-2 ${isDark ? "text-white" : "text-gray-900"}`}
+                            >
+                                Create Account
+                            </Text>
+                            <View className="w-16 h-1 bg-primary rounded-full" />
+                        </View>
+                        <Text
+                            className={`text-base font-light leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                            Join thousands of healthcare professionals managing revalidation.
+                        </Text>
+                    </View>
+
+                    {/* Form */}
+                    <View className="gap-5">
+                        {/* Email Input */}
+                        <View>
+                            <Text
+                                className={`text-sm font-semibold mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                            >
+                                Work Email Address
+                            </Text>
+                            <View className="relative">
+                                <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                    <MaterialIcons
+                                        name="mail"
+                                        size={22}
+                                        color={isDark ? "#6B7280" : "#9CA3AF"}
+                                    />
+                                </View>
+                                <TextInput
+                                    className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                        isDark
+                                            ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                            : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                    }`}
+                                    style={{
+                                        shadowColor: isDark ? "#000" : "#000",
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: isDark ? 0.1 : 0.05,
+                                        shadowRadius: 4,
+                                        elevation: 2,
+                                    }}
+                                    placeholder="e.g. name@nhs.net"
+                                    placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                            </View>
+                        </View>
+
+                        {/* Password Input */}
+                        <View>
+                            <Text
+                                className={`text-sm font-semibold mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                            >
+                                Create Password
+                            </Text>
+                            <View className="relative">
+                                <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                    <MaterialIcons
+                                        name="lock"
+                                        size={22}
+                                        color={isDark ? "#6B7280" : "#9CA3AF"}
+                                    />
+                                </View>
+                                <TextInput
+                                    className={`w-full pl-12 pr-12 py-4 rounded-2xl ${
+                                        isDark
+                                            ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                            : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                    }`}
+                                    style={{
+                                        shadowColor: isDark ? "#000" : "#000",
+                                        shadowOffset: { width: 0, height: 2 },
+                                        shadowOpacity: isDark ? 0.1 : 0.05,
+                                        shadowRadius: 4,
+                                        elevation: 2,
+                                    }}
+                                    placeholder="At least 8 characters"
+                                    placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                                <Pressable
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center justify-center z-10"
+                                    onPress={() => setShowPassword(!showPassword)}
+                                >
+                                    <MaterialIcons
+                                        name={showPassword ? "visibility-off" : "visibility"}
+                                        size={22}
+                                        color={isDark ? "#6B7280" : "#9CA3AF"}
+                                    />
+                                </Pressable>
+                            </View>
+                        </View>
+
+                        {/* Role Selector */}
+                        <View>
+                            <Text
+                                className={`text-sm font-semibold mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                            >
+                                Select Your Role
+                            </Text>
+                            <Pressable
+                                onPress={() => setShowRoleDropdown(true)}
+                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${
+                                    isDark
+                                        ? "bg-slate-800/90 border border-slate-700/50"
+                                        : "bg-white border border-gray-200 shadow-sm"
+                                }`}
+                                style={{
+                                    shadowColor: isDark ? "#000" : "#000",
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: isDark ? 0.1 : 0.05,
+                                    shadowRadius: 4,
+                                    elevation: 2,
+                                }}
+                            >
+                                <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center z-10">
+                                    <MaterialIcons
+                                        name="badge"
+                                        size={22}
+                                        color={isDark ? "#6B7280" : "#9CA3AF"}
+                                    />
+                                </View>
+                                <Text
+                                    className={`flex-1 ${
+                                        selectedRole
+                                            ? isDark
+                                                ? "text-white"
+                                                : "text-gray-900"
+                                            : isDark
+                                            ? "text-gray-400"
+                                            : "text-gray-400"
+                                    }`}
+                                >
+                                    {selectedRoleLabel}
+                                </Text>
+                                <MaterialIcons
+                                    name="expand-more"
+                                    size={22}
+                                    color={isDark ? "#6B7280" : "#9CA3AF"}
+                                />
+                            </Pressable>
+                        </View>
+
+                        {/* Checkboxes */}
+                        <View className="gap-4 pt-3">
+                            {/* Terms Checkbox */}
+                            <View className="flex-row items-start">
+                                <Pressable
+                                    onPress={() => setTermsAccepted(!termsAccepted)}
+                                    className={`h-6 w-6 rounded-full border-2 mr-3 mt-0.5 flex items-center justify-center ${
+                                        isDark
+                                            ? "border-slate-700 bg-slate-800"
+                                            : "border-gray-300 bg-white"
+                                    } ${termsAccepted ? "bg-primary border-primary" : ""}`}
+                                >
+                                    {termsAccepted && (
+                                        <MaterialIcons name="check" size={16} color="white" />
+                                    )}
+                                </Pressable>
+                                <View className="flex-1">
+                                    <Text
+                                        className={isDark ? "text-gray-400" : "text-gray-600"}
+                                    >
+                                        I agree to the{" "}
+                                        <Text className="text-primary font-medium">Terms of Service</Text>{" "}
+                                        and{" "}
+                                        <Text className="text-primary font-medium">Privacy Policy</Text>.
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* Marketing Checkbox */}
+                            <View className="flex-row items-start">
+                                <Pressable
+                                    onPress={() => setMarketingOptIn(!marketingOptIn)}
+                                    className={`h-6 w-6 rounded-full border-2 mr-3 mt-0.5 flex items-center justify-center ${
+                                        isDark
+                                            ? "border-slate-700 bg-slate-800"
+                                            : "border-gray-300 bg-white"
+                                    } ${marketingOptIn ? "bg-primary border-primary" : ""}`}
+                                >
+                                    {marketingOptIn && (
+                                        <MaterialIcons name="check" size={16} color="white" />
+                                    )}
+                                </Pressable>
+                                <View className="flex-1">
+                                    <Text
+                                        className={isDark ? "text-gray-400" : "text-gray-600"}
+                                    >
+                                        Receive monthly revalidation tips and UK healthcare updates via
+                                        email.
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Submit Button */}
+                        <View className="pt-6">
+                            <Pressable
+                                onPress={handleSubmit}
+                                className="w-full bg-primary py-4 rounded-2xl active:opacity-90 flex-row justify-center items-center gap-2 overflow-hidden"
+                                style={{
+                                    shadowColor: "#2563eb",
+                                    shadowOffset: { width: 0, height: 8 },
+                                    shadowOpacity: 0.3,
+                                    shadowRadius: 12,
+                                    elevation: 8,
+                                }}
+                            >
+                                <Text className="text-white font-bold text-base">Create Account</Text>
+                                <MaterialIcons name="arrow-forward" size={22} color="white" />
+                            </Pressable>
+                        </View>
+                    </View>
+
+                    {/* Divider */}
+                    <View className="mt-8 relative">
+                        <View className="absolute inset-0 flex items-center">
+                            <View
+                                className={`w-full border-t ${
+                                    isDark ? "border-slate-700/50" : "border-gray-200"
+                                }`}
+                            />
+                        </View>
+                        <View className="relative flex items-center justify-center">
+                            <View className={`px-4 ${isDark ? "bg-background-dark" : "bg-background-light"}`}>
+                                <Text
+                                    className={`text-sm font-medium ${
+                                        isDark ? "text-gray-500" : "text-gray-400"
+                                    }`}
+                                >
+                                    Or sign up with
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Social Login Buttons */}
+                    <View className="mt-5 flex-row gap-3">
+                        <Pressable
+                            className={`flex-1 py-3.5 px-4 rounded-xl border flex-row items-center justify-center gap-2 ${
+                                isDark
+                                    ? "bg-slate-800/80 border-slate-700/50"
+                                    : "bg-white border-gray-200 shadow-sm"
+                            } active:opacity-80`}
+                            style={{
+                                shadowColor: isDark ? "#000" : "#000",
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                shadowRadius: 4,
+                                elevation: 2,
+                            }}
+                        >
+                            <FontAwesome5
+                                name="google"
+                                size={20}
+                                color={isDark ? "#FFFFFF" : "#4285F4"}
+                            />
+                            <Text
+                                className={`text-sm font-semibold ${
+                                    isDark ? "text-white" : "text-gray-700"
+                                }`}
+                            >
+                                Google
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            className={`flex-1 py-3.5 px-4 rounded-xl border flex-row items-center justify-center gap-2 ${
+                                isDark
+                                    ? "bg-slate-800/80 border-slate-700/50"
+                                    : "bg-white border-gray-200 shadow-sm"
+                            } active:opacity-80`}
+                            style={{
+                                shadowColor: isDark ? "#000" : "#000",
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                shadowRadius: 4,
+                                elevation: 2,
+                            }}
+                        >
+                            <FontAwesome5
+                                name="apple"
+                                size={20}
+                                color={isDark ? "#FFFFFF" : "#000000"}
+                            />
+                            <Text
+                                className={`text-sm font-semibold ${
+                                    isDark ? "text-white" : "text-gray-700"
+                                }`}
+                            >
+                                Apple
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </ScrollView>
+
+            {/* Footer */}
+            <View className={`py-4 px-5 border-t ${isDark ? "border-slate-700/50" : "border-gray-200"}`}>
+                <View className="flex-row items-center justify-center">
+                    <Text
+                        className={isDark ? "text-gray-400" : "text-gray-500"}
+                    >
+                        Already have an account?{" "}
+                    </Text>
+                    <Pressable onPress={() => router.push("/(auth)/login")}>
+                        <Text className="text-primary font-bold text-base">Log In</Text>
+                    </Pressable>
+                </View>
+            </View>
+
+            {/* Role Dropdown Modal */}
+            <Modal
+                visible={showRoleDropdown}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowRoleDropdown(false)}
+            >
+                <Pressable
+                    className="flex-1 bg-black/50 justify-end"
+                    onPress={() => setShowRoleDropdown(false)}
+                >
+                    <View
+                        className={`${
+                            isDark ? "bg-slate-800" : "bg-white"
+                        } rounded-t-3xl p-6 max-h-[80%]`}
+                    >
+                        <Text
+                            className={`text-lg font-bold mb-4 ${
+                                isDark ? "text-white" : "text-gray-900"
+                            }`}
+                        >
+                            Select Your Role
+                        </Text>
+                        <ScrollView>
+                            {roles.map((role) => (
+                                <TouchableOpacity
+                                    key={role.value}
+                                    onPress={() => {
+                                        setSelectedRole(role.value);
+                                        setShowRoleDropdown(false);
+                                    }}
+                                    className={`py-4 px-4 rounded-xl mb-2 ${
+                                        selectedRole === role.value
+                                            ? "bg-primary/10"
+                                            : isDark
+                                            ? "bg-slate-700"
+                                            : "bg-gray-50"
+                                    }`}
+                                >
+                                    <Text
+                                        className={`${
+                                            selectedRole === role.value
+                                                ? "text-primary font-semibold"
+                                                : isDark
+                                                ? "text-white"
+                                                : "text-gray-900"
+                                        }`}
+                                    >
+                                        {role.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                        <Pressable
+                            onPress={() => setShowRoleDropdown(false)}
+                            className="mt-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-700"
+                        >
+                            <Text className="text-center text-gray-700 dark:text-gray-300 font-semibold">
+                                Cancel
+                            </Text>
+                        </Pressable>
+                    </View>
+                </Pressable>
+            </Modal>
+        </SafeAreaView>
+    );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-});

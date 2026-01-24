@@ -1,28 +1,21 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, SafeAreaView } from 'react-native';
 
 export default function DashboardScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Dashboard</Text>
-      <Text style={styles.subtitle}>Revalidation Tracker</Text>
-    </View>
+    <SafeAreaView className="flex-1 bg-white">
+      <View className="flex-1 justify-center items-center px-6">
+        <Text className="text-4xl font-bold text-blue-600 mb-4">
+          Dashboard
+        </Text>
+        <Text className="text-lg text-gray-700 text-center">
+          Revalidation Tracker
+        </Text>
+        <View className="mt-8 p-4 bg-green-100 rounded-lg">
+          <Text className="text-green-800 font-medium text-center">
+            ✅ NativeWind is working here too!
+          </Text>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-});

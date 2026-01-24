@@ -11,15 +11,33 @@
     "skipLibCheck": true,
     "noEmit": true,
     "isolatedModules": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@revalidation-tracker/shared-types": ["../../packages/shared-types/src"],
-      "@revalidation-tracker/utils": ["../../packages/utils/src"],
-      "@revalidation-tracker/constants": ["../../packages/constants/src"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@revalidation-tracker/shared-types": [
+        "../../packages/shared-types/src"
+      ],
+      "@revalidation-tracker/utils": [
+        "../../packages/utils/src"
+      ],
+      "@revalidation-tracker/constants": [
+        "../../packages/constants/src"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
