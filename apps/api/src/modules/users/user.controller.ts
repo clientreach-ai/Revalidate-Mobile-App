@@ -7,8 +7,19 @@ import {
   deleteUser,
   getRoleRequirements,
   registerUser,
+  updateOnboardingStep1,
+  updateOnboardingStep2,
+  updateOnboardingStep3,
+  updateOnboardingStep4,
+  getRegistrationProgress,
 } from './user.service';
-import { UpdateUserProfile } from './user.model';
+import { 
+  UpdateUserProfile,
+  OnboardingStep1Role,
+  OnboardingStep2Personal,
+  OnboardingStep3Professional,
+  OnboardingStep4Plan,
+} from './user.model';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { generateOTP, storeOTP } from '../auth/otp.service';
@@ -17,7 +28,7 @@ import { sendOTPEmail } from '../auth/email.service';
 const updateProfileSchema = z.object({
   registration_number: z.string().optional(),
   revalidation_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  professional_role: z.enum(['doctor', 'nurse', 'pharmacist', 'other']).optional(),
+  professional_role: z.enum(['doctor', 'nurse', 'pharmacist', 'other', 'other_healthcare']).optional(),
   work_setting: z.string().optional(),
   scope_of_practice: z.string().optional(),
 });
@@ -156,4 +167,136 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   }
 
   res.status(201).json(response);
+});
+
+/**
+ * Onboarding Step 1: Choose Role
+ * POST /api/v1/users/onboarding/step-1
+ */
+const step1Schema = z.object({
+  professional_role: z.enum(['doctor', 'nurse', 'pharmacist', 'other_healthcare']),
+});
+
+export const onboardingStep1 = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const validated = step1Schema.parse(req.body) as OnboardingStep1Role;
+  await updateOnboardingStep1(req.user.userId, validated);
+  const requirements = getRoleRequirements(validated.professional_role);
+
+  res.json({
+    success: true,
+    message: 'Role selected successfully',
+    data: {
+      professionalRole: validated.professional_role,
+      requirements,
+    },
+  });
+});
+
+/**
+ * Onboarding Step 2: Personal Details
+ * POST /api/v1/users/onboarding/step-2
+ */
+const step2Schema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  email: z.string().email('Invalid email address'),
+  phone_number: z.string().min(1, 'Phone number is required'),
+});
+
+export const onboardingStep2 = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const validated = step2Schema.parse(req.body) as OnboardingStep2Personal;
+  await updateOnboardingStep2(req.user.userId, validated);
+
+  res.json({
+    success: true,
+    message: 'Personal details saved successfully',
+    data: {
+      name: validated.name,
+      email: validated.email,
+      phone_number: validated.phone_number,
+    },
+  });
+});
+
+/**
+ * Onboarding Step 3: Professional Details
+ * POST /api/v1/users/onboarding/step-3
+ */
+const step3Schema = z.object({
+  registration_number: z.string().min(1, 'Registration number is required'),
+  revalidation_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format. Use YYYY-MM-DD'),
+  work_setting: z.string().optional(),
+  scope_of_practice: z.string().optional(),
+  organization_name: z.string().optional(),
+});
+
+export const onboardingStep3 = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const validated = step3Schema.parse(req.body) as OnboardingStep3Professional;
+  const updated = await updateOnboardingStep3(req.user.userId, validated);
+
+  res.json({
+    success: true,
+    message: 'Professional details saved successfully',
+    data: {
+      registrationNumber: updated.registration_number,
+      revalidationDate: updated.revalidation_date,
+      workSetting: updated.work_setting,
+      scopeOfPractice: updated.scope_of_practice,
+    },
+  });
+});
+
+/**
+ * Onboarding Step 4: Choose Subscription Plan
+ * POST /api/v1/users/onboarding/step-4
+ */
+const step4Schema = z.object({
+  subscription_tier: z.enum(['free', 'premium']),
+});
+
+export const onboardingStep4 = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const validated = step4Schema.parse(req.body) as OnboardingStep4Plan;
+  const updated = await updateOnboardingStep4(req.user.userId, validated);
+
+  res.json({
+    success: true,
+    message: 'Subscription plan selected successfully',
+    data: {
+      subscriptionTier: updated.subscription_tier,
+      subscriptionStatus: updated.subscription_status,
+      trialEndsAt: updated.trial_ends_at,
+    },
+  });
+});
+
+/**
+ * Get Registration Progress
+ * GET /api/v1/users/onboarding/progress
+ */
+export const getOnboardingProgress = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const progress = await getRegistrationProgress(req.user.userId);
+
+  res.json({
+    success: true,
+    data: progress,
+  });
 });

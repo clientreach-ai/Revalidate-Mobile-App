@@ -1,6 +1,15 @@
 import { prisma } from '../../lib/prisma';
 import { ApiError } from '../../common/middleware/error-handler';
-import { User, UpdateUserProfile, ROLE_REQUIREMENTS } from './user.model';
+import { 
+  User, 
+  UpdateUserProfile, 
+  ROLE_REQUIREMENTS,
+  OnboardingStep1Role,
+  OnboardingStep2Personal,
+  OnboardingStep3Professional,
+  OnboardingStep4Plan,
+  RegistrationProgress,
+} from './user.model';
 import { mapUserRow, mapUserToDb } from '../../config/database-mapping';
 
 /**
@@ -168,5 +177,178 @@ export async function registerUser(email: string, passwordHash: string): Promise
   return {
     id: user.id,
     email: user.email,
+  };
+}
+
+/**
+ * Update onboarding step 1: Role selection
+ */
+export async function updateOnboardingStep1(userId: string, data: OnboardingStep1Role): Promise<User> {
+  // Store professional role in description field as JSON
+  const description = JSON.stringify({ professionalRole: data.professional_role });
+  
+  const updated = await prisma.users.update({
+    where: { id: parseInt(userId) },
+    data: {
+      description,
+      updated_at: new Date(),
+    },
+  });
+
+  return mapUserRow(updated) as User;
+}
+
+/**
+ * Update onboarding step 2: Personal details
+ */
+export async function updateOnboardingStep2(userId: string, data: OnboardingStep2Personal): Promise<User> {
+  const userIdNum = parseInt(userId);
+  
+  // Check if email is already taken by another user
+  const existingUser = await prisma.users.findFirst({
+    where: {
+      email: data.email,
+      id: { not: userIdNum },
+    },
+    select: { id: true },
+  });
+
+  if (existingUser) {
+    throw new ApiError(409, 'Email is already registered to another account');
+  }
+
+  const updateData: any = {
+    name: data.name,
+    email: data.email,
+    mobile: data.phone_number,
+    updated_at: new Date(),
+  };
+
+  const updated = await prisma.users.update({
+    where: { id: userIdNum },
+    data: updateData,
+  });
+
+  return mapUserRow(updated) as User;
+}
+
+/**
+ * Update onboarding step 3: Professional details
+ */
+export async function updateOnboardingStep3(userId: string, data: OnboardingStep3Professional): Promise<User> {
+  const dbUpdates = mapUserToDb({
+    registration_number: data.registration_number,
+    revalidation_date: data.revalidation_date,
+    work_setting: data.work_setting,
+    scope_of_practice: data.scope_of_practice,
+  });
+
+  const updateData: any = {
+    registration: dbUpdates.registration,
+    due_date: dbUpdates.due_date,
+    updated_at: new Date(),
+  };
+
+  if (dbUpdates.work_settings !== undefined) updateData.work_settings = dbUpdates.work_settings || null;
+  if (dbUpdates.scope_practice !== undefined) updateData.scope_practice = dbUpdates.scope_practice || null;
+  if (data.organization_name !== undefined) updateData.organization_name = data.organization_name;
+
+  const updated = await prisma.users.update({
+    where: { id: parseInt(userId) },
+    data: updateData,
+  });
+
+  return mapUserRow(updated) as User;
+}
+
+/**
+ * Update onboarding step 4: Subscription plan
+ */
+export async function updateOnboardingStep4(userId: string, data: OnboardingStep4Plan): Promise<User> {
+  const updateData: any = {
+    subscription_tier: data.subscription_tier,
+    subscription_status: data.subscription_tier === 'premium' ? 'trial' : 'active',
+    updated_at: new Date(),
+  };
+
+  // Set trial end date if premium (30 days trial)
+  if (data.subscription_tier === 'premium') {
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+    updateData.trial_ends_at = trialEndsAt;
+  }
+
+  const updated = await prisma.users.update({
+    where: { id: parseInt(userId) },
+    data: updateData,
+  });
+
+  return mapUserRow(updated) as User;
+}
+
+/**
+ * Get registration progress
+ */
+export async function getRegistrationProgress(userId: string): Promise<RegistrationProgress> {
+  const user = await prisma.users.findUnique({
+    where: { id: parseInt(userId) },
+    select: {
+      description: true,
+      name: true,
+      email: true,
+      mobile: true,
+      registration: true,
+      due_date: true,
+      subscription_tier: true,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  // Check step 1: Role selected
+  let step1_role = false;
+  if (user.description) {
+    try {
+      const desc = typeof user.description === 'string' ? JSON.parse(user.description) : user.description;
+      step1_role = !!desc.professionalRole;
+    } catch (e) {
+      // Not JSON, check reg_type
+    }
+  }
+
+  // Check step 2: Personal details (name, email, and phone_number)
+  const step2_personal = !!(user.name && user.name.trim() !== '' && user.email && user.mobile);
+
+  // Check step 3: Professional details
+  const step3_professional = !!(user.registration && user.due_date);
+
+  // Check step 4: Plan selected
+  const step4_plan = !!user.subscription_tier;
+
+  const completed = step1_role && step2_personal && step3_professional && step4_plan;
+
+  // Determine current step
+  let currentStep = 0;
+  if (completed) {
+    currentStep = 0; // All done
+  } else if (!step1_role) {
+    currentStep = 1;
+  } else if (!step2_personal) {
+    currentStep = 2;
+  } else if (!step3_professional) {
+    currentStep = 3;
+  } else if (!step4_plan) {
+    currentStep = 4;
+  }
+
+  return {
+    step1_role,
+    step2_personal,
+    step3_professional,
+    step4_plan,
+    completed,
+    currentStep,
   };
 }

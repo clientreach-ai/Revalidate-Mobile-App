@@ -8,7 +8,7 @@ export interface User {
   email: string;
   registration_number: string;
   revalidation_date: string;
-  professional_role: 'doctor' | 'nurse' | 'pharmacist' | 'other';
+  professional_role: 'doctor' | 'nurse' | 'pharmacist' | 'other' | 'other_healthcare';
   work_setting?: string;
   scope_of_practice?: string;
   subscription_tier: 'free' | 'premium';
@@ -21,9 +21,43 @@ export interface User {
 export interface UpdateUserProfile {
   registration_number?: string;
   revalidation_date?: string;
-  professional_role?: 'doctor' | 'nurse' | 'pharmacist' | 'other';
+  professional_role?: 'doctor' | 'nurse' | 'pharmacist' | 'other' | 'other_healthcare';
   work_setting?: string;
   scope_of_practice?: string;
+}
+
+/**
+ * Onboarding step data types
+ */
+export interface OnboardingStep1Role {
+  professional_role: 'doctor' | 'nurse' | 'pharmacist' | 'other_healthcare';
+}
+
+export interface OnboardingStep2Personal {
+  name: string;
+  email: string;
+  phone_number: string;
+}
+
+export interface OnboardingStep3Professional {
+  registration_number: string;
+  revalidation_date: string;
+  work_setting?: string;
+  scope_of_practice?: string;
+  organization_name?: string;
+}
+
+export interface OnboardingStep4Plan {
+  subscription_tier: 'free' | 'premium';
+}
+
+export interface RegistrationProgress {
+  step1_role: boolean;
+  step2_personal: boolean;
+  step3_professional: boolean;
+  step4_plan: boolean;
+  completed: boolean;
+  currentStep: number; // 1-4, or 0 if all done
 }
 
 /**
@@ -42,6 +76,11 @@ export const ROLE_REQUIREMENTS = {
     practiceHours: null,
     cpdHours: 9, // Per year
   },
+  other_healthcare: {
+    practiceHours: null,
+    cpdHours: null,
+  },
+  // Keep 'other' for backward compatibility
   other: {
     practiceHours: null,
     cpdHours: null,
