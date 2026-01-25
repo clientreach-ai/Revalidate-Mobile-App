@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface MenuItem {
@@ -17,6 +18,7 @@ interface MenuItem {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { isDark } = useThemeStore();
 
   const handleMenuPress = (itemId: string) => {
     switch (itemId) {
@@ -87,7 +89,7 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -97,27 +99,37 @@ export default function ProfileScreen() {
         <View className="flex-row items-center justify-between mb-8 px-6 pt-4">
           <Pressable 
             onPress={() => router.back()}
-            className="w-10 h-10 items-center justify-center rounded-full bg-white shadow-sm"
+            className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${
+              isDark ? "bg-slate-800" : "bg-white"
+            }`}
           >
-            <MaterialIcons name="arrow-back-ios" size={20} color="#1F2937" />
+            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#1F2937"} />
           </Pressable>
-          <Text className="text-lg font-semibold text-slate-800">Profile</Text>
+          <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
+            Profile
+          </Text>
           <View className="w-10" />
         </View>
 
         {/* Profile Section */}
         <View className="items-center mb-8">
           <View className="relative">
-            <View className="w-32 h-32 rounded-full border-4 border-white overflow-hidden shadow-sm">
+            <View className={`w-32 h-32 rounded-full border-4 overflow-hidden shadow-sm ${
+              isDark ? "border-slate-800" : "border-white"
+            }`}>
               <View className="w-full h-full bg-teal-200 items-center justify-center">
                 <MaterialIcons name="person" size={64} color="#14B8A6" />
               </View>
             </View>
-            <Pressable className="absolute bottom-1 right-1 bg-[#2563EB] p-2 rounded-full border-2 border-white shadow-lg">
+            <Pressable className={`absolute bottom-1 right-1 bg-[#2563EB] p-2 rounded-full border-2 shadow-lg ${
+              isDark ? "border-slate-800" : "border-white"
+            }`}>
               <MaterialIcons name="edit" size={16} color="#FFFFFF" />
             </Pressable>
           </View>
-          <Text className="mt-4 text-2xl font-bold text-slate-800">Sarah Jenkins</Text>
+          <Text className={`mt-4 text-2xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+            Sarah Jenkins
+          </Text>
           <View className="mt-2 flex-row items-center px-3 py-1 rounded-full bg-blue-100">
             <Text className="text-[#2563EB] text-xs font-semibold uppercase tracking-wider">
               Nurse
@@ -160,7 +172,9 @@ export default function ProfileScreen() {
               key={item.id}
               onPress={item.onPress}
               className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${
-                item.isDestructive ? 'bg-red-50' : 'bg-white'
+                item.isDestructive 
+                  ? 'bg-red-50' 
+                  : (isDark ? 'bg-slate-800' : 'bg-white')
               }`}
             >
               <View className={`w-10 h-10 rounded-xl ${item.iconBgColor} items-center justify-center mr-4`}>
@@ -172,22 +186,32 @@ export default function ProfileScreen() {
               </View>
               {item.subtitle ? (
                 <View className="flex-1">
-                  <Text className={`font-medium ${item.isDestructive ? 'text-red-600' : 'text-slate-800'}`}>
+                  <Text className={`font-medium ${
+                    item.isDestructive 
+                      ? 'text-red-600' 
+                      : (isDark ? 'text-white' : 'text-slate-800')
+                  }`}>
                     {item.title}
                   </Text>
-                  <Text className="text-xs text-slate-400 mt-0.5">
+                  <Text className={`text-xs mt-0.5 ${
+                    isDark ? "text-gray-400" : "text-slate-400"
+                  }`}>
                     {item.subtitle}
                   </Text>
                 </View>
               ) : (
-                <Text className={`flex-1 font-medium ${item.isDestructive ? 'text-red-600' : 'text-slate-800'}`}>
+                <Text className={`flex-1 font-medium ${
+                  item.isDestructive 
+                    ? 'text-red-600' 
+                    : (isDark ? 'text-white' : 'text-slate-800')
+                }`}>
                   {item.title}
                 </Text>
               )}
               <MaterialIcons 
                 name="chevron-right" 
                 size={20} 
-                color={item.isDestructive ? '#DC2626' : '#94A3B8'} 
+                color={item.isDestructive ? '#DC2626' : (isDark ? '#64748B' : '#94A3B8')} 
               />
             </Pressable>
           ))}

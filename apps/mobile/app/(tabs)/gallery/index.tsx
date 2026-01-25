@@ -3,6 +3,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface Category {
@@ -30,6 +31,7 @@ interface RecentFile {
 export default function GalleryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDark } = useThemeStore();
   const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
   const [documentForm, setDocumentForm] = useState({
     title: '',
@@ -179,7 +181,7 @@ export default function GalleryScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -189,10 +191,10 @@ export default function GalleryScreen() {
         <View className="px-6 py-4">
           <View className="flex-row justify-between items-center mb-6">
             <View>
-              <Text className="text-2xl font-bold tracking-tight text-slate-800">
+              <Text className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}>
                 Evidence Gallery
               </Text>
-              <Text className="text-sm text-slate-500 mt-0.5">
+              <Text className={`text-sm mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                 UK Revalidation Portfolio
               </Text>
             </View>
@@ -204,15 +206,17 @@ export default function GalleryScreen() {
           {/* Search Bar */}
           <View className="relative">
             <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
-              <MaterialIcons name="search" size={20} color="#94A3B8" />
+              <MaterialIcons name="search" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
             </View>
             <TextInput
-              className="w-full pl-11 pr-12 py-3.5 bg-white border-none rounded-2xl shadow-sm text-sm"
+              className={`w-full pl-11 pr-12 py-3.5 border-none rounded-2xl shadow-sm text-sm ${
+                isDark ? "bg-slate-800 text-white" : "bg-white text-slate-800"
+              }`}
               placeholder="Search documents, tags, or dates..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
             />
             <View className="absolute inset-y-0 right-0 pr-4 items-center justify-center z-10">
-              <MaterialIcons name="tune" size={20} color="#94A3B8" />
+              <MaterialIcons name="tune" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
             </View>
           </View>
         </View>
@@ -228,7 +232,9 @@ export default function GalleryScreen() {
                     router.push(category.route as any);
                   }
                 }}
-                className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100"
+                className={`p-5 rounded-[24px] shadow-sm border ${
+                  isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                }`}
                 style={{ width: '47%' }}
               >
                 <View className={`w-12 h-12 rounded-2xl ${category.iconBgColor} items-center justify-center mb-4`}>
@@ -238,18 +244,22 @@ export default function GalleryScreen() {
                     color={category.iconColor} 
                   />
                 </View>
-                <Text className="font-bold text-base leading-tight text-slate-800">
+                <Text className={`font-bold text-base leading-tight ${isDark ? "text-white" : "text-slate-800"}`}>
                   {category.title}
                 </Text>
-                <Text className="text-xs text-slate-500 mt-1">
+                <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                   {category.documentCount}
                 </Text>
-                <View className="mt-4 pt-4 border-t border-slate-50 flex-row items-center" style={{ gap: 6 }}>
+                <View className={`mt-4 pt-4 border-t flex-row items-center ${
+                  isDark ? "border-slate-700" : "border-slate-50"
+                }`} style={{ gap: 6 }}>
                   <View 
                     className="w-1.5 h-1.5 rounded-full" 
                     style={{ backgroundColor: category.dotColor }}
                   />
-                  <Text className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                  <Text className={`text-[10px] font-medium uppercase tracking-wider ${
+                    isDark ? "text-gray-500" : "text-slate-400"
+                  }`}>
                     {category.updated}
                   </Text>
                 </View>
@@ -261,7 +271,9 @@ export default function GalleryScreen() {
         {/* Recent Files Section */}
         <View className="px-6 mt-8">
           <View className="flex-row items-center justify-between mb-4">
-            <Text className="font-bold text-lg text-slate-800">Recent Files</Text>
+            <Text className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-800"}`}>
+              Recent Files
+            </Text>
             <Pressable>
               <Text className="text-[#2B5F9E] text-sm font-semibold">View All</Text>
             </Pressable>
@@ -270,7 +282,9 @@ export default function GalleryScreen() {
             {recentFiles.map((file) => (
               <View
                 key={file.id}
-                className="bg-white p-3 rounded-2xl border border-slate-100 flex-row items-center"
+                className={`p-3 rounded-2xl border flex-row items-center ${
+                  isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                }`}
                 style={{ gap: 12 }}
               >
                 <View className={`w-10 h-10 ${file.iconBgColor} rounded-xl items-center justify-center`}>
@@ -281,15 +295,15 @@ export default function GalleryScreen() {
                   />
                 </View>
                 <View className="flex-1 min-w-0">
-                  <Text className="text-sm font-semibold text-slate-800" numberOfLines={1}>
+                  <Text className={`text-sm font-semibold ${isDark ? "text-white" : "text-slate-800"}`} numberOfLines={1}>
                     {file.name}
                   </Text>
-                  <Text className="text-[11px] text-slate-500 mt-0.5">
+                  <Text className={`text-[11px] mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                     {file.category} • {file.size}
                   </Text>
                 </View>
                 <Pressable>
-                  <MaterialIcons name="more-vert" size={20} color="#94A3B8" />
+                  <MaterialIcons name="more-vert" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
                 </Pressable>
               </View>
             ))}
@@ -327,13 +341,19 @@ export default function GalleryScreen() {
         onRequestClose={() => setShowAddDocumentModal(false)}
       >
         <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl max-h-[90%]">
+          <View className={`rounded-t-3xl max-h-[90%] ${
+            isDark ? "bg-slate-800" : "bg-white"
+          }`}>
             <SafeAreaView edges={['bottom']}>
               {/* Header */}
-              <View className="flex-row items-center justify-between px-6 pt-4 pb-4 border-b border-slate-100">
-                <Text className="text-2xl font-bold text-slate-800">Add Document</Text>
+              <View className={`flex-row items-center justify-between px-6 pt-4 pb-4 border-b ${
+                isDark ? "border-slate-700" : "border-slate-100"
+              }`}>
+                <Text className={`text-2xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                  Add Document
+                </Text>
                 <Pressable onPress={() => setShowAddDocumentModal(false)}>
-                  <MaterialIcons name="close" size={24} color="#64748B" />
+                  <MaterialIcons name="close" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
                 </Pressable>
               </View>
 
@@ -345,7 +365,11 @@ export default function GalleryScreen() {
                 <View className="px-6 pt-6" style={{ gap: 20 }}>
                   {/* Document Title */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Document Title *</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Document Title *
+                    </Text>
                     <TextInput
                       value={documentForm.title}
                       onChangeText={(text) => {
@@ -355,10 +379,12 @@ export default function GalleryScreen() {
                         }
                       }}
                       placeholder="Enter document title"
-                      placeholderTextColor="#94A3B8"
-                      className={`bg-white border rounded-2xl px-4 py-4 text-slate-800 text-base ${
-                        formErrors.title ? 'border-red-500' : 'border-slate-200'
-                      }`}
+                      placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
+                      className={`border rounded-2xl px-4 py-4 text-base ${
+                        isDark 
+                          ? "bg-slate-700 text-white border-slate-600" 
+                          : "bg-white text-slate-800 border-slate-200"
+                      } ${formErrors.title ? 'border-red-500' : ''}`}
                     />
                     {formErrors.title && (
                       <Text className="text-red-500 text-xs mt-1">{formErrors.title}</Text>
@@ -367,7 +393,11 @@ export default function GalleryScreen() {
 
                   {/* Category Selection */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Category *</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Category *
+                    </Text>
                     <View className="flex-row flex-wrap" style={{ gap: 12 }}>
                       {categories.map((category) => {
                         const isSelected = documentForm.category === category.title;
@@ -380,19 +410,19 @@ export default function GalleryScreen() {
                                 setFormErrors({ ...formErrors, category: '' });
                               }
                             }}
-                            className={`px-4 py-3 rounded-2xl border-2 flex-row items-center ${
-                              isSelected ? 'bg-white' : 'bg-white'
-                            }`}
+                            className="px-4 py-3 rounded-2xl border-2 flex-row items-center"
                             style={{
-                              borderColor: isSelected ? category.iconColor : formErrors.category ? '#EF4444' : '#E2E8F0',
-                              backgroundColor: isSelected ? `${category.iconColor}15` : '#FFFFFF',
+                              borderColor: isSelected ? category.iconColor : formErrors.category ? '#EF4444' : (isDark ? '#475569' : '#E2E8F0'),
+                              backgroundColor: isSelected ? `${category.iconColor}15` : (isDark ? '#1E293B' : '#FFFFFF'),
                             }}
                           >
                             <View className={`w-8 h-8 rounded-xl ${category.iconBgColor} items-center justify-center mr-2`}>
                               <MaterialIcons name={category.icon} size={18} color={category.iconColor} />
                             </View>
                             <Text className={`text-sm font-medium ${
-                              isSelected ? 'text-slate-800' : 'text-slate-600'
+                              isSelected 
+                                ? (isDark ? 'text-white' : 'text-slate-800')
+                                : (isDark ? 'text-gray-300' : 'text-slate-600')
                             }`}>
                               {category.title}
                             </Text>
@@ -407,25 +437,31 @@ export default function GalleryScreen() {
 
                   {/* File Upload */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Upload File *</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Upload File *
+                    </Text>
                     <Pressable 
                       onPress={() => {
                         // Show upload options
                         handleFileSelect('files');
                       }}
-                      className={`bg-slate-50 border-2 border-dashed rounded-2xl p-6 items-center ${
-                        formErrors.file ? 'border-red-500' : 'border-slate-300'
-                      }`}
+                      className={`border-2 border-dashed rounded-2xl p-6 items-center ${
+                        isDark ? "bg-slate-700" : "bg-slate-50"
+                      } ${formErrors.file ? 'border-red-500' : (isDark ? 'border-slate-600' : 'border-slate-300')}`}
                     >
                       {documentForm.file ? (
                         <View className="items-center w-full">
                           <View className="w-16 h-16 bg-blue-100 rounded-xl items-center justify-center mb-3">
                             <MaterialIcons name="description" size={32} color="#2563EB" />
                           </View>
-                          <Text className="text-slate-800 font-semibold text-sm" numberOfLines={1}>
+                          <Text className={`font-semibold text-sm ${isDark ? "text-white" : "text-slate-800"}`} numberOfLines={1}>
                             {documentForm.file.name}
                           </Text>
-                          <Text className="text-slate-500 text-xs mt-1">{documentForm.file.size}</Text>
+                          <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+                            {documentForm.file.size}
+                          </Text>
                           <Pressable 
                             onPress={() => {
                               setDocumentForm({ ...documentForm, file: null });
@@ -440,11 +476,19 @@ export default function GalleryScreen() {
                         </View>
                       ) : (
                         <View className="items-center">
-                          <View className="w-16 h-16 bg-slate-200 rounded-xl items-center justify-center mb-3">
-                            <MaterialIcons name="cloud-upload" size={32} color="#64748B" />
+                          <View className={`w-16 h-16 rounded-xl items-center justify-center mb-3 ${
+                            isDark ? "bg-slate-600" : "bg-slate-200"
+                          }`}>
+                            <MaterialIcons name="cloud-upload" size={32} color={isDark ? "#9CA3AF" : "#64748B"} />
                           </View>
-                          <Text className="text-slate-600 font-semibold text-sm mb-1">Tap to upload</Text>
-                          <Text className="text-slate-400 text-xs">PDF, JPG, PNG up to 10MB</Text>
+                          <Text className={`font-semibold text-sm mb-1 ${
+                            isDark ? "text-gray-300" : "text-slate-600"
+                          }`}>
+                            Tap to upload
+                          </Text>
+                          <Text className={`text-xs ${isDark ? "text-gray-500" : "text-slate-400"}`}>
+                            PDF, JPG, PNG up to 10MB
+                          </Text>
                         </View>
                       )}
                     </Pressable>
@@ -455,49 +499,85 @@ export default function GalleryScreen() {
 
                   {/* Description */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Description</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Description
+                    </Text>
                     <TextInput
                       value={documentForm.description}
                       onChangeText={(text) => setDocumentForm({ ...documentForm, description: text })}
                       placeholder="Enter document description or notes"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
                       multiline
                       numberOfLines={4}
                       textAlignVertical="top"
-                      className="bg-white border border-slate-200 rounded-2xl px-4 py-4 text-slate-800 text-base min-h-[100px]"
+                      className={`border rounded-2xl px-4 py-4 text-base min-h-[100px] ${
+                        isDark 
+                          ? "bg-slate-700 text-white border-slate-600" 
+                          : "bg-white text-slate-800 border-slate-200"
+                      }`}
                     />
                   </View>
 
                   {/* Upload Options */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-3">Upload From</Text>
+                    <Text className={`text-sm font-semibold mb-3 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Upload From
+                    </Text>
                     <View className="flex-row" style={{ gap: 12 }}>
                       <Pressable 
                         onPress={() => handleFileSelect('gallery')}
-                        className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 items-center active:bg-blue-50"
+                        className={`flex-1 border rounded-2xl p-4 items-center ${
+                          isDark 
+                            ? "bg-slate-700 border-slate-600 active:bg-slate-600" 
+                            : "bg-white border-slate-200 active:bg-blue-50"
+                        }`}
                       >
                         <View className="w-12 h-12 bg-blue-50 rounded-xl items-center justify-center mb-2">
                           <MaterialIcons name="photo-library" size={24} color="#2563EB" />
                         </View>
-                        <Text className="text-slate-700 font-medium text-sm">Gallery</Text>
+                        <Text className={`font-medium text-sm ${
+                          isDark ? "text-gray-300" : "text-slate-700"
+                        }`}>
+                          Gallery
+                        </Text>
                       </Pressable>
                       <Pressable 
                         onPress={() => handleFileSelect('camera')}
-                        className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 items-center active:bg-green-50"
+                        className={`flex-1 border rounded-2xl p-4 items-center ${
+                          isDark 
+                            ? "bg-slate-700 border-slate-600 active:bg-slate-600" 
+                            : "bg-white border-slate-200 active:bg-green-50"
+                        }`}
                       >
                         <View className="w-12 h-12 bg-green-50 rounded-xl items-center justify-center mb-2">
                           <MaterialIcons name="camera-alt" size={24} color="#10B981" />
                         </View>
-                        <Text className="text-slate-700 font-medium text-sm">Camera</Text>
+                        <Text className={`font-medium text-sm ${
+                          isDark ? "text-gray-300" : "text-slate-700"
+                        }`}>
+                          Camera
+                        </Text>
                       </Pressable>
                       <Pressable 
                         onPress={() => handleFileSelect('files')}
-                        className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 items-center active:bg-purple-50"
+                        className={`flex-1 border rounded-2xl p-4 items-center ${
+                          isDark 
+                            ? "bg-slate-700 border-slate-600 active:bg-slate-600" 
+                            : "bg-white border-slate-200 active:bg-purple-50"
+                        }`}
                       >
                         <View className="w-12 h-12 bg-purple-50 rounded-xl items-center justify-center mb-2">
                           <MaterialIcons name="folder" size={24} color="#9333EA" />
                         </View>
-                        <Text className="text-slate-700 font-medium text-sm">Files</Text>
+                        <Text className={`font-medium text-sm ${
+                          isDark ? "text-gray-300" : "text-slate-700"
+                        }`}>
+                          Files
+                        </Text>
                       </Pressable>
                     </View>
                   </View>
@@ -505,12 +585,20 @@ export default function GalleryScreen() {
               </ScrollView>
 
               {/* Footer Actions */}
-              <View className="px-6 pt-4 pb-6 border-t border-slate-100 flex-row" style={{ gap: 12 }}>
+              <View className={`px-6 pt-4 pb-6 border-t flex-row ${
+                isDark ? "border-slate-700" : "border-slate-100"
+              }`} style={{ gap: 12 }}>
                 <Pressable
                   onPress={() => setShowAddDocumentModal(false)}
-                  className="flex-1 py-4 rounded-2xl bg-slate-100 items-center"
+                  className={`flex-1 py-4 rounded-2xl items-center ${
+                    isDark ? "bg-slate-700" : "bg-slate-100"
+                  }`}
                 >
-                  <Text className="text-slate-700 font-semibold text-base">Cancel</Text>
+                  <Text className={`font-semibold text-base ${
+                    isDark ? "text-gray-300" : "text-slate-700"
+                  }`}>
+                    Cancel
+                  </Text>
                 </Pressable>
                 <Pressable
                   onPress={handleUploadDocument}

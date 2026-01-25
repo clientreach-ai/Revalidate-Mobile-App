@@ -3,6 +3,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface WorkSession {
@@ -24,6 +25,7 @@ interface MonthGroup {
 export default function WorkingHoursScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDark } = useThemeStore();
   const [activeFilter, setActiveFilter] = useState<'all' | '3months' | 'revalidation'>('all');
 
   const monthNames = [
@@ -99,7 +101,7 @@ export default function WorkingHoursScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -109,18 +111,20 @@ export default function WorkingHoursScreen() {
         <View className="px-4 py-4 mb-2">
           <View className="flex-row justify-between items-center">
             <View>
-              <Text className="text-2xl font-bold tracking-tight text-slate-800">
+              <Text className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}>
                 Work History
               </Text>
-              <Text className="text-slate-500 text-sm mt-0.5">
+              <Text className={`text-sm mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                 Track your clinical hours
               </Text>
             </View>
             <Pressable 
               onPress={() => router.push('/(tabs)/gallery')}
-              className="w-10 h-10 items-center justify-center rounded-full bg-slate-100"
+              className={`w-10 h-10 items-center justify-center rounded-full ${
+                isDark ? "bg-slate-700" : "bg-slate-100"
+              }`}
             >
-              <MaterialIcons name="photo-library" size={20} color="#64748B" />
+              <MaterialIcons name="photo-library" size={20} color={isDark ? "#9CA3AF" : "#64748B"} />
             </Pressable>
           </View>
         </View>
@@ -172,11 +176,15 @@ export default function WorkingHoursScreen() {
             <Pressable
               onPress={() => setActiveFilter('all')}
               className={`px-4 py-2 rounded-full ${
-                activeFilter === 'all' ? 'bg-[#1E61EB]' : 'bg-white border border-slate-200'
+                activeFilter === 'all' 
+                  ? 'bg-[#1E61EB]' 
+                  : (isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200')
               }`}
             >
               <Text className={`text-sm font-medium ${
-                activeFilter === 'all' ? 'text-white' : 'text-slate-600'
+                activeFilter === 'all' 
+                  ? 'text-white' 
+                  : (isDark ? 'text-gray-300' : 'text-slate-600')
               }`}>
                 All Sessions
               </Text>
@@ -184,11 +192,15 @@ export default function WorkingHoursScreen() {
             <Pressable
               onPress={() => setActiveFilter('3months')}
               className={`px-4 py-2 rounded-full ${
-                activeFilter === '3months' ? 'bg-[#1E61EB]' : 'bg-white border border-slate-200'
+                activeFilter === '3months' 
+                  ? 'bg-[#1E61EB]' 
+                  : (isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200')
               }`}
             >
               <Text className={`text-sm font-medium ${
-                activeFilter === '3months' ? 'text-white' : 'text-slate-600'
+                activeFilter === '3months' 
+                  ? 'text-white' 
+                  : (isDark ? 'text-gray-300' : 'text-slate-600')
               }`}>
                 Last 3 Months
               </Text>
@@ -196,11 +208,15 @@ export default function WorkingHoursScreen() {
             <Pressable
               onPress={() => setActiveFilter('revalidation')}
               className={`px-4 py-2 rounded-full ${
-                activeFilter === 'revalidation' ? 'bg-[#1E61EB]' : 'bg-white border border-slate-200'
+                activeFilter === 'revalidation' 
+                  ? 'bg-[#1E61EB]' 
+                  : (isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200')
               }`}
             >
               <Text className={`text-sm font-medium ${
-                activeFilter === 'revalidation' ? 'text-white' : 'text-slate-600'
+                activeFilter === 'revalidation' 
+                  ? 'text-white' 
+                  : (isDark ? 'text-gray-300' : 'text-slate-600')
               }`}>
                 Revalidation Cycle
               </Text>
@@ -212,7 +228,9 @@ export default function WorkingHoursScreen() {
         <View className="px-4" style={{ gap: 24 }}>
           {groupedSessions.map((group) => (
             <View key={`${group.month}-${group.year}`}>
-              <Text className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">
+              <Text className={`text-sm font-bold uppercase tracking-widest mb-3 px-1 ${
+                isDark ? "text-gray-400" : "text-slate-400"
+              }`}>
                 {group.month.toUpperCase()} {group.year}
               </Text>
               <View style={{ gap: 12 }}>
@@ -223,19 +241,23 @@ export default function WorkingHoursScreen() {
                   return (
                     <Pressable
                       key={session.id}
-                      className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex-row items-center"
+                      className={`p-4 rounded-2xl shadow-sm border flex-row items-center ${
+                        isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                      }`}
                     >
                       {/* Date Badge */}
                       <View className={`w-12 h-12 rounded-xl flex-col items-center justify-center mr-4 ${
-                        isCurrentMonth ? 'bg-blue-50' : 'bg-slate-50'
+                        isCurrentMonth 
+                          ? (isDark ? 'bg-blue-900/30' : 'bg-blue-50') 
+                          : (isDark ? 'bg-slate-700' : 'bg-slate-50')
                       }`}>
                         <Text className={`text-[10px] font-bold uppercase ${
-                          isCurrentMonth ? 'text-[#1E61EB]' : 'text-slate-400'
+                          isCurrentMonth ? 'text-[#1E61EB]' : (isDark ? 'text-gray-400' : 'text-slate-400')
                         }`}>
                           {dateBadge.month}
                         </Text>
                         <Text className={`text-lg font-bold leading-none ${
-                          isCurrentMonth ? 'text-[#1E61EB]' : 'text-slate-400'
+                          isCurrentMonth ? 'text-[#1E61EB]' : (isDark ? 'text-gray-400' : 'text-slate-400')
                         }`}>
                           {dateBadge.day}
                         </Text>
@@ -244,20 +266,20 @@ export default function WorkingHoursScreen() {
                       {/* Session Details */}
                       <View className="flex-1">
                         <View className="flex-row justify-between items-start mb-1">
-                          <Text className="font-semibold text-slate-800 flex-1">
+                          <Text className={`font-semibold flex-1 ${isDark ? "text-white" : "text-slate-800"}`}>
                             {session.location}
                           </Text>
                           <Text className={`text-sm font-bold ${
-                            isCurrentMonth ? 'text-[#1E61EB]' : 'text-slate-500'
+                            isCurrentMonth ? 'text-[#1E61EB]' : (isDark ? 'text-gray-300' : 'text-slate-500')
                           }`}>
                             {session.earnings}
                           </Text>
                         </View>
-                        <Text className="text-xs text-slate-500 mb-1">
+                        <Text className={`text-xs mb-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                           {session.shiftType} • {session.hours} hours
                         </Text>
                         {session.description && (
-                          <Text className="text-xs text-slate-400 italic" numberOfLines={1}>
+                          <Text className={`text-xs italic ${isDark ? "text-gray-500" : "text-slate-400"}`} numberOfLines={1}>
                             "{session.description}"
                           </Text>
                         )}
@@ -265,7 +287,7 @@ export default function WorkingHoursScreen() {
 
                       {/* Chevron */}
                       <View className="ml-2">
-                        <MaterialIcons name="chevron-right" size={20} color="#CBD5E1" />
+                        <MaterialIcons name="chevron-right" size={20} color={isDark ? "#475569" : "#CBD5E1"} />
                       </View>
                     </Pressable>
                   );

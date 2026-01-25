@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import Svg, { Circle } from 'react-native-svg';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface CPDActivity {
@@ -21,6 +22,7 @@ interface CPDActivity {
 export default function CPDHoursTrackingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDark } = useThemeStore();
   const [activeFilter, setActiveFilter] = useState<'all' | 'participatory' | 'non-participatory'>('all');
 
   // CPD Data
@@ -82,7 +84,7 @@ export default function CPDHoursTrackingScreen() {
   const filteredActivities = getFilteredActivities();
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -91,24 +93,28 @@ export default function CPDHoursTrackingScreen() {
         {/* Header */}
         <View className="px-6 pb-4">
           <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-2xl font-bold tracking-tight text-slate-800">
+            <Text className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}>
               CPD Portfolio
             </Text>
             <Pressable 
               onPress={() => router.push('/(tabs)/gallery')}
-              className="w-10 h-10 rounded-full bg-white shadow-sm items-center justify-center border border-slate-200"
+              className={`w-10 h-10 rounded-full shadow-sm items-center justify-center border ${
+                isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"
+              }`}
             >
-              <MaterialIcons name="photo-library" size={20} color="#64748B" />
+              <MaterialIcons name="photo-library" size={20} color={isDark ? "#9CA3AF" : "#64748B"} />
             </Pressable>
           </View>
-          <Text className="text-slate-500 text-sm">
+          <Text className={`text-sm ${isDark ? "text-gray-400" : "text-slate-500"}`}>
             Professional Revalidation 2024
           </Text>
         </View>
 
         {/* CPD Summary Card */}
         <View className="px-6 mb-6">
-          <View className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 items-center">
+          <View className={`rounded-3xl p-6 shadow-sm border items-center ${
+            isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+          }`}>
             {/* Circular Progress */}
             <View className="relative items-center justify-center mb-6">
               <Svg width={192} height={192} viewBox="0 0 192 192">
@@ -136,10 +142,10 @@ export default function CPDHoursTrackingScreen() {
                 />
               </Svg>
               <View className="absolute inset-0 items-center justify-center">
-                <Text className="text-4xl font-bold text-slate-800">
+                <Text className={`text-4xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
                   {totalHours} / {targetHours}
                 </Text>
-                <Text className="text-sm font-medium text-slate-500 mt-1">
+                <Text className={`text-sm font-medium mt-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                   Total Hours
                 </Text>
                 {progress >= 100 && (
@@ -155,33 +161,41 @@ export default function CPDHoursTrackingScreen() {
             {/* Breakdown Cards */}
             <View className="w-full flex-row" style={{ gap: 16 }}>
               {/* Participatory Hours */}
-              <View className="flex-1 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <View className={`flex-1 p-4 rounded-2xl border ${
+                isDark ? "bg-slate-700 border-slate-600" : "bg-slate-50 border-slate-100"
+              }`}>
                 <View className="flex-row items-center mb-1" style={{ gap: 8 }}>
                   <View className="w-2 h-2 rounded-full bg-[#2563EB]" />
-                  <Text className="text-xs font-semibold text-slate-500 uppercase">
+                  <Text className={`text-xs font-semibold uppercase ${
+                    isDark ? "text-gray-400" : "text-slate-500"
+                  }`}>
                     Participatory
                   </Text>
                 </View>
-                <Text className="text-lg font-bold text-slate-800">
+                <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
                   {participatoryHours} hrs
                 </Text>
-                <Text className="text-[10px] text-slate-400 mt-1">
+                <Text className={`text-[10px] mt-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
                   Min 20 required
                 </Text>
               </View>
 
               {/* Non-Participatory Hours */}
-              <View className="flex-1 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <View className={`flex-1 p-4 rounded-2xl border ${
+                isDark ? "bg-slate-700 border-slate-600" : "bg-slate-50 border-slate-100"
+              }`}>
                 <View className="flex-row items-center mb-1" style={{ gap: 8 }}>
-                  <View className="w-2 h-2 rounded-full bg-slate-300" />
-                  <Text className="text-xs font-semibold text-slate-500 uppercase">
+                  <View className={`w-2 h-2 rounded-full ${isDark ? "bg-gray-500" : "bg-slate-300"}`} />
+                  <Text className={`text-xs font-semibold uppercase ${
+                    isDark ? "text-gray-400" : "text-slate-500"
+                  }`}>
                     Non-Part.
                   </Text>
                 </View>
-                <Text className="text-lg font-bold text-slate-800">
+                <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
                   {nonParticipatoryHours} hrs
                 </Text>
-                <Text className="text-[10px] text-slate-400 mt-1">
+                <Text className={`text-[10px] mt-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
                   Flexible allocation
                 </Text>
               </View>
@@ -191,15 +205,21 @@ export default function CPDHoursTrackingScreen() {
 
         {/* Filter Tabs */}
         <View className="px-6 mb-6">
-          <View className="flex-row p-1 bg-slate-200/50 rounded-xl" style={{ gap: 4 }}>
+          <View className={`flex-row p-1 rounded-xl ${
+            isDark ? "bg-slate-700/50" : "bg-slate-200/50"
+          }`} style={{ gap: 4 }}>
             <Pressable
               onPress={() => setActiveFilter('all')}
               className={`flex-1 py-2 rounded-lg ${
-                activeFilter === 'all' ? 'bg-white shadow-sm' : ''
+                activeFilter === 'all' 
+                  ? (isDark ? 'bg-slate-800 shadow-sm' : 'bg-white shadow-sm') 
+                  : ''
               }`}
             >
               <Text className={`text-sm text-center ${
-                activeFilter === 'all' ? 'font-semibold text-[#2563EB]' : 'font-medium text-slate-500'
+                activeFilter === 'all' 
+                  ? 'font-semibold text-[#2563EB]' 
+                  : (isDark ? 'font-medium text-gray-400' : 'font-medium text-slate-500')
               }`}>
                 All
               </Text>
@@ -207,11 +227,15 @@ export default function CPDHoursTrackingScreen() {
             <Pressable
               onPress={() => setActiveFilter('participatory')}
               className={`flex-1 py-2 rounded-lg ${
-                activeFilter === 'participatory' ? 'bg-white shadow-sm' : ''
+                activeFilter === 'participatory' 
+                  ? (isDark ? 'bg-slate-800 shadow-sm' : 'bg-white shadow-sm') 
+                  : ''
               }`}
             >
               <Text className={`text-sm text-center ${
-                activeFilter === 'participatory' ? 'font-semibold text-[#2563EB]' : 'font-medium text-slate-500'
+                activeFilter === 'participatory' 
+                  ? 'font-semibold text-[#2563EB]' 
+                  : (isDark ? 'font-medium text-gray-400' : 'font-medium text-slate-500')
               }`}>
                 Participatory
               </Text>
@@ -219,11 +243,15 @@ export default function CPDHoursTrackingScreen() {
             <Pressable
               onPress={() => setActiveFilter('non-participatory')}
               className={`flex-1 py-2 rounded-lg ${
-                activeFilter === 'non-participatory' ? 'bg-white shadow-sm' : ''
+                activeFilter === 'non-participatory' 
+                  ? (isDark ? 'bg-slate-800 shadow-sm' : 'bg-white shadow-sm') 
+                  : ''
               }`}
             >
               <Text className={`text-sm text-center ${
-                activeFilter === 'non-participatory' ? 'font-semibold text-[#2563EB]' : 'font-medium text-slate-500'
+                activeFilter === 'non-participatory' 
+                  ? 'font-semibold text-[#2563EB]' 
+                  : (isDark ? 'font-medium text-gray-400' : 'font-medium text-slate-500')
               }`}>
                 Non-Part.
               </Text>
@@ -234,7 +262,9 @@ export default function CPDHoursTrackingScreen() {
         {/* Activities Section */}
         <View className="px-6" style={{ gap: 16 }}>
           <View className="flex-row items-center justify-between">
-            <Text className="text-lg font-bold text-slate-800">Activities</Text>
+            <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+              Activities
+            </Text>
             {filteredActivities.length > 0 && (
               <Pressable onPress={() => setActiveFilter('all')}>
                 <Text className="text-[#2563EB] text-sm font-semibold">View All</Text>
@@ -252,7 +282,11 @@ export default function CPDHoursTrackingScreen() {
                     // For now, we'll keep it as a placeholder
                     console.log('View activity:', activity.id);
                   }}
-                  className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex-row items-center active:bg-slate-50"
+                  className={`p-4 rounded-2xl border shadow-sm flex-row items-center ${
+                    isDark 
+                      ? "bg-slate-800 border-slate-700 active:bg-slate-700" 
+                      : "bg-white border-slate-100 active:bg-slate-50"
+                  }`}
                   style={{ gap: 16 }}
                 >
                   <View className={`w-12 h-12 rounded-xl ${activity.iconBgColor} items-center justify-center flex-shrink-0`}>
@@ -263,15 +297,19 @@ export default function CPDHoursTrackingScreen() {
                     />
                   </View>
                   <View className="flex-1 min-w-0">
-                    <Text className="font-bold text-sm text-slate-800" numberOfLines={1}>
+                    <Text className={`font-bold text-sm ${isDark ? "text-white" : "text-slate-800"}`} numberOfLines={1}>
                       {activity.title}
                     </Text>
-                    <Text className="text-xs text-slate-500 mt-0.5">
+                    <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                       {activity.date} • {activity.hours} Hours
                     </Text>
                     <View className="flex-row mt-2" style={{ gap: 8 }}>
-                      <View className="px-2 py-0.5 rounded-md bg-slate-100">
-                        <Text className="text-[10px] font-semibold text-slate-600">
+                      <View className={`px-2 py-0.5 rounded-md ${
+                        isDark ? "bg-slate-700" : "bg-slate-100"
+                      }`}>
+                        <Text className={`text-[10px] font-semibold ${
+                          isDark ? "text-gray-300" : "text-slate-600"
+                        }`}>
                           {activity.type === 'participatory' ? 'Participatory' : 'Non-Participatory'}
                         </Text>
                       </View>
@@ -288,9 +326,11 @@ export default function CPDHoursTrackingScreen() {
                 </Pressable>
               ))
             ) : (
-              <View className="bg-white p-8 rounded-2xl border border-slate-100 items-center">
-                <MaterialIcons name="inbox" size={48} color="#CBD5E1" />
-                <Text className="text-slate-400 mt-4 text-center">
+              <View className={`p-8 rounded-2xl border items-center ${
+                isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+              }`}>
+                <MaterialIcons name="inbox" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
+                <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
                   No {activeFilter === 'all' ? '' : activeFilter === 'participatory' ? 'participatory' : 'non-participatory'} activities found
                 </Text>
               </View>

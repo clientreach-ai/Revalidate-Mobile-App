@@ -10,6 +10,7 @@ import {
     onboardingProfessionalDetailsSchema,
     type OnboardingProfessionalDetailsInput,
 } from "@/validation/schema";
+import { useThemeStore } from "@/features/theme/theme.store";
 import "../global.css";
 
 const roleConfig = {
@@ -116,7 +117,7 @@ export default function ProfessionalDetails() {
     const role = (params.role as string) || "other";
     const config = roleConfig[role as keyof typeof roleConfig] || roleConfig.other;
 
-    const [isDark] = useState(false);
+    const { isDark } = useThemeStore();
     const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
     const [showScopeModal, setShowScopeModal] = useState(false);
     const [showProfessionalRegistrationsModal, setShowProfessionalRegistrationsModal] = useState(false);

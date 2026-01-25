@@ -10,6 +10,7 @@ import {
     onboardingRoleSchema,
     type OnboardingRoleInput,
 } from "@/validation/schema";
+import { useThemeStore } from "@/features/theme/theme.store";
 import "../global.css";
 
 const roles = [
@@ -22,7 +23,7 @@ const roles = [
 
 export default function RoleSelection() {
     const router = useRouter();
-    const [isDark] = useState(false);
+    const { isDark } = useThemeStore();
 
     const {
         handleSubmit,

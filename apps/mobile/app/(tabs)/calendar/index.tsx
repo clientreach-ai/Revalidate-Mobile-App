@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable, Modal, TextInput } from 'react-nativ
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 import { useRouter } from 'expo-router';
 
@@ -21,6 +22,7 @@ interface Event {
 export default function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDark } = useThemeStore();
   const [currentDate, setCurrentDate] = useState(new Date(2024, 2, 13)); // March 13, 2024
   const [selectedDate, setSelectedDate] = useState(new Date(2024, 2, 13));
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
@@ -227,7 +229,7 @@ export default function CalendarScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -236,16 +238,18 @@ export default function CalendarScreen() {
         {/* Header */}
         <View className="px-6 py-4 flex-row justify-between items-center">
           <View>
-            <Text className="text-2xl font-bold tracking-tight text-slate-800">
+            <Text className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}>
               Professional Calendar
             </Text>
-            <Text className="text-xs font-medium text-slate-500 uppercase tracking-wider mt-0.5">
+            <Text className={`text-xs font-medium uppercase tracking-wider mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
               UK Revalidation Tracker
             </Text>
           </View>
           <Pressable 
             onPress={() => router.push('/(tabs)/notifications')}
-            className="relative w-10 h-10 rounded-full bg-white shadow-sm items-center justify-center border border-slate-100"
+            className={`relative w-10 h-10 rounded-full shadow-sm items-center justify-center border ${
+              isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+            }`}
           >
             <MaterialIcons name="notifications" size={20} color="#2B5F9E" />
             {/* Notification Badge */}
@@ -257,10 +261,12 @@ export default function CalendarScreen() {
 
         {/* Calendar Widget */}
         <View className="px-4 mb-4">
-          <View className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+          <View className={`rounded-3xl p-5 shadow-sm border ${
+            isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+          }`}>
             {/* Month Navigation */}
             <View className="flex-row justify-between items-center mb-6 px-2">
-              <Text className="text-lg font-bold text-slate-800">
+              <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
                 {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
               </Text>
               <View className="flex-row gap-1">
@@ -283,7 +289,9 @@ export default function CalendarScreen() {
             <View className="flex-row justify-between mb-4">
               {dayNames.map((day) => (
                 <View key={day} className="flex-1 items-center">
-                  <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  <Text className={`text-[10px] font-bold uppercase tracking-widest ${
+                    isDark ? "text-gray-400" : "text-slate-400"
+                  }`}>
                     {day}
                   </Text>
                 </View>
@@ -315,7 +323,9 @@ export default function CalendarScreen() {
                       ) : (
                         <Text 
                           className={`text-sm font-medium ${
-                            isCurrentMonth ? 'text-slate-800' : 'text-slate-300'
+                            isCurrentMonth 
+                              ? (isDark ? 'text-white' : 'text-slate-800')
+                              : (isDark ? 'text-gray-500' : 'text-slate-300')
                           }`}
                         >
                           {day.date.getDate()}
@@ -341,12 +351,14 @@ export default function CalendarScreen() {
               className={`px-5 py-2.5 rounded-full ${
                 activeFilter === 'all'
                   ? 'bg-[#2B5F9E]'
+                  : isDark
+                  ? 'bg-slate-800 border border-slate-700'
                   : 'bg-white border border-slate-100'
               }`}
             >
               <Text
                 className={`text-sm font-semibold ${
-                  activeFilter === 'all' ? 'text-white' : 'text-slate-600'
+                  activeFilter === 'all' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-slate-600')
                 }`}
               >
                 All Events
@@ -357,12 +369,14 @@ export default function CalendarScreen() {
               className={`px-5 py-2.5 rounded-full ${
                 activeFilter === 'official'
                   ? 'bg-[#2B5F9E]'
+                  : isDark
+                  ? 'bg-slate-800 border border-slate-700'
                   : 'bg-white border border-slate-100'
               }`}
             >
               <Text
                 className={`text-sm font-semibold ${
-                  activeFilter === 'official' ? 'text-white' : 'text-slate-600'
+                  activeFilter === 'official' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-slate-600')
                 }`}
               >
                 Official CPD
@@ -373,12 +387,14 @@ export default function CalendarScreen() {
               className={`px-5 py-2.5 rounded-full ${
                 activeFilter === 'personal'
                   ? 'bg-[#2B5F9E]'
+                  : isDark
+                  ? 'bg-slate-800 border border-slate-700'
                   : 'bg-white border border-slate-100'
               }`}
             >
               <Text
                 className={`text-sm font-semibold ${
-                  activeFilter === 'personal' ? 'text-white' : 'text-slate-600'
+                  activeFilter === 'personal' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-slate-600')
                 }`}
               >
                 Personal Development
@@ -389,7 +405,9 @@ export default function CalendarScreen() {
 
         {/* Events List */}
         <View className="flex-1 px-6" style={{ gap: 16 }}>
-          <Text className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">
+          <Text className={`text-xs font-bold uppercase tracking-widest mt-2 ${
+            isDark ? "text-gray-400" : "text-slate-400"
+          }`}>
             {formatDateLabel(selectedDate)}
           </Text>
           
@@ -397,20 +415,28 @@ export default function CalendarScreen() {
             filteredEvents.map((event) => (
               <View
                 key={event.id}
-                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex-row items-start"
+                className={`p-4 rounded-2xl border shadow-sm flex-row items-start ${
+                  isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                }`}
                 style={{ gap: 16 }}
               >
                 {/* Time Line */}
                 <View className="items-center">
-                  <Text className="text-sm font-bold text-slate-800">{event.startTime}</Text>
-                  <View className="w-px h-12 bg-slate-200 my-1" />
-                  <Text className="text-xs text-slate-400">{event.endTime}</Text>
+                  <Text className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                    {event.startTime}
+                  </Text>
+                  <View className={`w-px h-12 my-1 ${isDark ? "bg-slate-600" : "bg-slate-200"}`} />
+                  <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                    {event.endTime}
+                  </Text>
                 </View>
 
                 {/* Event Details */}
                 <View className="flex-1">
                   <View className="flex-row justify-between items-start mb-1">
-                    <Text className="font-bold text-slate-800 flex-1">{event.title}</Text>
+                    <Text className={`font-bold flex-1 ${isDark ? "text-white" : "text-slate-800"}`}>
+                      {event.title}
+                    </Text>
                     <View
                       className={`px-2 py-0.5 rounded-full ${
                         event.type === 'official'
@@ -429,22 +455,28 @@ export default function CalendarScreen() {
                       </Text>
                     </View>
                   </View>
-                  <Text className="text-sm text-slate-500 mt-1">{event.description}</Text>
+                  <Text className={`text-sm mt-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+                    {event.description}
+                  </Text>
                   <View className="flex-row items-center mt-3">
                     <MaterialIcons
                       name={event.type === 'official' ? 'location-on' : 'history-edu'}
                       size={16}
-                      color="#94A3B8"
+                      color={isDark ? "#6B7280" : "#94A3B8"}
                     />
-                    <Text className="text-xs text-slate-400 ml-1">{event.location}</Text>
+                    <Text className={`text-xs ml-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
+                      {event.location}
+                    </Text>
                   </View>
                 </View>
               </View>
             ))
           ) : (
-            <View className="bg-white p-8 rounded-2xl border border-slate-100 items-center">
-              <MaterialIcons name="event-busy" size={48} color="#CBD5E1" />
-              <Text className="text-slate-400 mt-4 text-center">
+            <View className={`p-8 rounded-2xl border items-center ${
+              isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+            }`}>
+              <MaterialIcons name="event-busy" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
+              <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
                 No events scheduled for this date
               </Text>
             </View>
@@ -481,13 +513,19 @@ export default function CalendarScreen() {
         onRequestClose={() => setShowAddEventModal(false)}
       >
         <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl max-h-[90%]">
+          <View className={`rounded-t-3xl max-h-[90%] ${
+            isDark ? "bg-slate-800" : "bg-white"
+          }`}>
             <SafeAreaView edges={['bottom']}>
               {/* Header */}
-              <View className="flex-row items-center justify-between px-6 pt-4 pb-4 border-b border-slate-100">
-                <Text className="text-2xl font-bold text-slate-800">Add New Event</Text>
+              <View className={`flex-row items-center justify-between px-6 pt-4 pb-4 border-b ${
+                isDark ? "border-slate-700" : "border-slate-100"
+              }`}>
+                <Text className={`text-2xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                  Add New Event
+                </Text>
                 <Pressable onPress={() => setShowAddEventModal(false)}>
-                  <MaterialIcons name="close" size={24} color="#64748B" />
+                  <MaterialIcons name="close" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
                 </Pressable>
               </View>
 
@@ -499,7 +537,11 @@ export default function CalendarScreen() {
                 <View className="px-6 pt-6" style={{ gap: 20 }}>
                   {/* Event Title */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Event Title *</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Event Title *
+                    </Text>
                     <TextInput
                       value={eventForm.title}
                       onChangeText={(text) => {
@@ -509,10 +551,12 @@ export default function CalendarScreen() {
                         }
                       }}
                       placeholder="Enter event title"
-                      placeholderTextColor="#94A3B8"
-                      className={`bg-white border rounded-2xl px-4 py-4 text-slate-800 text-base ${
-                        formErrors.title ? 'border-red-500' : 'border-slate-200'
-                      }`}
+                      placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
+                      className={`border rounded-2xl px-4 py-4 text-base ${
+                        isDark 
+                          ? "bg-slate-700 text-white border-slate-600" 
+                          : "bg-white text-slate-800 border-slate-200"
+                      } ${formErrors.title ? 'border-red-500' : ''}`}
                     />
                     {formErrors.title && (
                       <Text className="text-red-500 text-xs mt-1">{formErrors.title}</Text>
@@ -521,44 +565,68 @@ export default function CalendarScreen() {
 
                   {/* Description */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Description</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Description
+                    </Text>
                     <TextInput
                       value={eventForm.description}
                       onChangeText={(text) => setEventForm({ ...eventForm, description: text })}
                       placeholder="Enter event description"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
                       multiline
                       numberOfLines={4}
                       textAlignVertical="top"
-                      className="bg-white border border-slate-200 rounded-2xl px-4 py-4 text-slate-800 text-base min-h-[100px]"
+                      className={`border rounded-2xl px-4 py-4 text-base min-h-[100px] ${
+                        isDark 
+                          ? "bg-slate-700 text-white border-slate-600" 
+                          : "bg-white text-slate-800 border-slate-200"
+                      }`}
                     />
                   </View>
 
                   {/* Location */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Location</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Location
+                    </Text>
                     <View className="relative">
                       <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
-                        <MaterialIcons name="location-on" size={20} color="#94A3B8" />
+                        <MaterialIcons name="location-on" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
                       </View>
                       <TextInput
                         value={eventForm.location}
                         onChangeText={(text) => setEventForm({ ...eventForm, location: text })}
                         placeholder="Enter location"
-                        placeholderTextColor="#94A3B8"
-                        className="bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-4 text-slate-800 text-base"
+                        placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
+                        className={`border rounded-2xl pl-12 pr-4 py-4 text-base ${
+                          isDark 
+                            ? "bg-slate-700 text-white border-slate-600" 
+                            : "bg-white text-slate-800 border-slate-200"
+                        }`}
                       />
                     </View>
                   </View>
 
                   {/* Date Selection */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Date</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Date
+                    </Text>
                     <Pressable 
                       onPress={() => setShowDatePicker(true)}
-                      className="bg-white border border-slate-200 rounded-2xl px-4 py-4 flex-row items-center justify-between active:bg-slate-50"
+                      className={`border rounded-2xl px-4 py-4 flex-row items-center justify-between ${
+                        isDark 
+                          ? "bg-slate-700 border-slate-600 active:bg-slate-600" 
+                          : "bg-white border-slate-200 active:bg-slate-50"
+                      }`}
                     >
-                      <Text className="text-slate-800 text-base">
+                      <Text className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}>
                         {eventForm.date.toLocaleDateString('en-GB', { 
                           weekday: 'long', 
                           day: 'numeric', 
@@ -566,24 +634,34 @@ export default function CalendarScreen() {
                           year: 'numeric' 
                         })}
                       </Text>
-                      <MaterialIcons name="calendar-today" size={20} color="#94A3B8" />
+                      <MaterialIcons name="calendar-today" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
                     </Pressable>
                   </View>
 
                   {/* Time Selection */}
                   <View className="flex-row" style={{ gap: 12 }}>
                     <View className="flex-1">
-                      <Text className="text-sm font-semibold text-slate-700 mb-2">Start Time *</Text>
+                      <Text className={`text-sm font-semibold mb-2 ${
+                        isDark ? "text-gray-300" : "text-slate-700"
+                      }`}>
+                        Start Time *
+                      </Text>
                       <Pressable
                         onPress={() => setShowStartTimePicker(true)}
-                        className={`bg-white border rounded-2xl pl-12 pr-4 py-4 flex-row items-center ${
-                          formErrors.startTime ? 'border-red-500' : 'border-slate-200'
-                        }`}
+                        className={`border rounded-2xl pl-12 pr-4 py-4 flex-row items-center ${
+                          isDark 
+                            ? "bg-slate-700 border-slate-600" 
+                            : "bg-white border-slate-200"
+                        } ${formErrors.startTime ? 'border-red-500' : ''}`}
                       >
                         <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
-                          <MaterialIcons name="access-time" size={20} color="#94A3B8" />
+                          <MaterialIcons name="access-time" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
                         </View>
-                        <Text className={`text-base ${eventForm.startTime ? 'text-slate-800' : 'text-slate-400'}`}>
+                        <Text className={`text-base ${
+                          eventForm.startTime 
+                            ? (isDark ? 'text-white' : 'text-slate-800')
+                            : (isDark ? 'text-gray-500' : 'text-slate-400')
+                        }`}>
                           {eventForm.startTime || '09:00'}
                         </Text>
                       </Pressable>
@@ -592,17 +670,27 @@ export default function CalendarScreen() {
                       )}
                     </View>
                     <View className="flex-1">
-                      <Text className="text-sm font-semibold text-slate-700 mb-2">End Time *</Text>
+                      <Text className={`text-sm font-semibold mb-2 ${
+                        isDark ? "text-gray-300" : "text-slate-700"
+                      }`}>
+                        End Time *
+                      </Text>
                       <Pressable
                         onPress={() => setShowEndTimePicker(true)}
-                        className={`bg-white border rounded-2xl pl-12 pr-4 py-4 flex-row items-center ${
-                          formErrors.endTime ? 'border-red-500' : 'border-slate-200'
-                        }`}
+                        className={`border rounded-2xl pl-12 pr-4 py-4 flex-row items-center ${
+                          isDark 
+                            ? "bg-slate-700 border-slate-600" 
+                            : "bg-white border-slate-200"
+                        } ${formErrors.endTime ? 'border-red-500' : ''}`}
                       >
                         <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
-                          <MaterialIcons name="access-time" size={20} color="#94A3B8" />
+                          <MaterialIcons name="access-time" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
                         </View>
-                        <Text className={`text-base ${eventForm.endTime ? 'text-slate-800' : 'text-slate-400'}`}>
+                        <Text className={`text-base ${
+                          eventForm.endTime 
+                            ? (isDark ? 'text-white' : 'text-slate-800')
+                            : (isDark ? 'text-gray-500' : 'text-slate-400')
+                        }`}>
                           {eventForm.endTime || '10:30'}
                         </Text>
                       </Pressable>
@@ -614,23 +702,31 @@ export default function CalendarScreen() {
 
                   {/* Event Type */}
                   <View>
-                    <Text className="text-sm font-semibold text-slate-700 mb-2">Event Type *</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${
+                      isDark ? "text-gray-300" : "text-slate-700"
+                    }`}>
+                      Event Type *
+                    </Text>
                     <View className="flex-row" style={{ gap: 12 }}>
                       <Pressable
                         onPress={() => setEventForm({ ...eventForm, type: 'official' })}
                         className={`flex-1 py-4 rounded-2xl border-2 items-center ${
                           eventForm.type === 'official'
                             ? 'bg-blue-50 border-[#2B5F9E]'
+                            : isDark
+                            ? 'bg-slate-700 border-slate-600'
                             : 'bg-white border-slate-200'
                         }`}
                       >
                         <MaterialIcons 
                           name="business" 
                           size={24} 
-                          color={eventForm.type === 'official' ? '#2B5F9E' : '#94A3B8'} 
+                          color={eventForm.type === 'official' ? '#2B5F9E' : (isDark ? '#6B7280' : '#94A3B8')} 
                         />
                         <Text className={`text-sm font-semibold mt-2 ${
-                          eventForm.type === 'official' ? 'text-[#2B5F9E]' : 'text-slate-600'
+                          eventForm.type === 'official' 
+                            ? 'text-[#2B5F9E]' 
+                            : (isDark ? 'text-gray-300' : 'text-slate-600')
                         }`}>
                           Official CPD
                         </Text>
@@ -640,16 +736,20 @@ export default function CalendarScreen() {
                         className={`flex-1 py-4 rounded-2xl border-2 items-center ${
                           eventForm.type === 'personal'
                             ? 'bg-amber-50 border-amber-400'
+                            : isDark
+                            ? 'bg-slate-700 border-slate-600'
                             : 'bg-white border-slate-200'
                         }`}
                       >
                         <MaterialIcons 
                           name="person" 
                           size={24} 
-                          color={eventForm.type === 'personal' ? '#F59E0B' : '#94A3B8'} 
+                          color={eventForm.type === 'personal' ? '#F59E0B' : (isDark ? '#6B7280' : '#94A3B8')} 
                         />
                         <Text className={`text-sm font-semibold mt-2 ${
-                          eventForm.type === 'personal' ? 'text-amber-600' : 'text-slate-600'
+                          eventForm.type === 'personal' 
+                            ? 'text-amber-600' 
+                            : (isDark ? 'text-gray-300' : 'text-slate-600')
                         }`}>
                           Personal
                         </Text>
@@ -660,12 +760,20 @@ export default function CalendarScreen() {
               </ScrollView>
 
               {/* Footer Actions */}
-              <View className="px-6 pt-4 pb-6 border-t border-slate-100 flex-row" style={{ gap: 12 }}>
+              <View className={`px-6 pt-4 pb-6 border-t flex-row ${
+                isDark ? "border-slate-700" : "border-slate-100"
+              }`} style={{ gap: 12 }}>
                 <Pressable
                   onPress={() => setShowAddEventModal(false)}
-                  className="flex-1 py-4 rounded-2xl bg-slate-100 items-center"
+                  className={`flex-1 py-4 rounded-2xl items-center ${
+                    isDark ? "bg-slate-700" : "bg-slate-100"
+                  }`}
                 >
-                  <Text className="text-slate-700 font-semibold text-base">Cancel</Text>
+                  <Text className={`font-semibold text-base ${
+                    isDark ? "text-gray-300" : "text-slate-700"
+                  }`}>
+                    Cancel
+                  </Text>
                 </Pressable>
                 <Pressable
                   onPress={handleSaveEvent}
@@ -699,9 +807,13 @@ export default function CalendarScreen() {
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl p-6 w-[90%] max-w-sm"
+            className={`rounded-3xl p-6 w-[90%] max-w-sm ${
+              isDark ? "bg-slate-800" : "bg-white"
+            }`}
           >
-            <Text className="text-xl font-bold text-slate-800 mb-4">Select Date</Text>
+            <Text className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
+              Select Date
+            </Text>
             <ScrollView className="max-h-64">
               {calendarDays.filter(day => day.isCurrentMonth).map((day, index) => (
                 <Pressable
@@ -711,11 +823,15 @@ export default function CalendarScreen() {
                     setShowDatePicker(false);
                   }}
                   className={`py-3 px-4 rounded-xl mb-2 ${
-                    isSameDay(day.date, eventForm.date) ? 'bg-[#2B5F9E]' : 'bg-slate-50'
+                    isSameDay(day.date, eventForm.date) 
+                      ? 'bg-[#2B5F9E]' 
+                      : (isDark ? 'bg-slate-700' : 'bg-slate-50')
                   }`}
                 >
                   <Text className={`font-medium ${
-                    isSameDay(day.date, eventForm.date) ? 'text-white' : 'text-slate-800'
+                    isSameDay(day.date, eventForm.date) 
+                      ? 'text-white' 
+                      : (isDark ? 'text-white' : 'text-slate-800')
                   }`}>
                     {day.date.toLocaleDateString('en-GB', { 
                       weekday: 'long', 
@@ -728,9 +844,15 @@ export default function CalendarScreen() {
             </ScrollView>
             <Pressable
               onPress={() => setShowDatePicker(false)}
-              className="mt-4 py-3 rounded-xl bg-slate-100"
+              className={`mt-4 py-3 rounded-xl ${
+                isDark ? "bg-slate-700" : "bg-slate-100"
+              }`}
             >
-              <Text className="text-center font-semibold text-slate-700">Cancel</Text>
+              <Text className={`text-center font-semibold ${
+                isDark ? "text-gray-300" : "text-slate-700"
+              }`}>
+                Cancel
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -749,12 +871,20 @@ export default function CalendarScreen() {
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl p-6 w-[90%] max-w-sm"
+            className={`rounded-3xl p-6 w-[90%] max-w-sm ${
+              isDark ? "bg-slate-800" : "bg-white"
+            }`}
           >
-            <Text className="text-xl font-bold text-slate-800 mb-4">Select Start Time</Text>
+            <Text className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
+              Select Start Time
+            </Text>
             <View className="flex-row justify-center mb-4" style={{ gap: 8 }}>
               <View className="flex-1">
-                <Text className="text-xs text-slate-500 text-center mb-2">Hour</Text>
+                <Text className={`text-xs text-center mb-2 ${
+                  isDark ? "text-gray-400" : "text-slate-500"
+                }`}>
+                  Hour
+                </Text>
                 <ScrollView className="max-h-32">
                   {Array.from({ length: 24 }, (_, hour) => (
                     <Pressable
@@ -768,12 +898,14 @@ export default function CalendarScreen() {
                       }}
                       className={`py-2 rounded-lg mb-1 ${
                         eventForm.startTime && parseInt(eventForm.startTime.split(':')[0] || '0') === hour
-                          ? 'bg-[#2B5F9E]' : 'bg-slate-50'
+                          ? 'bg-[#2B5F9E]' 
+                          : (isDark ? 'bg-slate-700' : 'bg-slate-50')
                       }`}
                     >
                       <Text className={`text-center text-sm ${
                         eventForm.startTime && parseInt(eventForm.startTime.split(':')[0] || '0') === hour
-                          ? 'text-white font-bold' : 'text-slate-700'
+                          ? 'text-white font-bold' 
+                          : (isDark ? 'text-gray-300' : 'text-slate-700')
                       }`}>
                         {hour.toString().padStart(2, '0')}
                       </Text>
@@ -782,7 +914,11 @@ export default function CalendarScreen() {
                 </ScrollView>
               </View>
               <View className="flex-1">
-                <Text className="text-xs text-slate-500 text-center mb-2">Minute</Text>
+                <Text className={`text-xs text-center mb-2 ${
+                  isDark ? "text-gray-400" : "text-slate-500"
+                }`}>
+                  Minute
+                </Text>
                 <ScrollView className="max-h-32">
                   {[0, 15, 30, 45].map((minute) => (
                     <Pressable
@@ -796,12 +932,14 @@ export default function CalendarScreen() {
                       }}
                       className={`py-2 rounded-lg mb-1 ${
                         eventForm.startTime && parseInt(eventForm.startTime.split(':')[1] || '0') === minute
-                          ? 'bg-[#2B5F9E]' : 'bg-slate-50'
+                          ? 'bg-[#2B5F9E]' 
+                          : (isDark ? 'bg-slate-700' : 'bg-slate-50')
                       }`}
                     >
                       <Text className={`text-center text-sm ${
                         eventForm.startTime && parseInt(eventForm.startTime.split(':')[1] || '0') === minute
-                          ? 'text-white font-bold' : 'text-slate-700'
+                          ? 'text-white font-bold' 
+                          : (isDark ? 'text-gray-300' : 'text-slate-700')
                       }`}>
                         {minute.toString().padStart(2, '0')}
                       </Text>
@@ -813,9 +951,15 @@ export default function CalendarScreen() {
             <View className="flex-row" style={{ gap: 12 }}>
               <Pressable
                 onPress={() => setShowStartTimePicker(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-100"
+                className={`flex-1 py-3 rounded-xl ${
+                  isDark ? "bg-slate-700" : "bg-slate-100"
+                }`}
               >
-                <Text className="text-center font-semibold text-slate-700">Cancel</Text>
+                <Text className={`text-center font-semibold ${
+                  isDark ? "text-gray-300" : "text-slate-700"
+                }`}>
+                  Cancel
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => setShowStartTimePicker(false)}
@@ -841,95 +985,115 @@ export default function CalendarScreen() {
         >
           <Pressable 
             onPress={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl p-6 w-[90%] max-w-sm"
+            className={`rounded-3xl p-6 w-[90%] max-w-sm ${
+              isDark ? "bg-slate-800" : "bg-white"
+            }`}
           >
-            <Text className="text-xl font-bold text-slate-800 mb-4">Select End Time</Text>
+            <Text className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
+              Select End Time
+            </Text>
             <View className="flex-row justify-center mb-4" style={{ gap: 8 }}>
               <View className="flex-1">
-                <Text className="text-xs text-slate-500 text-center mb-2">Hour</Text>
+                <Text className={`text-xs text-center mb-2 ${
+                  isDark ? "text-gray-400" : "text-slate-500"
+                }`}>
+                  Hour
+                </Text>
                 <ScrollView className="max-h-32">
-                  {Array.from({ length: 24 }, (_, hour) => (
-                    <Pressable
-                      key={hour}
-                      onPress={() => {
-                        const currentMin = eventForm.endTime ? (() => {
-                          const parts = eventForm.endTime.split(':');
-                          return parts[1] ? parseInt(parts[1]) : 30;
-                        })() : 30;
-                        setEventForm({ ...eventForm, endTime: formatTime(hour, currentMin) });
-                        if (formErrors.endTime) {
-                          setFormErrors({ ...formErrors, endTime: '' });
-                        }
-                      }}
-                      className={`py-2 rounded-lg mb-1 ${
-                        (() => {
-                          if (!eventForm.endTime) return false;
-                          const parts = eventForm.endTime.split(':');
-                          return parts[0] ? parseInt(parts[0]) === hour : false;
-                        })()
-                          ? 'bg-[#2B5F9E]' : 'bg-slate-50'
-                      }`}
-                    >
-                      <Text className={`text-center text-sm ${
-                        (() => {
-                          if (!eventForm.endTime) return false;
-                          const parts = eventForm.endTime.split(':');
-                          return parts[0] ? parseInt(parts[0]) === hour : false;
-                        })()
-                          ? 'text-white font-bold' : 'text-slate-700'
-                      }`}>
-                        {hour.toString().padStart(2, '0')}
-                      </Text>
-                    </Pressable>
-                  ))}
+                  {Array.from({ length: 24 }, (_, hour) => {
+                    const isSelected = (() => {
+                      if (!eventForm.endTime) return false;
+                      const parts = eventForm.endTime.split(':');
+                      return parts[0] ? parseInt(parts[0]) === hour : false;
+                    })();
+                    return (
+                      <Pressable
+                        key={hour}
+                        onPress={() => {
+                          const currentMin = eventForm.endTime ? (() => {
+                            const parts = eventForm.endTime.split(':');
+                            return parts[1] ? parseInt(parts[1]) : 30;
+                          })() : 30;
+                          setEventForm({ ...eventForm, endTime: formatTime(hour, currentMin) });
+                          if (formErrors.endTime) {
+                            setFormErrors({ ...formErrors, endTime: '' });
+                          }
+                        }}
+                        className={`py-2 rounded-lg mb-1 ${
+                          isSelected 
+                            ? 'bg-[#2B5F9E]' 
+                            : (isDark ? 'bg-slate-700' : 'bg-slate-50')
+                        }`}
+                      >
+                        <Text className={`text-center text-sm ${
+                          isSelected 
+                            ? 'text-white font-bold' 
+                            : (isDark ? 'text-gray-300' : 'text-slate-700')
+                        }`}>
+                          {hour.toString().padStart(2, '0')}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </ScrollView>
               </View>
               <View className="flex-1">
-                <Text className="text-xs text-slate-500 text-center mb-2">Minute</Text>
+                <Text className={`text-xs text-center mb-2 ${
+                  isDark ? "text-gray-400" : "text-slate-500"
+                }`}>
+                  Minute
+                </Text>
                 <ScrollView className="max-h-32">
-                  {[0, 15, 30, 45].map((minute) => (
-                    <Pressable
-                      key={minute}
-                      onPress={() => {
-                        const currentHour = eventForm.endTime ? (() => {
-                          const parts = eventForm.endTime.split(':');
-                          return parts[0] ? parseInt(parts[0]) : 10;
-                        })() : 10;
-                        setEventForm({ ...eventForm, endTime: formatTime(currentHour, minute) });
-                        if (formErrors.endTime) {
-                          setFormErrors({ ...formErrors, endTime: '' });
-                        }
-                      }}
-                      className={`py-2 rounded-lg mb-1 ${
-                        (() => {
-                          if (!eventForm.endTime) return false;
-                          const parts = eventForm.endTime.split(':');
-                          return parts[1] ? parseInt(parts[1]) === minute : false;
-                        })()
-                          ? 'bg-[#2B5F9E]' : 'bg-slate-50'
-                      }`}
-                    >
-                      <Text className={`text-center text-sm ${
-                        (() => {
-                          if (!eventForm.endTime) return false;
-                          const parts = eventForm.endTime.split(':');
-                          return parts[1] ? parseInt(parts[1]) === minute : false;
-                        })()
-                          ? 'text-white font-bold' : 'text-slate-700'
-                      }`}>
-                        {minute.toString().padStart(2, '0')}
-                      </Text>
-                    </Pressable>
-                  ))}
+                  {[0, 15, 30, 45].map((minute) => {
+                    const isSelected = (() => {
+                      if (!eventForm.endTime) return false;
+                      const parts = eventForm.endTime.split(':');
+                      return parts[1] ? parseInt(parts[1]) === minute : false;
+                    })();
+                    return (
+                      <Pressable
+                        key={minute}
+                        onPress={() => {
+                          const currentHour = eventForm.endTime ? (() => {
+                            const parts = eventForm.endTime.split(':');
+                            return parts[0] ? parseInt(parts[0]) : 10;
+                          })() : 10;
+                          setEventForm({ ...eventForm, endTime: formatTime(currentHour, minute) });
+                          if (formErrors.endTime) {
+                            setFormErrors({ ...formErrors, endTime: '' });
+                          }
+                        }}
+                        className={`py-2 rounded-lg mb-1 ${
+                          isSelected 
+                            ? 'bg-[#2B5F9E]' 
+                            : (isDark ? 'bg-slate-700' : 'bg-slate-50')
+                        }`}
+                      >
+                        <Text className={`text-center text-sm ${
+                          isSelected 
+                            ? 'text-white font-bold' 
+                            : (isDark ? 'text-gray-300' : 'text-slate-700')
+                        }`}>
+                          {minute.toString().padStart(2, '0')}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </ScrollView>
               </View>
             </View>
             <View className="flex-row" style={{ gap: 12 }}>
               <Pressable
                 onPress={() => setShowEndTimePicker(false)}
-                className="flex-1 py-3 rounded-xl bg-slate-100"
+                className={`flex-1 py-3 rounded-xl ${
+                  isDark ? "bg-slate-700" : "bg-slate-100"
+                }`}
               >
-                <Text className="text-center font-semibold text-slate-700">Cancel</Text>
+                <Text className={`text-center font-semibold ${
+                  isDark ? "text-gray-300" : "text-slate-700"
+                }`}>
+                  Cancel
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => setShowEndTimePicker(false)}

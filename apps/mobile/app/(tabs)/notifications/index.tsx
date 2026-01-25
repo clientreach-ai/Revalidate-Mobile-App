@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface Notification {
@@ -19,6 +20,7 @@ interface Notification {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { isDark } = useThemeStore();
   const [notifications, setNotifications] = useState<Notification[]>([
     {
       id: '1',
@@ -101,8 +103,12 @@ export default function NotificationsScreen() {
 
     return (
       <View key={title}>
-        <View className="px-4 py-2 bg-slate-100">
-          <Text className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <View className={`px-4 py-2 ${
+          isDark ? "bg-slate-800" : "bg-slate-100"
+        }`}>
+          <Text className={`text-xs font-semibold uppercase tracking-wider ${
+            isDark ? "text-gray-400" : "text-slate-500"
+          }`}>
             {title}
           </Text>
         </View>
@@ -110,9 +116,9 @@ export default function NotificationsScreen() {
           <Pressable
             key={notification.id}
             onPress={() => markAsRead(notification.id)}
-            className={`flex-row items-center gap-4 px-4 py-4 bg-white border-b border-slate-100 ${
-              !notification.isRead ? 'opacity-100' : 'opacity-80'
-            }`}
+            className={`flex-row items-center gap-4 px-4 py-4 border-b ${
+              isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+            } ${!notification.isRead ? 'opacity-100' : 'opacity-80'}`}
           >
             <View className="relative">
               <View className={`w-12 h-12 rounded-xl ${notification.iconBgColor} items-center justify-center`}>
@@ -123,13 +129,17 @@ export default function NotificationsScreen() {
                 />
               </View>
               {!notification.isRead && (
-                <View className="absolute -top-1 -right-1 w-3 h-3 bg-[#2563EB] border-2 border-white rounded-full" />
+                <View className={`absolute -top-1 -right-1 w-3 h-3 bg-[#2563EB] border-2 rounded-full ${
+                  isDark ? "border-slate-800" : "border-white"
+                }`} />
               )}
             </View>
             <View className="flex-1 min-w-0">
               <View className="flex-row justify-between items-baseline mb-1">
                 <Text 
-                  className={`text-[15px] flex-1 ${notification.isRead ? 'font-medium' : 'font-bold'} text-slate-800`}
+                  className={`text-[15px] flex-1 ${notification.isRead ? 'font-medium' : 'font-bold'} ${
+                    isDark ? "text-white" : "text-slate-800"
+                  }`}
                   numberOfLines={1}
                 >
                   {notification.title}
@@ -138,14 +148,16 @@ export default function NotificationsScreen() {
                   className={`text-xs ml-2 shrink-0 ${
                     !notification.isRead 
                       ? 'font-medium text-[#2563EB]' 
-                      : 'font-normal text-slate-500'
+                      : (isDark ? 'font-normal text-gray-400' : 'font-normal text-slate-500')
                   }`}
                 >
                   {notification.time}
                 </Text>
               </View>
               <Text 
-                className="text-sm font-normal text-slate-500 leading-snug"
+                className={`text-sm font-normal leading-snug ${
+                  isDark ? "text-gray-400" : "text-slate-500"
+                }`}
                 numberOfLines={2}
               >
                 {notification.description}
@@ -158,9 +170,11 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       {/* Header */}
-      <View className="bg-white/80 px-4 pt-4 pb-2">
+      <View className={`px-4 pt-4 pb-2 ${
+        isDark ? "bg-slate-800/80" : "bg-white/80"
+      }`}>
         <View className="flex-row items-center justify-between mb-4">
           <Pressable 
             onPress={() => router.back()}
@@ -177,7 +191,9 @@ export default function NotificationsScreen() {
             </Pressable>
           )}
         </View>
-        <Text className="text-3xl font-bold tracking-tight text-slate-800 px-0.5">
+        <Text className={`text-3xl font-bold tracking-tight px-0.5 ${
+          isDark ? "text-white" : "text-slate-800"
+        }`}>
           Notifications
         </Text>
       </View>
@@ -193,8 +209,10 @@ export default function NotificationsScreen() {
 
         {/* End of notifications indicator */}
         <View className="py-12 items-center justify-center opacity-40">
-          <MaterialIcons name="notifications-off" size={48} color="#94A3B8" />
-          <Text className="text-sm text-slate-500 mt-2">End of notifications</Text>
+          <MaterialIcons name="notifications-off" size={48} color={isDark ? "#4B5563" : "#94A3B8"} />
+          <Text className={`text-sm mt-2 ${isDark ? "text-gray-500" : "text-slate-500"}`}>
+            End of notifications
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface SettingItemProps {
@@ -24,22 +25,34 @@ function SettingItem({
   onPress,
   rightElement 
 }: SettingItemProps) {
+  const { isDark } = useThemeStore();
+  
   return (
     <Pressable
       onPress={onPress}
-      className="w-full flex-row items-center p-4 bg-white rounded-2xl shadow-sm"
+      className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${
+        isDark ? "bg-slate-800" : "bg-white"
+      }`}
     >
       <View className={`w-10 h-10 rounded-xl ${iconBgColor} items-center justify-center mr-4`}>
         <MaterialIcons name={icon} size={20} color={iconColor} />
       </View>
       <View className="flex-1">
-        <Text className="font-medium text-slate-800">{title}</Text>
+        <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+          {title}
+        </Text>
         {subtitle && (
-          <Text className="text-xs text-slate-400 mt-0.5">{subtitle}</Text>
+          <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+            {subtitle}
+          </Text>
         )}
       </View>
       {rightElement || (
-        <MaterialIcons name="chevron-right" size={20} color="#94A3B8" />
+        <MaterialIcons 
+          name="chevron-right" 
+          size={20} 
+          color={isDark ? "#64748B" : "#94A3B8"} 
+        />
       )}
     </Pressable>
   );
@@ -47,12 +60,15 @@ function SettingItem({
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { isDark, toggleTheme } = useThemeStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView 
+      className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} 
+      edges={['top']}
+    >
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -62,11 +78,19 @@ export default function SettingsScreen() {
         <View className="flex-row items-center justify-between mb-8 px-6 pt-4">
           <Pressable 
             onPress={() => router.back()}
-            className="w-10 h-10 items-center justify-center rounded-full bg-white shadow-sm"
+            className={`w-10 h-10 items-center justify-center rounded-full ${
+              isDark ? "bg-slate-800" : "bg-white"
+            } shadow-sm`}
           >
-            <MaterialIcons name="arrow-back-ios" size={20} color="#1F2937" />
+            <MaterialIcons 
+              name="arrow-back-ios" 
+              size={20} 
+              color={isDark ? "#E5E7EB" : "#1F2937"} 
+            />
           </Pressable>
-          <Text className="text-lg font-semibold text-slate-800">Settings</Text>
+          <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
+            Settings
+          </Text>
           <View className="w-10" />
         </View>
 
@@ -74,17 +98,25 @@ export default function SettingsScreen() {
         <View className="px-6" style={{ gap: 24 }}>
           {/* Notifications */}
           <View>
-            <Text className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
+            <Text className={`text-sm font-semibold mb-3 uppercase tracking-wider ${
+              isDark ? "text-gray-400" : "text-slate-500"
+            }`}>
               Notifications
             </Text>
             <View style={{ gap: 12 }}>
-              <View className="w-full flex-row items-center p-4 bg-white rounded-2xl shadow-sm">
+              <View className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${
+                isDark ? "bg-slate-800" : "bg-white"
+              }`}>
                 <View className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center mr-4">
                   <MaterialIcons name="notifications" size={20} color="#2563EB" />
                 </View>
                 <View className="flex-1">
-                  <Text className="font-medium text-slate-800">Push Notifications</Text>
-                  <Text className="text-xs text-slate-400 mt-0.5">Receive app notifications</Text>
+                  <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+                    Push Notifications
+                  </Text>
+                  <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                    Receive app notifications
+                  </Text>
                 </View>
                 <Switch
                   value={notificationsEnabled}
@@ -93,13 +125,19 @@ export default function SettingsScreen() {
                   thumbColor="#FFFFFF"
                 />
               </View>
-              <View className="w-full flex-row items-center p-4 bg-white rounded-2xl shadow-sm">
+              <View className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${
+                isDark ? "bg-slate-800" : "bg-white"
+              }`}>
                 <View className="w-10 h-10 rounded-xl bg-green-50 items-center justify-center mr-4">
                   <MaterialIcons name="email" size={20} color="#10B981" />
                 </View>
                 <View className="flex-1">
-                  <Text className="font-medium text-slate-800">Email Notifications</Text>
-                  <Text className="text-xs text-slate-400 mt-0.5">Receive email updates</Text>
+                  <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+                    Email Notifications
+                  </Text>
+                  <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                    Receive email updates
+                  </Text>
                 </View>
                 <Switch
                   value={emailNotifications}
@@ -113,21 +151,35 @@ export default function SettingsScreen() {
 
           {/* Appearance */}
           <View>
-            <Text className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
+            <Text className={`text-sm font-semibold mb-3 uppercase tracking-wider ${
+              isDark ? "text-gray-400" : "text-slate-500"
+            }`}>
               Appearance
             </Text>
             <View style={{ gap: 12 }}>
-              <View className="w-full flex-row items-center p-4 bg-white rounded-2xl shadow-sm">
-                <View className="w-10 h-10 rounded-xl bg-slate-100 items-center justify-center mr-4">
-                  <MaterialIcons name="dark-mode" size={20} color="#64748B" />
+              <View className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${
+                isDark ? "bg-slate-800" : "bg-white"
+              }`}>
+                <View className={`w-10 h-10 rounded-xl items-center justify-center mr-4 ${
+                  isDark ? "bg-slate-700" : "bg-slate-100"
+                }`}>
+                  <MaterialIcons 
+                    name={isDark ? "light-mode" : "dark-mode"} 
+                    size={20} 
+                    color={isDark ? "#D1D5DB" : "#64748B"} 
+                  />
                 </View>
                 <View className="flex-1">
-                  <Text className="font-medium text-slate-800">Dark Mode</Text>
-                  <Text className="text-xs text-slate-400 mt-0.5">Switch to dark theme</Text>
+                  <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+                    {isDark ? "Light Mode" : "Dark Mode"}
+                  </Text>
+                  <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                    {isDark ? "Switch to light theme" : "Switch to dark theme"}
+                  </Text>
                 </View>
                 <Switch
-                  value={darkMode}
-                  onValueChange={setDarkMode}
+                  value={isDark}
+                  onValueChange={toggleTheme}
                   trackColor={{ false: '#E5E7EB', true: '#2563EB' }}
                   thumbColor="#FFFFFF"
                 />
@@ -137,7 +189,9 @@ export default function SettingsScreen() {
 
           {/* General */}
           <View>
-            <Text className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
+            <Text className={`text-sm font-semibold mb-3 uppercase tracking-wider ${
+              isDark ? "text-gray-400" : "text-slate-500"
+            }`}>
               General
             </Text>
             <View style={{ gap: 12 }}>
@@ -167,7 +221,9 @@ export default function SettingsScreen() {
 
           {/* Support */}
           <View>
-            <Text className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">
+            <Text className={`text-sm font-semibold mb-3 uppercase tracking-wider ${
+              isDark ? "text-gray-400" : "text-slate-500"
+            }`}>
               Support
             </Text>
             <View style={{ gap: 12 }}>

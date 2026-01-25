@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface StatCardProps {
@@ -11,28 +12,38 @@ interface StatCardProps {
   icon: keyof typeof MaterialIcons.glyphMap;
   iconColor: string;
   bgColor: string;
+  isDark?: boolean;
 }
 
-function StatCard({ title, value, subtitle, icon, iconColor, bgColor }: StatCardProps) {
+function StatCard({ title, value, subtitle, icon, iconColor, bgColor, isDark }: StatCardProps) {
   return (
-    <View className="bg-white rounded-2xl p-5 shadow-sm">
+    <View className={`rounded-2xl p-5 shadow-sm ${
+      isDark ? "bg-slate-800" : "bg-white"
+    }`}>
       <View className="flex-row items-center justify-between mb-3">
         <View className={`w-12 h-12 rounded-xl ${bgColor} items-center justify-center`}>
           <MaterialIcons name={icon} size={24} color={iconColor} />
         </View>
-        <Text className="text-xs text-slate-400 font-medium">{title}</Text>
+        <Text className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+          {title}
+        </Text>
       </View>
-      <Text className="text-3xl font-bold text-slate-800 mb-1">{value}</Text>
-      <Text className="text-sm text-slate-500">{subtitle}</Text>
+      <Text className={`text-3xl font-bold mb-1 ${isDark ? "text-white" : "text-slate-800"}`}>
+        {value}
+      </Text>
+      <Text className={`text-sm ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+        {subtitle}
+      </Text>
     </View>
   );
 }
 
 export default function AllStatsScreen() {
   const router = useRouter();
+  const { isDark } = useThemeStore();
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -42,11 +53,15 @@ export default function AllStatsScreen() {
         <View className="flex-row items-center justify-between mb-8 px-6 pt-4">
           <Pressable 
             onPress={() => router.back()}
-            className="w-10 h-10 items-center justify-center rounded-full bg-white shadow-sm"
+            className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${
+              isDark ? "bg-slate-800" : "bg-white"
+            }`}
           >
-            <MaterialIcons name="arrow-back-ios" size={20} color="#1F2937" />
+            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#1F2937"} />
           </Pressable>
-          <Text className="text-lg font-semibold text-slate-800">All Stats</Text>
+          <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
+            All Stats
+          </Text>
           <View className="w-10" />
         </View>
 
@@ -62,6 +77,7 @@ export default function AllStatsScreen() {
                 icon="access-time"
                 iconColor="#2563EB"
                 bgColor="bg-blue-50"
+                isDark={isDark}
               />
             </View>
             <View className="flex-1">
@@ -72,6 +88,7 @@ export default function AllStatsScreen() {
                 icon="school"
                 iconColor="#10B981"
                 bgColor="bg-green-50"
+                isDark={isDark}
               />
             </View>
           </View>
@@ -86,6 +103,7 @@ export default function AllStatsScreen() {
                 icon="lightbulb"
                 iconColor="#F59E0B"
                 bgColor="bg-amber-50"
+                isDark={isDark}
               />
             </View>
             <View className="flex-1">
@@ -96,6 +114,7 @@ export default function AllStatsScreen() {
                 icon="feedback"
                 iconColor="#8B5CF6"
                 bgColor="bg-purple-50"
+                isDark={isDark}
               />
             </View>
           </View>
@@ -110,6 +129,7 @@ export default function AllStatsScreen() {
                 icon="description"
                 iconColor="#EC4899"
                 bgColor="bg-pink-50"
+                isDark={isDark}
               />
             </View>
             <View className="flex-1">
@@ -120,21 +140,30 @@ export default function AllStatsScreen() {
                 icon="account-balance-wallet"
                 iconColor="#14B8A6"
                 bgColor="bg-teal-50"
+                isDark={isDark}
               />
             </View>
           </View>
 
           {/* Progress Section */}
-          <View className="bg-white rounded-2xl p-5 shadow-sm mt-4">
-            <Text className="text-lg font-bold text-slate-800 mb-4">Revalidation Progress</Text>
+          <View className={`rounded-2xl p-5 shadow-sm mt-4 ${
+            isDark ? "bg-slate-800" : "bg-white"
+          }`}>
+            <Text className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
+              Revalidation Progress
+            </Text>
             
             {/* Overall Progress */}
             <View className="mb-6">
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-medium text-slate-600">Overall Progress</Text>
+                <Text className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-slate-600"}`}>
+                  Overall Progress
+                </Text>
                 <Text className="text-sm font-bold text-[#2563EB]">65%</Text>
               </View>
-              <View className="w-full bg-slate-100 rounded-full h-3">
+              <View className={`w-full rounded-full h-3 ${
+                isDark ? "bg-slate-700" : "bg-slate-100"
+              }`}>
                 <View className="bg-[#2563EB] h-3 rounded-full" style={{ width: '65%' }} />
               </View>
             </View>
@@ -142,10 +171,14 @@ export default function AllStatsScreen() {
             {/* Practice Hours Progress */}
             <View className="mb-4">
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-medium text-slate-600">Practice Hours</Text>
+                <Text className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-slate-600"}`}>
+                  Practice Hours
+                </Text>
                 <Text className="text-sm font-bold text-green-600">1,240 / 450</Text>
               </View>
-              <View className="w-full bg-slate-100 rounded-full h-2">
+              <View className={`w-full rounded-full h-2 ${
+                isDark ? "bg-slate-700" : "bg-slate-100"
+              }`}>
                 <View className="bg-green-500 h-2 rounded-full" style={{ width: '100%' }} />
               </View>
             </View>
@@ -153,10 +186,14 @@ export default function AllStatsScreen() {
             {/* CPD Hours Progress */}
             <View className="mb-4">
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-medium text-slate-600">CPD Hours</Text>
+                <Text className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-slate-600"}`}>
+                  CPD Hours
+                </Text>
                 <Text className="text-sm font-bold text-amber-600">85 / 35</Text>
               </View>
-              <View className="w-full bg-slate-100 rounded-full h-2">
+              <View className={`w-full rounded-full h-2 ${
+                isDark ? "bg-slate-700" : "bg-slate-100"
+              }`}>
                 <View className="bg-amber-500 h-2 rounded-full" style={{ width: '100%' }} />
               </View>
             </View>
@@ -164,10 +201,14 @@ export default function AllStatsScreen() {
             {/* Reflections Progress */}
             <View>
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm font-medium text-slate-600">Reflections</Text>
+                <Text className={`text-sm font-medium ${isDark ? "text-gray-400" : "text-slate-600"}`}>
+                  Reflections
+                </Text>
                 <Text className="text-sm font-bold text-purple-600">12 / 5</Text>
               </View>
-              <View className="w-full bg-slate-100 rounded-full h-2">
+              <View className={`w-full rounded-full h-2 ${
+                isDark ? "bg-slate-700" : "bg-slate-100"
+              }`}>
                 <View className="bg-purple-500 h-2 rounded-full" style={{ width: '100%' }} />
               </View>
             </View>

@@ -10,6 +10,7 @@ import {
     onboardingPersonalDetailsSchema,
     type OnboardingPersonalDetailsInput,
 } from "@/validation/schema";
+import { useThemeStore } from "@/features/theme/theme.store";
 import "../global.css";
 
 export default function PersonalDetails() {
@@ -17,7 +18,7 @@ export default function PersonalDetails() {
     const params = useLocalSearchParams();
     const role = params.role as string;
 
-    const [isDark] = useState(false);
+    const { isDark } = useThemeStore();
 
     const {
         control,
