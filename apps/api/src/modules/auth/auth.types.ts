@@ -2,15 +2,14 @@
  * Authentication types and interfaces
  * 
  * Authentication Flow:
- * 1. Client authenticates with Firebase (email/password or social login)
- * 2. Client receives Firebase ID token
- * 3. Client sends Firebase ID token to backend
- * 4. Backend verifies Firebase ID token and links to MySQL user
- * 5. Backend issues JWT token for subsequent API requests
+ * 1. Client sends email/password to backend
+ * 2. Backend verifies password against MySQL database
+ * 3. Backend issues JWT token for subsequent API requests
  */
 
 export interface RegisterRequest {
-  firebaseIdToken: string; // Firebase ID token from client
+  email: string;
+  password: string;
   professionalDetails: {
     registrationNumber: string;
     revalidationDate: string; // ISO date string
@@ -21,7 +20,8 @@ export interface RegisterRequest {
 }
 
 export interface LoginRequest {
-  firebaseIdToken: string; // Firebase ID token from client
+  email: string;
+  password: string;
 }
 
 export interface AuthResponse {
@@ -38,7 +38,6 @@ export interface AuthResponse {
 export interface JwtPayload {
   userId: string;
   email: string;
-  firebaseUid: string;
   iat?: number;
   exp?: number;
 }

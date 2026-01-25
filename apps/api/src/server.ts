@@ -1,6 +1,5 @@
 import app from './app';
 import { connectMySQL } from './config/database';
-import { initializeFirebaseAdmin } from './config/firebase';
 
 const PORT = process.env.PORT || 3000;
 
@@ -9,14 +8,6 @@ async function startServer() {
   try {
     // Connect to MySQL
     await connectMySQL();
-    
-    // Initialize Firebase Admin (optional - will fail gracefully if not configured)
-    try {
-      initializeFirebaseAdmin();
-    } catch (error: any) {
-      console.warn('⚠️  Firebase Admin not initialized:', error.message);
-      console.warn('   Authentication features may not work until Firebase is configured.');
-    }
     
     // Start the server
     app.listen(PORT, () => {

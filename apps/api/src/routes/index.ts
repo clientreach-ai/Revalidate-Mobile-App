@@ -6,6 +6,7 @@ import cpdHoursRoutes from './cpd-hours.routes';
 import feedbackRoutes from './feedback.routes';
 import reflectionsRoutes from './reflections.routes';
 import appraisalRoutes from './appraisal.routes';
+import adminRoutes from './admin.routes';
 // TODO: Add more routes as modules are implemented
 // import calendarRoutes from './calendar.routes';
 // import documentsRoutes from './documents.routes';
@@ -27,6 +28,7 @@ router.use(`${API_VERSION}/cpd-hours`, cpdHoursRoutes);
 router.use(`${API_VERSION}/feedback`, feedbackRoutes);
 router.use(`${API_VERSION}/reflections`, reflectionsRoutes);
 router.use(`${API_VERSION}/appraisals`, appraisalRoutes);
+router.use(`${API_VERSION}/admin`, adminRoutes);
 // TODO: Mount additional routes as they're implemented
 // router.use(`${API_VERSION}/calendar`, calendarRoutes);
 // router.use(`${API_VERSION}/documents`, documentsRoutes);

@@ -36,13 +36,26 @@ export function getActualColumnName(expectedName: keyof typeof USER_COLUMN_MAPPI
  * Convert database row to expected format
  */
 export function mapUserRow(dbRow: any): any {
+  // Try to extract professionalRole from description (stored as JSON)
+  let professionalRole = dbRow.reg_type; // Fallback to reg_type
+  if (dbRow.description) {
+    try {
+      const desc = typeof dbRow.description === 'string' ? JSON.parse(dbRow.description) : dbRow.description;
+      if (desc.professionalRole) {
+        professionalRole = desc.professionalRole;
+      }
+    } catch (e) {
+      // If description is not JSON, use reg_type as fallback
+    }
+  }
+
   return {
     id: dbRow.id,
     firebase_uid: dbRow.firebase_uid,
     email: dbRow.email,
     registration_number: dbRow.registration,
     revalidation_date: dbRow.due_date,
-    professional_role: dbRow.reg_type,
+    professional_role: professionalRole,
     work_setting: dbRow.work_settings ? String(dbRow.work_settings) : null,
     scope_of_practice: dbRow.scope_practice ? String(dbRow.scope_practice) : null,
     subscription_tier: dbRow.subscription_tier || 'free',

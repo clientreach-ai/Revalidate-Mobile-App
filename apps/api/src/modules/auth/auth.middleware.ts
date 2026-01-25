@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import { JWT_CONFIG } from '../../config/env';
 import { JwtPayload } from './auth.types';
 import { ApiError } from '../../common/middleware/error-handler';
-import { getFirebaseAuth } from '../../config/firebase';
 
 /**
  * Extend Express Request to include user info
@@ -14,7 +13,6 @@ declare global {
       user?: {
         userId: string;
         email: string;
-        firebaseUid?: string;
       };
     }
   }
@@ -44,7 +42,6 @@ export function authenticateToken(
     req.user = {
       userId: decoded.userId,
       email: decoded.email,
-      firebaseUid: decoded.firebaseUid,
     };
 
     next();
@@ -74,7 +71,6 @@ export function optionalAuth(
       req.user = {
         userId: decoded.userId,
         email: decoded.email,
-        firebaseUid: decoded.firebaseUid,
       };
     }
     next();
@@ -84,44 +80,3 @@ export function optionalAuth(
   }
 }
 
-/**
- * Middleware to verify Firebase ID token directly
- * 
- * Use this for endpoints that need to verify Firebase ID token
- * (e.g., initial login/registration, token refresh)
- */
-export async function verifyFirebaseIdToken(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  try {
-    const authHeader = req.headers.authorization;
-    const idToken = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    if (!idToken) {
-      throw new ApiError(401, 'Firebase ID token required');
-    }
-
-    const firebaseAuth = getFirebaseAuth();
-
-    const decodedToken = await firebaseAuth.verifyIdToken(idToken);
-    
-    // Attach Firebase user info to request
-    (req as any).firebaseUser = {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      emailVerified: decodedToken.email_verified,
-    };
-
-    next();
-  } catch (error: any) {
-    if (error.code === 'auth/id-token-expired') {
-      throw new ApiError(401, 'Firebase ID token has expired');
-    }
-    if (error.code === 'auth/argument-error') {
-      throw new ApiError(401, 'Invalid Firebase ID token');
-    }
-    throw new ApiError(401, 'Failed to verify Firebase ID token');
-  }
-}

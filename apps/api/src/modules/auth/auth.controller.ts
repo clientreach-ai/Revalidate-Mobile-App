@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { getFirebaseAuth } from '../../config/firebase';
+import bcrypt from 'bcrypt';
 import { getMySQLPool } from '../../config/database';
 import { JWT_CONFIG } from '../../config/env';
 import { asyncHandler } from '../../common/middleware/async-handler';
@@ -14,12 +14,12 @@ import {
   ChangePasswordRequest,
 } from './auth.types';
 import { z } from 'zod';
-import { DecodedIdToken } from 'firebase-admin/auth';
 import { mapUserRow } from '../../config/database-mapping';
 
 // Validation schemas
 const registerSchema = z.object({
-  firebaseIdToken: z.string().min(1, 'Firebase ID token is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   professionalDetails: z.object({
     registrationNumber: z.string().min(1, 'Registration number is required'),
     revalidationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
@@ -30,88 +30,28 @@ const registerSchema = z.object({
 });
 
 const loginSchema = z.object({
-  firebaseIdToken: z.string().min(1, 'Firebase ID token is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
 /**
- * Verify Firebase ID token and return decoded token
+ * Hash password using bcrypt
  */
-async function verifyFirebaseToken(idToken: string): Promise<DecodedIdToken> {
-  const firebaseAuth = getFirebaseAuth();
-  try {
-    const decodedToken = await firebaseAuth.verifyIdToken(idToken);
-    return decodedToken;
-  } catch (error: any) {
-    if (error.code === 'auth/id-token-expired') {
-      throw new ApiError(401, 'Firebase ID token has expired');
-    }
-    if (error.code === 'auth/argument-error') {
-      throw new ApiError(401, 'Invalid Firebase ID token');
-    }
-    throw new ApiError(401, 'Failed to verify Firebase ID token');
-  }
+async function hashPassword(password: string): Promise<string> {
+  const saltRounds = 10;
+  return bcrypt.hash(password, saltRounds);
 }
 
 /**
- * Get or create MySQL user from Firebase UID
+ * Verify password against hash
  */
-async function getOrCreateMySQLUser(
-  firebaseUid: string,
-  email: string,
-  professionalDetails?: RegisterRequest['professionalDetails']
-): Promise<any> {
-  const pool = getMySQLPool();
-
-  // Check if user exists in MySQL
-  const [existingUsers] = await pool.execute(
-    'SELECT id, email, reg_type, due_date, registration, work_settings, scope_practice FROM users WHERE firebase_uid = ?',
-    [firebaseUid]
-  ) as any[];
-
-  if (existingUsers.length > 0) {
-    return existingUsers[0];
-  }
-
-  // User doesn't exist - create new user
-  // If professionalDetails provided, this is registration
-  // Otherwise, this is first login (shouldn't happen, but handle gracefully)
-  if (!professionalDetails) {
-    throw new ApiError(400, 'User not found. Please complete registration first.');
-  }
-
-  const [result] = await pool.execute(
-    `INSERT INTO users (
-      firebase_uid, email, registration, due_date, 
-      reg_type, work_settings, scope_practice, 
-      subscription_tier, subscription_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'free', 'active', NOW(), NOW())`,
-    [
-      firebaseUid,
-      email,
-      professionalDetails.registrationNumber,
-      professionalDetails.revalidationDate,
-      professionalDetails.professionalRole,
-      professionalDetails.workSetting || null,
-      professionalDetails.scopeOfPractice || null,
-    ]
-  ) as any;
-
-  const [newUsers] = await pool.execute(
-    'SELECT id, email, reg_type, due_date, registration, work_settings, scope_practice FROM users WHERE id = ?',
-    [result.insertId]
-  ) as any[];
-
-  const mapped = mapUserRow(newUsers[0]);
-  return {
-    id: mapped.id,
-    email: mapped.email,
-    professional_role: mapped.professional_role,
-    revalidation_date: mapped.revalidation_date,
-  };
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
 }
 
 /**
@@ -126,47 +66,61 @@ function generateToken(payload: JwtPayload): string {
 /**
  * Register a new user
  * POST /api/v1/auth/register
- * 
- * Flow:
- * 1. Client creates Firebase account (email/password or social)
- * 2. Client gets Firebase ID token
- * 3. Client sends ID token + professional details to this endpoint
- * 4. Backend verifies ID token, creates MySQL user record
- * 5. Backend returns JWT token for API requests
  */
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const validated = registerSchema.parse(req.body) as RegisterRequest;
-  const firebaseAuth = getFirebaseAuth();
-
-  // Verify Firebase ID token
-  const decodedToken = await verifyFirebaseToken(validated.firebaseIdToken);
-  const firebaseUid = decodedToken.uid;
-  const email = decodedToken.email;
-
-  if (!email) {
-    throw new ApiError(400, 'Email not found in Firebase token');
-  }
+  const pool = getMySQLPool();
 
   // Check if user already exists
-  const pool = getMySQLPool();
   const [existingUsers] = await pool.execute(
-    'SELECT id FROM users WHERE firebase_uid = ? OR email = ?',
-    [firebaseUid, email]
+    'SELECT id FROM users WHERE email = ?',
+    [validated.email]
   ) as any[];
 
   if (existingUsers.length > 0) {
     throw new ApiError(409, 'User already exists. Please login instead.');
   }
 
-  // Create user in MySQL
-  const userData = await getOrCreateMySQLUser(firebaseUid, email, validated.professionalDetails);
+  // Hash password
+  const passwordHash = await hashPassword(validated.password);
+
+  // Create user in MySQL (using existing table structure)
+  // Note: reg_type enum is ('admin','email','mobile','facebook','google','apple')
+  // We use 'email' for email/password registrations
+  // Professional role info can be stored in description or handled separately
+  const [result] = await pool.execute(
+    `INSERT INTO users (
+      email, password, name, registration, due_date, 
+      reg_type, work_settings, scope_practice, 
+      subscription_tier, subscription_status, status, user_type,
+      description, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'free', 'active', '1', 'Customer', ?, NOW(), NOW())`,
+    [
+      validated.email,
+      passwordHash,
+      validated.email.split('@')[0], // Use email prefix as name
+      validated.professionalDetails.registrationNumber,
+      validated.professionalDetails.revalidationDate,
+      'email', // reg_type: always 'email' for email/password registration
+      validated.professionalDetails.workSetting || null,
+      validated.professionalDetails.scopeOfPractice || null,
+      JSON.stringify({ professionalRole: validated.professionalDetails.professionalRole }), // Store in description as JSON
+    ]
+  ) as any;
+
+  // Get created user
+  const [newUsers] = await pool.execute(
+    'SELECT id, email, reg_type, due_date, registration, work_settings, scope_practice FROM users WHERE id = ?',
+    [result.insertId]
+  ) as any[];
+
+  const userData = newUsers[0];
   const user = mapUserRow(userData);
 
   // Generate JWT token for API requests
   const token = generateToken({
     userId: user.id.toString(),
     email: user.email,
-    firebaseUid,
   });
 
   const response: AuthResponse = {
@@ -188,35 +142,46 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 /**
  * Login user
  * POST /api/v1/auth/login
- * 
- * Flow:
- * 1. Client authenticates with Firebase (email/password or social)
- * 2. Client gets Firebase ID token
- * 3. Client sends ID token to this endpoint
- * 4. Backend verifies ID token, gets/creates MySQL user
- * 5. Backend returns JWT token for API requests
  */
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const validated = loginSchema.parse(req.body) as LoginRequest;
+  const pool = getMySQLPool();
 
-  // Verify Firebase ID token
-  const decodedToken = await verifyFirebaseToken(validated.firebaseIdToken);
-  const firebaseUid = decodedToken.uid;
-  const email = decodedToken.email;
+  // Get user by email
+  const [users] = await pool.execute(
+    'SELECT id, email, password, reg_type, due_date, registration, work_settings, scope_practice, status FROM users WHERE email = ?',
+    [validated.email]
+  ) as any[];
 
-  if (!email) {
-    throw new ApiError(400, 'Email not found in Firebase token');
+  if (users.length === 0) {
+    throw new ApiError(401, 'Invalid email or password');
   }
 
-  // Get or create MySQL user (create if first login after Firebase auth)
-  const userData = await getOrCreateMySQLUser(firebaseUid, email);
+  const userData = users[0];
+
+  // Check if user is active
+  if (userData.status === '0') {
+    throw new ApiError(403, 'Account is inactive. Please contact support.');
+  }
+
+  // Check if user has a password
+  if (!userData.password) {
+    throw new ApiError(401, 'Account not set up. Please reset your password first.');
+  }
+
+  // Verify password
+  const isValidPassword = await verifyPassword(validated.password, userData.password);
+
+  if (!isValidPassword) {
+    throw new ApiError(401, 'Invalid email or password');
+  }
+
   const user = mapUserRow(userData);
 
   // Generate JWT token for API requests
   const token = generateToken({
     userId: user.id.toString(),
     email: user.email,
-    firebaseUid,
   });
 
   const response: AuthResponse = {
@@ -248,7 +213,7 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response) =
   const [users] = await pool.execute(
     `SELECT id, email, registration, due_date, reg_type, 
      work_settings, scope_practice, subscription_tier, subscription_status, 
-     trial_ends_at, created_at, updated_at, firebase_uid
+     trial_ends_at, created_at, updated_at
      FROM users WHERE id = ?`,
     [req.user.userId]
   ) as any[];
@@ -283,8 +248,8 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response) =
  * Request password reset
  * POST /api/v1/auth/password-reset
  * 
- * Note: Password reset is handled entirely by Firebase.
- * This endpoint can be used to trigger Firebase password reset email.
+ * Note: This generates a reset token and stores it in the database.
+ * In production, you would send an email with a reset link.
  */
 export const requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
   const { email } = req.body as PasswordResetRequest;
@@ -293,41 +258,40 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
     throw new ApiError(400, 'Email is required');
   }
 
-  const firebaseAuth = getFirebaseAuth();
+  const pool = getMySQLPool();
 
-  try {
-    // Generate password reset link
-    const resetLink = await firebaseAuth.generatePasswordResetLink(email);
-    
-    // In production, send email with reset link via your email service
-    // For now, we'll just return success
-    // TODO: Integrate email service (SendGrid, AWS SES, etc.)
-    
+  // Check if user exists
+  const [users] = await pool.execute(
+    'SELECT id, email FROM users WHERE email = ?',
+    [email]
+  ) as any[];
+
+  // Don't reveal if user exists (security best practice)
+  if (users.length === 0) {
     res.json({
       success: true,
-      message: 'Password reset link sent to email',
-      // Remove in production - only for development
-      ...(process.env.NODE_ENV === 'development' && { resetLink }),
+      message: 'If an account exists, a password reset link has been sent',
     });
-  } catch (error: any) {
-    if (error.code === 'auth/user-not-found') {
-      // Don't reveal if user exists
-      res.json({
-        success: true,
-        message: 'If an account exists, a password reset link has been sent',
-      });
-      return;
-    }
-    throw new ApiError(500, 'Failed to send password reset email');
+    return;
   }
+
+  // Generate reset token (in production, store this in database with expiry)
+  // For now, we'll just return success
+  // TODO: Implement proper password reset token storage and email sending
+  
+  res.json({
+    success: true,
+    message: 'If an account exists, a password reset link has been sent',
+    // Remove in production - only for development
+    ...(process.env.NODE_ENV === 'development' && { 
+      note: 'Password reset email functionality needs to be implemented' 
+    }),
+  });
 });
 
 /**
  * Change password (authenticated)
  * POST /api/v1/auth/change-password
- * 
- * Note: Password changes are handled by Firebase.
- * This endpoint updates the password in Firebase using the user's Firebase UID.
  */
 export const changePassword = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
@@ -335,12 +299,11 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   }
 
   const validated = changePasswordSchema.parse(req.body) as ChangePasswordRequest;
-  const firebaseAuth = getFirebaseAuth();
   const pool = getMySQLPool();
 
-  // Get user's Firebase UID
+  // Get user's current password
   const [users] = await pool.execute(
-    'SELECT firebase_uid FROM users WHERE id = ?',
+    'SELECT password FROM users WHERE id = ?',
     [req.user.userId]
   ) as any[];
 
@@ -348,20 +311,27 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
     throw new ApiError(404, 'User not found');
   }
 
-  const firebaseUid = users[0].firebase_uid;
+  const currentPasswordHash = users[0].password;
 
-  if (!firebaseUid) {
-    throw new ApiError(400, 'User does not have a Firebase account linked');
+  if (!currentPasswordHash) {
+    throw new ApiError(400, 'User does not have a password set');
   }
 
-  // Update password in Firebase
-  try {
-    await firebaseAuth.updateUser(firebaseUid, {
-      password: validated.newPassword,
-    });
-  } catch (error: any) {
-    throw new ApiError(500, 'Failed to update password');
+  // Verify current password
+  const isValidPassword = await verifyPassword(validated.currentPassword, currentPasswordHash);
+
+  if (!isValidPassword) {
+    throw new ApiError(401, 'Current password is incorrect');
   }
+
+  // Hash new password
+  const newPasswordHash = await hashPassword(validated.newPassword);
+
+  // Update password in database
+  await pool.execute(
+    'UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?',
+    [newPasswordHash, req.user.userId]
+  );
 
   res.json({
     success: true,
@@ -373,42 +343,17 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
  * Refresh token
  * POST /api/v1/auth/refresh
  * 
- * Client sends Firebase ID token to refresh our JWT token
+ * Client sends current JWT token to get a new one
  */
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
-  const { firebaseIdToken } = req.body;
-
-  if (!firebaseIdToken) {
-    throw new ApiError(400, 'Firebase ID token is required');
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
   }
-
-  // Verify Firebase ID token
-  const decodedToken = await verifyFirebaseToken(firebaseIdToken);
-  const firebaseUid = decodedToken.uid;
-  const email = decodedToken.email;
-
-  if (!email) {
-    throw new ApiError(400, 'Email not found in Firebase token');
-  }
-
-  // Get MySQL user
-  const pool = getMySQLPool();
-  const [users] = await pool.execute(
-    'SELECT id, email FROM users WHERE firebase_uid = ?',
-    [firebaseUid]
-  ) as any[];
-
-  if (users.length === 0) {
-    throw new ApiError(404, 'User not found');
-  }
-
-  const user = users[0];
 
   // Generate new JWT token
   const token = generateToken({
-    userId: user.id.toString(),
-    email: user.email,
-    firebaseUid,
+    userId: req.user.userId,
+    email: req.user.email,
   });
 
   res.json({

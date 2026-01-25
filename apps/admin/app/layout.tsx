@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Revalidation Tracker - Admin',
+  title: 'Revalidation Tracker - Admin Dashboard',
   description: 'Admin dashboard for Revalidation Tracker',
 };
 

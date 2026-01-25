@@ -15,29 +15,27 @@ const router = Router();
  * Authentication Routes
  * 
  * Flow:
- * 1. Client authenticates with Firebase (email/password or social login)
- * 2. Client receives Firebase ID token
- * 3. Client sends Firebase ID token to /register or /login
- * 4. Backend verifies Firebase ID token and links to MySQL user
- * 5. Backend returns JWT token for subsequent API requests
+ * 1. Client sends email/password to /register or /login
+ * 2. Backend verifies password against MySQL database
+ * 3. Backend returns JWT token for subsequent API requests
  */
 
-// Registration: Client sends Firebase ID token + professional details
+// Registration: Client sends email, password, and professional details
 router.post('/register', register);
 
-// Login: Client sends Firebase ID token
+// Login: Client sends email and password
 router.post('/login', login);
 
 // Get current user (requires JWT token)
 router.get('/me', authenticateToken, getCurrentUser);
 
-// Password reset: Triggered via Firebase (this is optional - Firebase handles it)
+// Password reset: Request password reset link
 router.post('/password-reset', requestPasswordReset);
 
-// Change password: Updates password in Firebase
+// Change password: Updates password in MySQL
 router.post('/change-password', authenticateToken, changePassword);
 
-// Refresh token: Client sends Firebase ID token to get new JWT token
-router.post('/refresh', refreshToken);
+// Refresh token: Client sends current JWT token to get new one
+router.post('/refresh', authenticateToken, refreshToken);
 
 export default router;
