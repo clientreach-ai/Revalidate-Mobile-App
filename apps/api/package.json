@@ -24,7 +24,7 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
-    "@prisma/client": "^5.19.0",
+    "@prisma/client": "^5.22.0",
     "axios": "^1.6.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
@@ -42,8 +42,8 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.5",
-    "@types/nodemailer": "^6.4.14",
     "@types/node": "^20.19.30",
+    "@types/nodemailer": "^6.4.14",
     "prisma": "^5.19.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"

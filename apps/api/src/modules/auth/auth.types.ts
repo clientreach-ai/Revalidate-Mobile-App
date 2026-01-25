@@ -10,13 +10,6 @@
 export interface RegisterRequest {
   email: string;
   password: string;
-  professionalDetails: {
-    registrationNumber: string;
-    revalidationDate: string; // ISO date string
-    professionalRole: 'doctor' | 'nurse' | 'pharmacist' | 'other';
-    workSetting?: string;
-    scopeOfPractice?: string;
-  };
 }
 
 export interface LoginRequest {
@@ -47,5 +40,15 @@ export interface PasswordResetRequest {
 }
 
 export interface ChangePasswordRequest {
+  currentPassword: string;
   newPassword: string;
+}
+
+export interface VerifyOTPRequest {
+  email: string;
+  otp: string;
+}
+
+export interface ResendOTPRequest {
+  email: string;
 }

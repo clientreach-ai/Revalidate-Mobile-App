@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,1107 +7,1436 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model addressbooks {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  house_number String
-  street_road String?
-  county String?
-  town String?
-  postcode String
-  type String
-  address1 String?
-  recyclebin_status String @default(0)
-  recyclebin_datetime DateTime?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id                  BigInt                         @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id             BigInt                         @db.UnsignedBigInt
+  house_number        String                         @db.Text
+  street_road         String?                        @db.Text
+  county              String?                        @db.VarChar(200)
+  town                String?                        @db.VarChar(200)
+  postcode            String
+  type                addressbooks_type
+  address1            String?                        @db.VarChar(500)
+  recyclebin_status   addressbooks_recyclebin_status @default(dbgenerated("0"))
+  recyclebin_datetime DateTime?                      @db.DateTime(0)
+  created_at          DateTime                       @default(now()) @db.Timestamp(0)
+  updated_at          DateTime                       @default(now()) @db.Timestamp(0)
+  users               users                          @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "addressbooks_user_id_foreign")
 
-  @@map("addressbooks")
+  @@index([user_id], map: "addressbooks_user_id_foreign")
 }
 
 model appraisal_records {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
+  id             BigInt   @id @default(autoincrement())
+  user_id        BigInt   @db.UnsignedBigInt
   appraisal_date DateTime @db.Date
-  notes String?
-  document_ids String?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  notes          String?  @db.Text
+  document_ids   String?  @db.Text
+  created_at     DateTime @default(now()) @db.Timestamp(0)
+  updated_at     DateTime @default(now()) @db.Timestamp(0)
+  users          users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "appraisal_records_ibfk_1")
 
-  @@map("appraisal_records")
+  @@index([appraisal_date], map: "idx_appraisal_date")
+  @@index([user_id], map: "idx_user_id")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model attendances {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  name String
-  date DateTime
-  work_settings Int
+  id             BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id        BigInt             @db.UnsignedBigInt
+  name           String             @db.VarChar(200)
+  date           DateTime           @db.Date
+  work_settings  Int
   scope_practice Int
-  registration Int
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  registration   Int
+  status         attendances_status @default(dbgenerated("0"))
+  created_at     DateTime           @default(now()) @db.Timestamp(0)
+  updated_at     DateTime           @default(now()) @db.Timestamp(0)
+  users          users              @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "attendance_hours_user_id_foreign")
 
-  @@map("attendances")
+  @@index([user_id], map: "attendance_hours_user_id_foreign")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model banners {
-  id BigInt @id @default(autoincrement())
-  name String
-  image String
-  short_order Int @default(0)
-  type String?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("banners")
+  id          BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  name        String         @db.VarChar(100)
+  image       String         @db.VarChar(100)
+  short_order Int            @default(0)
+  type        String?
+  status      banners_status @default(dbgenerated("0"))
+  created_at  DateTime       @default(now()) @db.Timestamp(0)
+  updated_at  DateTime       @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model brands {
-  id BigInt @id @default(autoincrement())
-  name String
-  image String
-  short_order Int @default(0)
-  description String?
-  home String @default(0)
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("brands")
+  id          BigInt        @id @default(autoincrement()) @db.UnsignedBigInt
+  name        String        @db.VarChar(100)
+  image       String        @db.VarChar(100)
+  short_order Int           @default(0)
+  description String?       @db.LongText
+  home        brands_home   @default(dbgenerated("0"))
+  status      brands_status @default(dbgenerated("0"))
+  created_at  DateTime      @default(now()) @db.Timestamp(0)
+  updated_at  DateTime      @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model calender_bookings {
-  id BigInt @id @default(autoincrement())
-  name String
-  location String
-  description String
-  start_date DateTime
-  end_date DateTime
-  start_time DateTime
-  end_time DateTime
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("calender_bookings")
+  id          BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  name        String                   @db.VarChar(200)
+  location    String                   @db.VarChar(200)
+  description String                   @db.VarChar(200)
+  start_date  DateTime                 @db.Date
+  end_date    DateTime                 @db.Date
+  start_time  DateTime                 @db.Time(0)
+  end_time    DateTime                 @db.Time(0)
+  status      calender_bookings_status @default(dbgenerated("0"))
+  created_at  DateTime                 @default(now()) @db.Timestamp(0)
+  updated_at  DateTime                 @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model categories {
-  id BigInt @id @default(autoincrement())
-  name String
-  price Decimal @default(0.00)
-  slug String?
-  parent_id BigInt?
-  short_order Int?
-  image String?
-  description String?
-  top_category Int @default(0)
-  must_try_status String @default(0)
-  status String @default(0)
-  banner_image String?
-  recyclebin_status String @default(0)
-  recyclebin_datetime DateTime?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id                  BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
+  name                String                       @db.VarChar(100)
+  price               Decimal                      @default(0.00) @db.Decimal(18, 2)
+  slug                String?                      @db.VarChar(100)
+  parent_id           BigInt?                      @db.UnsignedBigInt
+  short_order         Int?
+  image               String?
+  description         String?                      @db.LongText
+  top_category        Int                          @default(0)
+  must_try_status     categories_must_try_status   @default(dbgenerated("0"))
+  status              categories_status            @default(dbgenerated("0"))
+  banner_image        String?
+  recyclebin_status   categories_recyclebin_status @default(dbgenerated("0"))
+  recyclebin_datetime DateTime?                    @db.DateTime(0)
+  created_at          DateTime                     @default(now()) @db.Timestamp(0)
+  updated_at          DateTime                     @default(now()) @db.Timestamp(0)
+  categories          categories?                  @relation("categoriesTocategories", fields: [parent_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "parentid_foreign")
+  other_categories    categories[]                 @relation("categoriesTocategories")
 
-  @@map("categories")
+  @@index([parent_id], map: "parentid_foreign")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model company_setups {
-  id BigInt @id @default(autoincrement())
-  company_name String
-  gstn String
-  company_address String?
-  number String?
-  alternate_number String?
-  email String?
-  support_email String?
-  contact_person_name String?
-  customer_care_number String?
-  bank_name String?
-  account_number String?
-  ifsc_code String?
-  bank_address String?
-  image String?
-  mail_mailer String?
-  mail_host String?
-  mail_port String?
-  mail_username String?
-  mail_password String?
-  mail_encryption String?
-  mail_from_address String?
-  mail_from_name String?
-  stripe_key String?
-  stripe_secret String?
-  paypal_key String?
-  paypal_secret String?
-  google_client_id String?
-  google_client_secret String?
-  facebook_client_id String?
-  facebook_client_secret String?
-  address_api_key String?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("company_setups")
+  id                     BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
+  company_name           String                @db.VarChar(100)
+  gstn                   String                @db.VarChar(100)
+  company_address        String?
+  number                 String?
+  alternate_number       String?
+  email                  String?
+  support_email          String?
+  contact_person_name    String?
+  customer_care_number   String?
+  bank_name              String?
+  account_number         String?
+  ifsc_code              String?
+  bank_address           String?
+  image                  String?
+  mail_mailer            String?               @db.VarChar(200)
+  mail_host              String?               @db.VarChar(200)
+  mail_port              String?               @db.VarChar(200)
+  mail_username          String?               @db.VarChar(200)
+  mail_password          String?               @db.VarChar(200)
+  mail_encryption        String?               @db.VarChar(200)
+  mail_from_address      String?               @db.VarChar(200)
+  mail_from_name         String?               @db.VarChar(200)
+  stripe_key             String?               @db.VarChar(200)
+  stripe_secret          String?               @db.VarChar(200)
+  paypal_key             String?               @db.VarChar(200)
+  paypal_secret          String?               @db.VarChar(200)
+  google_client_id       String?               @db.VarChar(200)
+  google_client_secret   String?               @db.VarChar(200)
+  facebook_client_id     String?               @db.VarChar(200)
+  facebook_client_secret String?               @db.VarChar(200)
+  address_api_key        String?               @db.VarChar(200)
+  status                 company_setups_status @default(dbgenerated("0"))
+  created_at             DateTime              @default(now()) @db.Timestamp(0)
+  updated_at             DateTime              @default(now()) @db.Timestamp(0)
 }
 
 model contact_us {
-  id BigInt @id @default(autoincrement())
-  name String
-  mobile String
-  subject String
-  message String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("contact_us")
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String   @db.VarChar(100)
+  mobile     String   @db.VarChar(100)
+  subject    String   @db.VarChar(500)
+  message    String   @db.LongText
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model countries {
-  id Int @id @default(autoincrement())
-  name String
-  iso3 String?
-  numeric_code String?
-  iso2 String?
-  phonecode String?
-  capital String?
-  currency String?
-  currency_symbol String?
-  tld String?
-  native String?
-  region String?
-  subregion String?
-  timezones String?
-  translations String?
-  latitude Decimal?
-  longitude Decimal?
-  emoji String?
-  emojiU String?
-  created_at DateTime?
-  updated_at DateTime @default(now())
-  flag Int @default(1)
-  wikiDataId String?
-
-  @@map("countries")
+  id              Int       @id @default(autoincrement()) @db.UnsignedMediumInt
+  name            String    @db.VarChar(100)
+  iso3            String?   @db.Char(3)
+  numeric_code    String?   @db.Char(3)
+  iso2            String?   @db.Char(2)
+  phonecode       String?   @db.VarChar(255)
+  capital         String?   @db.VarChar(255)
+  currency        String?   @db.VarChar(255)
+  currency_symbol String?   @db.VarChar(255)
+  tld             String?   @db.VarChar(255)
+  native          String?   @db.VarChar(255)
+  region          String?   @db.VarChar(255)
+  subregion       String?   @db.VarChar(255)
+  timezones       String?   @db.Text
+  translations    String?   @db.Text
+  latitude        Decimal?  @db.Decimal(10, 8)
+  longitude       Decimal?  @db.Decimal(11, 8)
+  emoji           String?
+  emojiU          String?
+  created_at      DateTime? @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+  flag            Boolean   @default(true)
+  wikiDataId      String?   @db.VarChar(255)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model cpd_hours {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  date DateTime
-  method String?
-  topic String?
-  link_code String?
-  standards_proficiency String?
-  number_hours String?
-  participatory_hours String?
-  document String?
-  learning_type String?
-  standard String?
-  learning String?
-  status String @default(0)
-  reset String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-  duration_minutes Int?
+  id                    BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id               BigInt           @db.UnsignedBigInt
+  date                  DateTime         @db.Date
+  method                String?          @db.VarChar(200)
+  topic                 String?          @db.VarChar(200)
+  link_code             String?          @db.VarChar(200)
+  standards_proficiency String?          @db.VarChar(200)
+  number_hours          String?          @db.VarChar(200)
+  participatory_hours   String?          @db.VarChar(200)
+  document              String?          @db.VarChar(200)
+  learning_type         String?          @db.VarChar(200)
+  standard              String?          @db.VarChar(200)
+  learning              String?          @db.VarChar(200)
+  status                cpd_hours_status @default(dbgenerated("0"))
+  reset                 cpd_hours_reset  @default(dbgenerated("0"))
+  created_at            DateTime         @default(now()) @db.Timestamp(0)
+  updated_at            DateTime         @default(now()) @db.Timestamp(0)
+  duration_minutes      Int?
+  users                 users            @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "cpd_hours_user_id_foreign")
 
-  @@map("cpd_hours")
+  @@index([user_id], map: "cpd_hours_user_id_foreign")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model criterias {
-  id BigInt @id @default(autoincrement())
-  name String
-  questions String?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("criterias")
+  id         BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  questions  String?          @db.Text
+  status     criterias_status @default(dbgenerated("0"))
+  created_at DateTime         @default(now()) @db.Timestamp(0)
+  updated_at DateTime         @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model currency_values {
-  id BigInt @id @default(autoincrement())
-  name String
-  image String
-  first_icon String
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  name        String   @unique(map: "currency_values_name_unique")
+  image       String
+  first_icon  String
   second_icon String?
-  value String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("currency_values")
+  value       String
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  updated_at  DateTime @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model designations {
-  id BigInt @id @default(autoincrement())
-  designations String
-  status String @default(1)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("designations")
+  id           BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  designations String              @db.VarChar(100)
+  status       designations_status @default(dbgenerated("1"))
+  created_at   DateTime            @default(now()) @db.Timestamp(0)
+  updated_at   DateTime            @default(now()) @db.Timestamp(0)
 }
 
 model discussions {
-  id Int @id @default(autoincrement())
-  user_id BigInt?
-  where String
-  date DateTime
-  discussion String
-  notes String?
-  document String?
-  status String @default(1)
-  reset String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id         Int                @id @default(autoincrement())
+  user_id    BigInt?            @db.UnsignedBigInt
+  where      String             @db.VarChar(200)
+  date       DateTime           @db.Date
+  discussion String             @db.VarChar(200)
+  notes      String?            @db.LongText
+  document   String?            @db.VarChar(200)
+  status     discussions_status @default(dbgenerated("1"))
+  reset      discussions_reset  @default(dbgenerated("0"))
+  created_at DateTime           @default(now()) @db.Timestamp(0)
+  updated_at DateTime           @default(now()) @db.Timestamp(0)
+  users      users?             @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "discussions_hours_user_id_foreign")
 
-  @@map("discussions")
+  @@index([user_id], map: "discussions_hours_user_id_foreign")
 }
 
 model earnings {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt?
-  financial_year_id BigInt?
-  working_hour_id BigInt?
-  earnings Decimal @default(0)
-  date_recorded DateTime @default(now())
-  description String?
-  created_at DateTime? @default(now())
-  updated_at DateTime @default(now())
+  id                BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id           BigInt?          @db.UnsignedBigInt
+  financial_year_id BigInt?          @db.UnsignedBigInt
+  working_hour_id   BigInt?          @db.UnsignedBigInt
+  earnings          Decimal          @default(0) @db.Decimal(8, 0)
+  date_recorded     DateTime         @default(now()) @db.Timestamp(0)
+  description       String?          @db.VarChar(256)
+  created_at        DateTime?        @default(now()) @db.Timestamp(0)
+  updated_at        DateTime         @default(now()) @db.Timestamp(0)
+  financial_years   financial_years? @relation(fields: [financial_year_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "earnings_fk")
+  users             users?           @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "user")
+  working_hours     working_hours?   @relation(fields: [working_hour_id], references: [id], onDelete: Cascade, map: "working_hour")
 
-  @@map("earnings")
+  @@index([financial_year_id], map: "earnings_fk")
+  @@index([user_id], map: "user")
+  @@index([working_hour_id], map: "working_hour")
 }
 
 model failed_jobs {
-  id BigInt @id @default(autoincrement())
-  uuid String
-  connection String
-  queue String
-  payload String
-  exception String
-  failed_at DateTime @default(now())
-
-  @@map("failed_jobs")
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid       String   @unique(map: "failed_jobs_uuid_unique")
+  connection String   @db.Text
+  queue      String   @db.Text
+  payload    String   @db.LongText
+  exception  String   @db.LongText
+  failed_at  DateTime @default(now()) @db.Timestamp(0)
 }
 
 model feedback_log {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  feedback_date DateTime
-  feedback_type String
-  feedback_text String?
-  document_ids String?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id            BigInt                     @id @default(autoincrement())
+  user_id       BigInt                     @db.UnsignedBigInt
+  feedback_date DateTime                   @db.Date
+  feedback_type feedback_log_feedback_type
+  feedback_text String?                    @db.Text
+  document_ids  String?                    @db.Text
+  created_at    DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at    DateTime                   @default(now()) @db.Timestamp(0)
+  users         users                      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "feedback_log_ibfk_1")
 
-  @@map("feedback_log")
+  @@index([feedback_date], map: "idx_feedback_date")
+  @@index([feedback_type], map: "idx_feedback_type")
+  @@index([user_id], map: "idx_user_id")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model file_managers {
-  id BigInt @id @default(autoincrement())
-  name String
-  image String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("file_managers")
+  id         BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String               @db.VarChar(200)
+  image      String               @db.VarChar(200)
+  status     file_managers_status @default(dbgenerated("0"))
+  created_at DateTime             @default(now()) @db.Timestamp(0)
+  updated_at DateTime             @default(now()) @db.Timestamp(0)
 }
 
 model financial_years {
-  id BigInt @id @default(autoincrement())
-  name String?
-  start_date DateTime? @default(now())
-  end_date DateTime @default(now())
-  is_current Int @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("financial_years")
+  id         BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String?    @db.VarChar(256)
+  start_date DateTime?  @default(now()) @db.Timestamp(0)
+  end_date   DateTime   @default(now()) @db.Timestamp(0)
+  is_current Boolean    @default(false)
+  created_at DateTime   @default(now()) @db.Timestamp(0)
+  updated_at DateTime   @default(now()) @db.Timestamp(0)
+  earnings   earnings[]
 }
 
 model helps {
-  id Int @id @default(autoincrement())
-  name String?
-  email String?
-  phone String?
-  questions String?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("helps")
+  id         Int      @id @default(autoincrement())
+  name       String?  @db.VarChar(50)
+  email      String?  @db.VarChar(60)
+  phone      String?  @db.VarChar(20)
+  questions  String?  @db.Text
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model hospitals {
-  id BigInt @id @default(autoincrement())
-  name String
-  unique_id String
-  about1 String
-  about2 String
-  about3 String
-  about4 String
-  about5 String
-  address1 String
-  address2 String
-  postcode String
-  county String
-  town String
-  mobile String?
-  email String?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("hospitals")
+  id         BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  unique_id  String
+  about1     String
+  about2     String
+  about3     String
+  about4     String
+  about5     String
+  address1   String           @db.VarChar(200)
+  address2   String           @db.VarChar(200)
+  postcode   String           @db.VarChar(200)
+  county     String           @db.VarChar(200)
+  town       String           @db.VarChar(200)
+  mobile     String?          @db.VarChar(200)
+  email      String?          @db.VarChar(200)
+  status     hospitals_status @default(dbgenerated("0"))
+  created_at DateTime         @default(now()) @db.Timestamp(0)
+  updated_at DateTime         @default(now()) @db.Timestamp(0)
 }
 
 model informations {
-  id BigInt @id @default(autoincrement())
-  title String
-  description String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("informations")
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  title       String
+  description String   @db.LongText
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  updated_at  DateTime @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model learning_methods {
-  id BigInt @id @default(autoincrement())
-  name String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("learning_methods")
+  id         BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  status     learning_methods_status @default(dbgenerated("0"))
+  created_at DateTime                @default(now()) @db.Timestamp(0)
+  updated_at DateTime                @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model link_codes {
-  id BigInt @id @default(autoincrement())
-  name String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("link_codes")
+  id         BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  status     link_codes_status @default(dbgenerated("0"))
+  created_at DateTime          @default(now()) @db.Timestamp(0)
+  updated_at DateTime          @default(now()) @db.Timestamp(0)
 }
 
 model logs {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  action String?
-  created_at DateTime @default(now())
-
-  @@map("logs")
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  action     String?  @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model mail_automations {
-  id BigInt @id @default(autoincrement())
-  name String?
-  list_id Int
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("mail_automations")
+  id         BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String?                 @db.VarChar(200)
+  list_id    Int
+  status     mail_automations_status @default(dbgenerated("0"))
+  created_at DateTime                @default(now()) @db.Timestamp(0)
+  updated_at DateTime                @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model mail_campaigns {
-  id BigInt @id @default(autoincrement())
-  name String
-  from_email_id Int
+  id             BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
+  name           String
+  from_email_id  Int
   reply_email_id Int
-  list_id Int
-  date DateTime?
-  time DateTime?
-  subject String?
-  description String?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("mail_campaigns")
+  list_id        Int
+  date           DateTime?             @db.Time(0)
+  time           DateTime?             @db.Time(0)
+  subject        String?               @db.VarChar(500)
+  description    String?               @db.LongText
+  status         mail_campaigns_status @default(dbgenerated("0"))
+  created_at     DateTime              @default(now()) @db.Timestamp(0)
+  updated_at     DateTime              @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model mail_categories {
-  id BigInt @id @default(autoincrement())
-  name String
-  user_ids String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("mail_categories")
+  id         BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String                 @db.VarChar(200)
+  user_ids   String                 @db.LongText
+  status     mail_categories_status @default(dbgenerated("0"))
+  created_at DateTime               @default(now()) @db.Timestamp(0)
+  updated_at DateTime               @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model mail_list_users {
-  id BigInt @id @default(autoincrement())
-  list_id Int
-  user_id Int
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("mail_list_users")
+  id         BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  list_id    Int
+  user_id    Int
+  status     mail_list_users_status @default(dbgenerated("0"))
+  created_at DateTime               @default(now()) @db.Timestamp(0)
+  updated_at DateTime               @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model mail_settings {
-  id BigInt @id @default(autoincrement())
-  mail_mailer String
-  mail_host String
-  mail_port String
-  mail_username String
-  mail_password String
-  mail_encryption String
-  mail_from_address String
-  mail_from_name String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("mail_settings")
+  id                BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  mail_mailer       String               @db.VarChar(200)
+  mail_host         String               @db.VarChar(200)
+  mail_port         String               @db.VarChar(200)
+  mail_username     String               @db.VarChar(200)
+  mail_password     String               @db.VarChar(200)
+  mail_encryption   String               @db.VarChar(200)
+  mail_from_address String               @db.VarChar(200)
+  mail_from_name    String               @db.VarChar(200)
+  status            mail_settings_status @default(dbgenerated("0"))
+  created_at        DateTime             @default(now()) @db.Timestamp(0)
+  updated_at        DateTime             @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model mail_templates {
-  id BigInt @id @default(autoincrement())
-  list_id Int?
-  name String
-  subject String?
-  description String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("mail_templates")
+  id          BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
+  list_id     Int?
+  name        String                @db.VarChar(200)
+  subject     String?               @db.VarChar(200)
+  description String                @db.LongText
+  status      mail_templates_status @default(dbgenerated("0"))
+  created_at  DateTime              @default(now()) @db.Timestamp(0)
+  updated_at  DateTime              @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model menus {
-  id BigInt @id @default(autoincrement())
-  label String
-  link String
-  active_link String
-  icon String
-  parent Int
-  sort Int
-  status String @default(1)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("menus")
+  id          BigInt       @id @default(autoincrement()) @db.UnsignedBigInt
+  label       String       @db.VarChar(100)
+  link        String       @db.VarChar(100)
+  active_link String       @db.VarChar(100)
+  icon        String       @db.VarChar(100)
+  parent      Int
+  sort        Int
+  status      menus_status @default(dbgenerated("1"))
+  created_at  DateTime     @default(now()) @db.Timestamp(0)
+  updated_at  DateTime     @default(now()) @db.Timestamp(0)
 }
 
 model migrations {
-  id Int @id @default(autoincrement())
+  id        Int    @id @default(autoincrement()) @db.UnsignedInt
   migration String
-  batch Int
-
-  @@map("migrations")
+  batch     Int
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model model_has_permissions {
-  permission_id BigInt
-  model_type String
-  model_id Int
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  permission_id BigInt      @db.UnsignedBigInt
+  model_type    String
+  model_id      Int
+  created_at    DateTime    @default(now()) @db.Timestamp(0)
+  updated_at    DateTime    @default(now()) @db.Timestamp(0)
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, map: "model_has_permissions_permission_id_foreign")
 
-  @@map("model_has_permissions")
+  @@index([permission_id], map: "model_has_permissions_permission_id_foreign")
+  @@ignore
 }
 
 model model_has_roles {
-  role_id BigInt @id
+  role_id    BigInt   @id @db.UnsignedBigInt
   model_type String
-  model_id Int
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("model_has_roles")
+  model_id   Int
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+  roles      roles    @relation(fields: [role_id], references: [id], onDelete: Cascade, map: "model_has_roles_role_id_foreign")
 }
 
 model newsletters {
-  id BigInt @id @default(autoincrement())
-  email String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("newsletters")
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  email      String
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model notifications {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt?
-  title String
-  message String
-  type String?
-  status String @default(0)
-  recyclebin_status String @default(0)
-  recyclebin_datetime DateTime?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id                  BigInt                          @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id             BigInt?                         @db.UnsignedBigInt
+  title               String                          @db.LongText
+  message             String                          @db.LongText
+  type                String?                         @db.VarChar(200)
+  status              notifications_status            @default(dbgenerated("0"))
+  recyclebin_status   notifications_recyclebin_status @default(dbgenerated("0"))
+  recyclebin_datetime DateTime?                       @db.DateTime(0)
+  created_at          DateTime                        @default(now()) @db.Timestamp(0)
+  updated_at          DateTime                        @default(now()) @db.Timestamp(0)
+  users               users?                          @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "notificatoins_hours_user_id_foreign")
 
-  @@map("notifications")
+  @@index([user_id], map: "notificatoins_hours_user_id_foreign")
 }
 
 model oauth_access_tokens {
-  id String @id
-  user_id BigInt?
-  client_id BigInt
-  name String?
-  scopes String?
-  revoked Int
-  created_at DateTime?
-  updated_at DateTime?
-  expires_at DateTime?
+  id         String    @id @db.VarChar(100)
+  user_id    BigInt?   @db.UnsignedBigInt
+  client_id  BigInt    @db.UnsignedBigInt
+  name       String?
+  scopes     String?   @db.Text
+  revoked    Boolean
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  expires_at DateTime? @db.DateTime(0)
 
-  @@map("oauth_access_tokens")
+  @@index([user_id], map: "oauth_access_tokens_user_id_index")
 }
 
 model oauth_auth_codes {
-  id String @id
-  user_id BigInt
-  client_id BigInt
-  scopes String?
-  revoked Int
-  expires_at DateTime?
+  id         String    @id @db.VarChar(100)
+  user_id    BigInt    @db.UnsignedBigInt
+  client_id  BigInt    @db.UnsignedBigInt
+  scopes     String?   @db.Text
+  revoked    Boolean
+  expires_at DateTime? @db.DateTime(0)
 
-  @@map("oauth_auth_codes")
+  @@index([user_id], map: "oauth_auth_codes_user_id_index")
 }
 
 model oauth_clients {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt?
-  name String
-  secret String?
-  provider String?
-  redirect String
-  personal_access_client Int
-  password_client Int
-  revoked Int
-  created_at DateTime?
-  updated_at DateTime?
+  id                     BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id                BigInt?   @db.UnsignedBigInt
+  name                   String
+  secret                 String?   @db.VarChar(100)
+  provider               String?
+  redirect               String    @db.Text
+  personal_access_client Boolean
+  password_client        Boolean
+  revoked                Boolean
+  created_at             DateTime? @db.Timestamp(0)
+  updated_at             DateTime? @db.Timestamp(0)
 
-  @@map("oauth_clients")
+  @@index([user_id], map: "oauth_clients_user_id_index")
 }
 
 model oauth_personal_access_clients {
-  id BigInt @id @default(autoincrement())
-  client_id BigInt
-  created_at DateTime?
-  updated_at DateTime?
-
-  @@map("oauth_personal_access_clients")
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  client_id  BigInt    @db.UnsignedBigInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
 }
 
 model oauth_refresh_tokens {
-  id String @id
-  access_token_id String
-  revoked Int
-  expires_at DateTime?
+  id              String    @id @db.VarChar(100)
+  access_token_id String    @db.VarChar(100)
+  revoked         Boolean
+  expires_at      DateTime? @db.DateTime(0)
 
-  @@map("oauth_refresh_tokens")
+  @@index([access_token_id], map: "oauth_refresh_tokens_access_token_id_index")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model order_setups {
-  id BigInt @id @default(autoincrement())
-  primary_color String?
-  secondary_color String?
-  button_color String?
-  text_color String?
-  text_border String?
-  splash_image String?
-  home_image String?
-  other_image String?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("order_setups")
+  id              BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  primary_color   String?             @db.VarChar(200)
+  secondary_color String?             @db.VarChar(200)
+  button_color    String?             @db.VarChar(200)
+  text_color      String?             @db.VarChar(200)
+  text_border     String?             @db.VarChar(200)
+  splash_image    String?             @db.VarChar(200)
+  home_image      String?             @db.VarChar(200)
+  other_image     String?             @db.VarChar(200)
+  status          order_setups_status @default(dbgenerated("0"))
+  created_at      DateTime            @default(now()) @db.Timestamp(0)
+  updated_at      DateTime            @default(now()) @db.Timestamp(0)
 }
 
 model other_healthcare_reg {
-  id Int @id @default(autoincrement())
-  name String
-  status String @default(1)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("other_healthcare_reg")
+  id         Int                         @id @default(autoincrement())
+  name       String                      @db.VarChar(264)
+  status     other_healthcare_reg_status @default(dbgenerated("1"))
+  created_at DateTime                    @default(now()) @db.Timestamp(0)
+  updated_at DateTime                    @default(now()) @db.Timestamp(0)
 }
 
 model particulars {
-  id BigInt @id @default(autoincrement())
-  name String
-  description String
-  status String @default(1)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("particulars")
+  id          BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  name        String
+  description String             @db.Text
+  status      particulars_status @default(dbgenerated("1"))
+  created_at  DateTime           @default(now()) @db.Timestamp(0)
+  updated_at  DateTime           @default(now()) @db.Timestamp(0)
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model password_resets {
-  email String
-  token String
-  created_at DateTime?
+  email      String
+  token      String
+  created_at DateTime? @db.Timestamp(0)
 
-  @@map("password_resets")
+  @@index([email], map: "password_resets_email_index")
+  @@ignore
 }
 
 model payment_consoles {
-  id BigInt @id @default(autoincrement())
-  value String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("payment_consoles")
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  value      String   @db.Text
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
 }
 
 model permissions {
-  id BigInt @id @default(autoincrement())
-  name String
-  url String
-  icon String
-  parent_id Int
-  guard_name String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("permissions")
+  id                    BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  name                  String                  @db.VarChar(100)
+  url                   String                  @db.VarChar(100)
+  icon                  String                  @db.VarChar(100)
+  parent_id             Int
+  guard_name            String                  @db.VarChar(100)
+  created_at            DateTime                @default(now()) @db.Timestamp(0)
+  updated_at            DateTime                @default(now()) @db.Timestamp(0)
+  model_has_permissions model_has_permissions[] @ignore
+  role_has_permissions  role_has_permissions[]
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model personal_documents {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  document String?
-  document_name String
-  type String @default("personal")
-  date DateTime?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("personal_documents")
+  id            BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id       BigInt                    @db.UnsignedBigInt
+  document      String?                   @db.VarChar(500)
+  document_name String                    @db.VarChar(200)
+  type          String                    @default("personal") @db.VarChar(256)
+  date          DateTime?                 @db.Date
+  status        personal_documents_status @default(dbgenerated("0"))
+  created_at    DateTime                  @default(now()) @db.Timestamp(0)
+  updated_at    DateTime                  @default(now()) @db.Timestamp(0)
 }
 
-model portfolios {
-  id BigInt @id @default(autoincrement())
-  services_id Int
-  name String
-  image String
-  status String @default(0)
-  home String @default(1)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("portfolios")
-}
-
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model portfolio_images {
-  id BigInt @id @default(autoincrement())
-  name String?
+  id           BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  name         String?                 @db.VarChar(200)
   portfolio_id Int
-  image String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  image        String                  @db.VarChar(200)
+  status       portfolio_images_status @default(dbgenerated("0"))
+  created_at   DateTime                @default(now()) @db.Timestamp(0)
+  updated_at   DateTime                @default(now()) @db.Timestamp(0)
+}
 
-  @@map("portfolio_images")
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model portfolios {
+  id          BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  services_id Int
+  name        String            @db.VarChar(200)
+  image       String            @db.VarChar(200)
+  status      portfolios_status @default(dbgenerated("0"))
+  home        portfolios_home   @default(dbgenerated("1"))
+  created_at  DateTime          @default(now()) @db.Timestamp(0)
+  updated_at  DateTime          @default(now()) @db.Timestamp(0)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model reflective_account_forms {
+  id               BigInt                          @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id          BigInt                          @db.UnsignedBigInt
+  date             DateTime                        @db.Date
+  code             String                          @db.LongText
+  cpd_activity     String                          @db.VarChar(200)
+  learn_activity   String?                         @db.VarChar(200)
+  improve_practice String                          @db.VarChar(200)
+  relevant_code    String                          @db.VarChar(200)
+  document         String?                         @db.VarChar(200)
+  status           reflective_account_forms_status @default(dbgenerated("0"))
+  reset            reflective_account_forms_reset  @default(dbgenerated("0"))
+  created_at       DateTime                        @default(now()) @db.Timestamp(0)
+  updated_at       DateTime                        @default(now()) @db.Timestamp(0)
+  users            users                           @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "reflective_account_forms_user_id_foreign")
+
+  @@index([user_id], map: "reflective_account_forms_user_id_foreign")
 }
 
 model reflective_accounts {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  reflection_date DateTime
-  reflection_text String?
-  document_ids String?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id              BigInt   @id @default(autoincrement())
+  user_id         BigInt   @db.UnsignedBigInt
+  reflection_date DateTime @db.Date
+  reflection_text String?  @db.Text
+  document_ids    String?  @db.Text
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  updated_at      DateTime @default(now()) @db.Timestamp(0)
+  users           users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "reflective_accounts_ibfk_1")
 
-  @@map("reflective_accounts")
+  @@index([reflection_date], map: "idx_reflection_date")
+  @@index([user_id], map: "idx_user_id")
 }
 
-model reflective_account_forms {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  date DateTime
-  code String
-  cpd_activity String
-  learn_activity String?
-  improve_practice String
-  relevant_code String
-  document String?
-  status String @default(0)
-  reset String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("reflective_account_forms")
-}
-
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model reflective_codes {
-  id BigInt @id @default(autoincrement())
-  name String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("reflective_codes")
-}
-
-model roles {
-  id BigInt @id @default(autoincrement())
-  name String
-  guard_name String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("roles")
+  id         BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  status     reflective_codes_status @default(dbgenerated("0"))
+  created_at DateTime                @default(now()) @db.Timestamp(0)
+  updated_at DateTime                @default(now()) @db.Timestamp(0)
 }
 
 model role_has_permissions {
-  id BigInt @id @default(autoincrement())
-  permission_id BigInt
-  role_id BigInt
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id            BigInt      @id @default(autoincrement()) @db.UnsignedBigInt
+  permission_id BigInt      @db.UnsignedBigInt
+  role_id       BigInt      @db.UnsignedBigInt
+  created_at    DateTime    @default(now()) @db.Timestamp(0)
+  updated_at    DateTime    @default(now()) @db.Timestamp(0)
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade, map: "role_has_permissions_permission_id_foreign")
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: Cascade, map: "role_has_permissions_role_id_foreign")
 
-  @@map("role_has_permissions")
+  @@index([permission_id], map: "role_has_permissions_permission_id_foreign")
+  @@index([role_id], map: "role_has_permissions_role_id_foreign")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model role_masters {
-  id BigInt @id @default(autoincrement())
-  name String
-  criterias String
-  type String
-  unity String
-  value Int
-  reflective_time Int @default(0)
-  feedback_time Int @default(0)
-  discussion_time Int @default(0)
-  CPDWork_time Int @default(0)
-  status String @default(0)
-  sort_status Int @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id              BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  name            String              @db.VarChar(200)
+  criterias       String              @db.VarChar(200)
+  type            String              @db.VarChar(200)
+  unity           String              @db.VarChar(200)
+  value           Int
+  reflective_time Int                 @default(0)
+  feedback_time   Int                 @default(0)
+  discussion_time Int                 @default(0)
+  CPDWork_time    Int                 @default(0)
+  status          role_masters_status @default(dbgenerated("0"))
+  sort_status     Int                 @default(0)
+  created_at      DateTime            @default(now()) @db.Timestamp(0)
+  updated_at      DateTime            @default(now()) @db.Timestamp(0)
+}
 
-  @@map("role_masters")
+model roles {
+  id                   BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  name                 String                 @db.VarChar(100)
+  guard_name           String                 @db.VarChar(100)
+  created_at           DateTime               @default(now()) @db.Timestamp(0)
+  updated_at           DateTime               @default(now()) @db.Timestamp(0)
+  model_has_roles      model_has_roles?
+  role_has_permissions role_has_permissions[]
 }
 
 model seeders {
-  id BigInt @id @default(autoincrement())
-  seeder String
-  seeded_at DateTime @default(now())
-
-  @@map("seeders")
+  id        BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  seeder    String
+  seeded_at DateTime @default(now()) @db.Timestamp(0)
 }
 
 model seos {
-  id Int @id @default(autoincrement())
-  type String
-  meta_title String
-  meta_keywords String
-  meta_description String
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("seos")
+  id               Int      @id @default(autoincrement())
+  type             String
+  meta_title       String   @db.Text
+  meta_keywords    String   @db.Text
+  meta_description String   @db.Text
+  created_at       DateTime @default(now()) @db.Timestamp(0)
+  updated_at       DateTime @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model sequences {
-  id BigInt @id @default(autoincrement())
+  id            BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
   automation_id Int
-  name String
-  type String?
-  list_id Int
-  subject String
-  description String?
-  send_email_id String
-  before String
-  days DateTime?
-  time DateTime
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("sequences")
+  name          String
+  type          String?          @db.VarChar(200)
+  list_id       Int
+  subject       String           @db.VarChar(200)
+  description   String?          @db.LongText
+  send_email_id String           @db.VarChar(200)
+  before        String           @db.VarChar(200)
+  days          DateTime?        @db.Date
+  time          DateTime         @db.Time(0)
+  status        sequences_status @default(dbgenerated("0"))
+  created_at    DateTime         @default(now()) @db.Timestamp(0)
+  updated_at    DateTime         @default(now()) @db.Timestamp(0)
 }
 
 model settings {
-  id BigInt @id @default(autoincrement())
-  type String
-  value Decimal
-  currency String
-  sign String?
-  label String?
-  description String?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("settings")
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  type        String
+  value       Decimal  @db.Decimal(18, 2)
+  currency    String   @db.VarChar(100)
+  sign        String?  @db.VarChar(100)
+  label       String?  @db.Text
+  description String?  @db.LongText
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  updated_at  DateTime @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model sliders {
-  id BigInt @id @default(autoincrement())
-  image String
-  cate_id Int?
-  sort_order Int @default(0)
-  status String @default(0)
-  recyclebin_status String @default(0)
-  recyclebin_datetime DateTime?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-  link String?
-  name String?
-  bg_color String?
-
-  @@map("sliders")
+  id                  BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
+  image               String
+  cate_id             Int?
+  sort_order          Int                       @default(0)
+  status              sliders_status            @default(dbgenerated("0"))
+  recyclebin_status   sliders_recyclebin_status @default(dbgenerated("0"))
+  recyclebin_datetime DateTime?                 @db.DateTime(0)
+  created_at          DateTime                  @default(now()) @db.Timestamp(0)
+  updated_at          DateTime                  @default(now()) @db.Timestamp(0)
+  link                String?                   @db.LongText
+  name                String?
+  bg_color            String?
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model sliderss {
-  id BigInt @id @default(autoincrement())
-  image String
-  cate_id Int?
-  sort_order Int @default(0)
-  status String @default(0)
-  recyclebin_status String @default(0)
-  recyclebin_datetime DateTime?
-  link String?
-  name String?
-  bg_color String?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("sliderss")
+  id                  BigInt                     @id @default(autoincrement()) @db.UnsignedBigInt
+  image               String
+  cate_id             Int?
+  sort_order          Int                        @default(0)
+  status              sliderss_status            @default(dbgenerated("0"))
+  recyclebin_status   sliderss_recyclebin_status @default(dbgenerated("0"))
+  recyclebin_datetime DateTime?                  @db.DateTime(0)
+  link                String?                    @db.LongText
+  name                String?
+  bg_color            String?
+  created_at          DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at          DateTime                   @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model sources_feedback {
-  id BigInt @id @default(autoincrement())
-  name String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("sources_feedback")
+  id         BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  status     sources_feedback_status @default(dbgenerated("0"))
+  created_at DateTime                @default(now()) @db.Timestamp(0)
+  updated_at DateTime                @default(now()) @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model testimonials {
-  id BigInt @id @default(autoincrement())
-  name String
-  designation String
-  image String
-  description String
-  status String @default(0)
-  recyclebin_status String @default(0)
-  recyclebin_datetime DateTime?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("testimonials")
+  id                  BigInt                         @id @default(autoincrement()) @db.UnsignedBigInt
+  name                String                         @db.VarChar(100)
+  designation         String                         @db.VarChar(100)
+  image               String                         @db.VarChar(100)
+  description         String                         @db.Text
+  status              testimonials_status            @default(dbgenerated("0"))
+  recyclebin_status   testimonials_recyclebin_status @default(dbgenerated("0"))
+  recyclebin_datetime DateTime?                      @db.DateTime(0)
+  created_at          DateTime                       @default(now()) @db.Timestamp(0)
+  updated_at          DateTime                       @default(now()) @db.Timestamp(0)
 }
 
 model timers {
-  id Int @id @default(autoincrement())
-  time Int? @default(0)
-  user_id BigInt? @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  time       Int?     @default(0)
+  user_id    BigInt?  @default(0) @db.UnsignedBigInt
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+  users      users?   @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "timers_user_id_foreign")
 
-  @@map("timers")
+  @@index([user_id], map: "timers_user_id_foreign")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model types_feedback {
-  id BigInt @id @default(autoincrement())
-  name String
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("types_feedback")
+  id         BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  status     types_feedback_status @default(dbgenerated("0"))
+  created_at DateTime              @default(now()) @db.Timestamp(0)
+  updated_at DateTime              @default(now()) @db.Timestamp(0)
 }
 
-model users {
-  id BigInt @id @default(autoincrement())
-  unique_id String?
-  salutation String?
-  first_name String?
-  surname String?
-  name String
-  email String?
-  phone_code String?
-  mobile String?
-  reg_type String
-  status String @default(0)
-  user_type String @default("Customer")
-  otp Int @default(0)
-  password String?
-  gender String?
-  designation_id Int @default(0)
-  work_settings Int?
-  scope_practice Int?
-  registration String?
-  organization_name String?
-  mode String?
-  due_date String?
-  hourly_rate Decimal @default(0.00)
-  hours_completed_already Int @default(0)
-  training_hours_completed_already Int @default(0)
-  earned Decimal @default(0.00)
-  earning_home String?
-  image String?
-  block_user String @default(1)
-  update_status String @default(0)
-  device_token String?
-  description String?
-  notepad String?
-  remember_token String?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-  deleted_at DateTime?
-  last_login DateTime?
-  premium_status String? @default("free")
-  offline_data String?
-  firebase_uid String?
-  subscription_tier String? @default("free")
-  subscription_status String? @default("active")
-  trial_ends_at DateTime?
-
-  @@map("users")
-}
-
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model user_calendars {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  type String
-  title String
-  date DateTime
-  end_date DateTime?
-  start_time String?
-  end_time String?
-  venue String?
-  invite String?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id         BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt                @db.UnsignedBigInt
+  type       String                @db.VarChar(200)
+  title      String                @db.VarChar(200)
+  date       DateTime              @db.Date
+  end_date   DateTime?             @db.Date
+  start_time String?               @db.VarChar(10)
+  end_time   String?               @db.VarChar(10)
+  venue      String?
+  invite     String?
+  status     user_calendars_status @default(dbgenerated("0"))
+  created_at DateTime              @default(now()) @db.Timestamp(0)
+  updated_at DateTime              @default(now()) @db.Timestamp(0)
+  users      users                 @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "user_calendars_user_id_foreign")
 
-  @@map("user_calendars")
+  @@index([user_id], map: "user_calendars_user_id_foreign")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model user_calendars_old {
-  id BigInt @id @default(autoincrement())
-  user_id Int
-  type String
-  title String
-  date DateTime
-  start_time DateTime
-  end_time DateTime
-  venue String
-  invite String?
-  status String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  @@map("user_calendars_old")
+  id         BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  type       String                    @db.VarChar(200)
+  title      String                    @db.VarChar(200)
+  date       DateTime                  @db.Date
+  start_time DateTime                  @db.Time(0)
+  end_time   DateTime                  @db.Time(0)
+  venue      String
+  invite     String?
+  status     user_calendars_old_status @default(dbgenerated("0"))
+  created_at DateTime                  @default(now()) @db.Timestamp(0)
+  updated_at DateTime                  @default(now()) @db.Timestamp(0)
 }
 
 model user_documents {
-  id BigInt @id @default(autoincrement())
-  created_at DateTime?
-  updated_at DateTime?
-
-  @@map("user_documents")
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model user_feedback_logs {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  name String
-  date DateTime
+  id               BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id          BigInt                    @db.UnsignedBigInt
+  name             String                    @db.VarChar(200)
+  date             DateTime                  @db.Date
   sources_feedback Int?
-  types_feedback Int?
-  content_feedback String?
-  document String
-  status String @default(0)
-  reset String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  types_feedback   Int?
+  content_feedback String?                   @db.VarChar(250)
+  document         String                    @db.LongText
+  status           user_feedback_logs_status @default(dbgenerated("0"))
+  reset            user_feedback_logs_reset  @default(dbgenerated("0"))
+  created_at       DateTime                  @default(now()) @db.Timestamp(0)
+  updated_at       DateTime                  @default(now()) @db.Timestamp(0)
+  users            users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "user_feedback_logs_user_id_foreign")
 
-  @@map("user_feedback_logs")
+  @@index([user_id], map: "user_feedback_logs_user_id_foreign")
 }
 
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model user_roles {
-  id BigInt @id @default(autoincrement())
-  designation_id BigInt
-  menu_id BigInt
-  status String @default(1)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id             BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  designation_id BigInt            @db.UnsignedBigInt
+  menu_id        BigInt            @db.UnsignedBigInt
+  status         user_roles_status @default(dbgenerated("1"))
+  created_at     DateTime          @default(now()) @db.Timestamp(0)
+  updated_at     DateTime          @default(now()) @db.Timestamp(0)
 
-  @@map("user_roles")
+  @@index([designation_id], map: "user_roles_designation_id_foreign")
+  @@index([menu_id], map: "user_roles_menu_id_foreign")
 }
 
-model working_hours {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  hospital BigInt
-  date DateTime
-  mode String?
-  number_hours String
-  work_settings String
-  scope_practice String
-  registration String
-  hourly_rate Decimal @default(0.00)
-  description String?
-  document String?
-  status String @default(0)
-  reset String @default(0)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model users {
+  id                               BigInt                     @id @default(autoincrement()) @db.UnsignedBigInt
+  unique_id                        String?                    @db.VarChar(200)
+  salutation                       String?                    @db.VarChar(200)
+  first_name                       String?                    @db.VarChar(200)
+  surname                          String?                    @db.VarChar(200)
+  name                             String                     @db.VarChar(100)
+  email                            String?
+  phone_code                       String?                    @db.VarChar(100)
+  mobile                           String?                    @db.VarChar(100)
+  reg_type                         users_reg_type
+  status                           users_status               @default(dbgenerated("0"))
+  user_type                        users_user_type            @default(Customer)
+  otp                              Int                        @default(0)
+  password                         String?
+  gender                           users_gender?
+  designation_id                   Int                        @default(0)
+  work_settings                    Int?
+  scope_practice                   Int?
+  registration                     String?                    @db.VarChar(200)
+  organization_name                String?                    @db.VarChar(200)
+  mode                             String?                    @db.VarChar(200)
+  due_date                         String?                    @db.Text
+  hourly_rate                      Decimal                    @default(0.00) @db.Decimal(18, 2)
+  hours_completed_already          Int                        @default(0)
+  training_hours_completed_already Int                        @default(0)
+  earned                           Decimal                    @default(0.00) @db.Decimal(18, 2)
+  earning_home                     String?                    @db.VarChar(200)
+  image                            String?                    @db.VarChar(200)
+  block_user                       users_block_user           @default(dbgenerated("1"))
+  update_status                    users_update_status        @default(dbgenerated("0"))
+  device_token                     String?                    @db.LongText
+  description                      String?                    @db.LongText
+  notepad                          String?                    @db.Text
+  remember_token                   String?                    @db.VarChar(100)
+  created_at                       DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at                       DateTime                   @default(now()) @db.Timestamp(0)
+  deleted_at                       DateTime?                  @db.Timestamp(0)
+  last_login                       DateTime?                  @db.Timestamp(0)
+  premium_status                   users_premium_status?      @default(free)
+  offline_data                     String?                    @db.Text
+  firebase_uid                     String?                    @unique(map: "idx_users_firebase_uid") @db.VarChar(255)
+  subscription_tier                users_subscription_tier?   @default(free)
+  subscription_status              users_subscription_status? @default(active)
+  trial_ends_at                    DateTime?                  @db.DateTime(0)
+  addressbooks                     addressbooks[]
+  appraisal_records                appraisal_records[]
+  attendances                      attendances[]
+  cpd_hours                        cpd_hours[]
+  discussions                      discussions[]
+  earnings                         earnings[]
+  feedback_log                     feedback_log[]
+  notifications                    notifications[]
+  reflective_account_forms         reflective_account_forms[]
+  reflective_accounts              reflective_accounts[]
+  timers                           timers[]
+  user_calendars                   user_calendars[]
+  user_feedback_logs               user_feedback_logs[]
+  work_hours                       work_hours[]
+  working_hours                    working_hours[]
 
-  @@map("working_hours")
+  @@index([email], map: "idx_users_email")
 }
 
 model work_hours {
-  id BigInt @id @default(autoincrement())
-  user_id BigInt
-  start_time DateTime
-  end_time DateTime?
+  id               BigInt    @id @default(autoincrement())
+  user_id          BigInt    @db.UnsignedBigInt
+  start_time       DateTime  @db.DateTime(0)
+  end_time         DateTime? @db.DateTime(0)
   duration_minutes Int?
-  work_description String?
-  document_ids String?
-  is_active Boolean? @default(false)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  work_description String?   @db.Text
+  document_ids     String?   @db.Text
+  is_active        Boolean?  @default(false)
+  created_at       DateTime  @default(now()) @db.Timestamp(0)
+  updated_at       DateTime  @default(now()) @db.Timestamp(0)
+  users            users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "work_hours_ibfk_1")
 
-  @@map("work_hours")
+  @@index([is_active], map: "idx_is_active")
+  @@index([start_time], map: "idx_start_time")
+  @@index([user_id], map: "idx_user_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model working_hours {
+  id             BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id        BigInt               @db.UnsignedBigInt
+  hospital       BigInt               @db.UnsignedBigInt
+  date           DateTime             @db.Date
+  mode           String?              @db.VarChar(200)
+  number_hours   String               @db.VarChar(200)
+  work_settings  String               @db.VarChar(200)
+  scope_practice String               @db.VarChar(200)
+  registration   String               @db.VarChar(200)
+  hourly_rate    Decimal              @default(0.00) @db.Decimal(18, 2)
+  description    String?              @db.Text
+  document       String?              @db.VarChar(200)
+  status         working_hours_status @default(dbgenerated("0"))
+  reset          working_hours_reset  @default(dbgenerated("0"))
+  created_at     DateTime             @default(now()) @db.Timestamp(0)
+  updated_at     DateTime             @default(now()) @db.Timestamp(0)
+  earnings       earnings[]
+  users          users                @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "working_hours_user_id_foreign")
+
+  @@index([user_id], map: "working_hours_user_id_foreign")
+}
+
+enum designations_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum learning_methods_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum link_codes_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum other_healthcare_reg_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum reflective_codes_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum sources_feedback_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum types_feedback_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum criterias_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum feedback_log_feedback_type {
+  patient
+  colleague
+}
+
+enum file_managers_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum mail_automations_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum mail_categories_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum mail_list_users_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum particulars_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum user_roles_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum portfolio_images_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum portfolios_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum sliders_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum sliderss_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum banners_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum brands_home {
+  zero @map("0")
+  one @map("1")
+}
+
+enum mail_templates_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum notifications_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum portfolios_home {
+  zero @map("1")
+  one @map("0")
+}
+
+enum sliders_recyclebin_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum sliderss_recyclebin_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum testimonials_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum brands_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum notifications_recyclebin_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum personal_documents_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum testimonials_recyclebin_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum addressbooks_type {
+  zero @map("1")
+  one @map("2")
+}
+
+enum attendances_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum discussions_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum menus_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum calender_bookings_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum discussions_reset {
+  zero @map("0")
+  one @map("1")
+}
+
+enum user_feedback_logs_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum addressbooks_recyclebin_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum categories_must_try_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum mail_campaigns_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum mail_settings_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum order_setups_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum reflective_account_forms_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum user_calendars_old_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum user_feedback_logs_reset {
+  zero @map("0")
+  one @map("1")
+}
+
+enum users_reg_type {
+  admin
+  email
+  mobile
+  facebook
+  google
+  apple
+}
+
+enum categories_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum reflective_account_forms_reset {
+  zero @map("0")
+  one @map("1")
+}
+
+enum role_masters_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum user_calendars_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum users_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum sequences_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum users_user_type {
+  Admin
+  Customer
+  Small_Business_Owners @map("Small Business Owners")
+  Custom_Merchandise    @map("Custom Merchandise")
+  Large_distributors    @map("Large distributors")
+  Design_studio         @map("Design studio")
+}
+
+enum categories_recyclebin_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum working_hours_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum cpd_hours_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum working_hours_reset {
+  zero @map("0")
+  one @map("1")
+}
+
+enum cpd_hours_reset {
+  zero @map("0")
+  one @map("1")
+}
+
+enum users_gender {
+  zero @map("1")
+  one @map("2")
+}
+
+enum hospitals_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum users_block_user {
+  zero @map("0")
+  one @map("1")
+}
+
+enum users_update_status {
+  zero @map("1")
+  one @map("0")
+}
+
+enum company_setups_status {
+  zero @map("0")
+  one @map("1")
+}
+
+enum users_premium_status {
+  free
+  premium
+}
+
+enum users_subscription_tier {
+  free
+  premium
+}
+
+enum users_subscription_status {
+  active
+  trial
+  expired
+  cancelled
 }
 
 model email_otps {
-  id        BigInt    @id @default(autoincrement())
-  email     String    @db.VarChar(255)
-  otp       String    @db.VarChar(6)
-  expires_at DateTime
-  used      Boolean   @default(false)
-  created_at DateTime  @default(now())
+  id         BigInt   @id @default(autoincrement())
+  email      String   @db.VarChar(255)
+  otp        String   @db.VarChar(10)
+  used       Boolean  @default(false)
+  expires_at DateTime @db.DateTime
+  created_at DateTime @default(now()) @db.Timestamp(0)
 
   @@index([email])
-  @@index([expires_at])
-  @@map("email_otps")
-}
-
-model email_otps {
-  id        BigInt    @id @default(autoincrement())
-  email     String    @db.VarChar(255)
-  otp       String    @db.VarChar(6)
-  expires_at DateTime
-  used      Boolean   @default(false)
-  created_at DateTime  @default(now())
-
-  @@index([email])
-  @@index([expires_at])
   @@map("email_otps")
 }
