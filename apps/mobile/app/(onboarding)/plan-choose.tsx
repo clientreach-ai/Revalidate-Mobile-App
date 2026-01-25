@@ -64,7 +64,7 @@ export default function PlanChoose() {
             setIsNavigating(true);
             setTimeout(() => {
                 try {
-                    router.replace("/(tabs)/dashboard");
+                    router.replace("/(tabs)/home");
                 } catch (error) {
                     console.error("Navigation error:", error);
                     setIsNavigating(false);
