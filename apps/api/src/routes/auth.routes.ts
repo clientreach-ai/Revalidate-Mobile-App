@@ -8,6 +8,7 @@ import {
   refreshToken,
   verifyEmailOTP,
   resendOTP,
+  resetPasswordWithOTP,
 } from '../modules/auth/auth.controller';
 import { authenticateToken } from '../modules/auth/auth.middleware';
 
@@ -23,7 +24,9 @@ router.post('/login', login);
 
 router.get('/me', authenticateToken, getCurrentUser);
 
-router.post('/password-reset', requestPasswordReset);
+router.post('/forgot-password', requestPasswordReset);
+
+router.post('/reset-password', resetPasswordWithOTP);
 
 router.post('/change-password', authenticateToken, changePassword);
 

@@ -13,6 +13,7 @@ import {
   ChangePasswordRequest,
   VerifyOTPRequest,
   ResendOTPRequest,
+  ResetPasswordWithOTPRequest,
 } from './auth.types';
 import { z } from 'zod';
 import { mapUserRow } from '../../config/database-mapping';
@@ -63,6 +64,12 @@ const verifyOTPSchema = z.object({
 
 const resendOTPSchema = z.object({
   email: z.string().email('Invalid email address'),
+});
+
+const resetPasswordWithOTPSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  otp: z.string().length(6, 'OTP must be 6 digits'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
 async function hashPassword(password: string): Promise<string> {
@@ -280,26 +287,52 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
     throw new ApiError(400, 'Email is required');
   }
 
+  // Check if user exists and is registered
   const user = await prisma.users.findFirst({
     where: { email },
-    select: { id: true, email: true },
+    select: { id: true, email: true, status: true },
   });
 
   if (!user) {
-  res.json(serializeBigInt({
-    success: true,
-    message: 'If an account exists, a password reset link has been sent',
-  }));
+    // Don't reveal if email exists for security
+    res.json(serializeBigInt({
+      success: true,
+      message: 'If an account exists with this email, a password reset code has been sent.',
+    }));
     return;
   }
 
-  res.json(serializeBigInt({
+  // Check if user account is active
+  if (user.status === 'zero') {
+    throw new ApiError(403, 'Account is not verified. Please verify your email first.');
+  }
+
+  // Generate and store OTP for password reset
+  const otp = generateOTP();
+  await storeOTP(email, otp);
+
+  // Send OTP email
+  const emailResult = await sendOTPEmail(email, otp);
+
+  const response: any = {
     success: true,
-    message: 'If an account exists, a password reset link has been sent',
-    ...(process.env.NODE_ENV === 'development' && { 
-      note: 'Password reset email functionality needs to be implemented' 
-    }),
-  }));
+    message: 'Password reset code has been sent to your email.',
+  };
+
+  if (!emailResult.success) {
+    response.message = 'We could not send the password reset code. Please try again later.';
+    response.warning = emailResult.error;
+  }
+
+  // In development, include OTP in response
+  if (process.env.NODE_ENV === 'development') {
+    response.data = { otp };
+    if (emailResult.otp) {
+      response.data.devOtp = emailResult.otp;
+    }
+  }
+
+  res.json(serializeBigInt(response));
 });
 
 export const changePassword = asyncHandler(async (req: Request, res: Response) => {
@@ -439,4 +472,47 @@ export const resendOTP = asyncHandler(async (req: Request, res: Response) => {
   }
 
   res.json(serializeBigInt(response));
+});
+
+export const resetPasswordWithOTP = asyncHandler(async (req: Request, res: Response) => {
+  const validated = resetPasswordWithOTPSchema.parse(req.body) as ResetPasswordWithOTPRequest;
+
+  // Verify the OTP
+  const isValidOTP = await verifyOTP(validated.email, validated.otp);
+
+  if (!isValidOTP) {
+    throw new ApiError(400, 'Invalid or expired OTP. Please request a new password reset code.');
+  }
+
+  // Find the user
+  const user = await prisma.users.findFirst({
+    where: { email: validated.email },
+    select: { id: true, status: true },
+  });
+
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  // Check if user account is active
+  if (user.status === 'zero') {
+    throw new ApiError(403, 'Account is not verified. Please verify your email first.');
+  }
+
+  // Hash the new password
+  const newPasswordHash = await hashPassword(validated.newPassword);
+
+  // Update user password
+  await prisma.users.update({
+    where: { id: user.id },
+    data: {
+      password: newPasswordHash,
+      updated_at: new Date(),
+    },
+  });
+
+  res.json(serializeBigInt({
+    success: true,
+    message: 'Password has been reset successfully. You can now login with your new password.',
+  }));
 });
