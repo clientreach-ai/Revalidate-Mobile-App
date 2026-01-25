@@ -119,6 +119,7 @@ export default function ProfessionalDetails() {
     const [isDark] = useState(false);
     const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
     const [showScopeModal, setShowScopeModal] = useState(false);
+    const [showProfessionalRegistrationsModal, setShowProfessionalRegistrationsModal] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -135,15 +136,50 @@ export default function ProfessionalDetails() {
         resolver: zodResolver(onboardingProfessionalDetailsSchema) as Resolver<OnboardingProfessionalDetailsInput>,
         defaultValues: {
             registrationNumber: "",
+            professionalRegistrations: [],
+            registrationPin: "",
+            hourlyRate: 0,
+            workHoursCompleted: 0,
+            trainingHoursCompleted: 0,
+            earningsCurrentYear: 0,
+            workDescription: "",
+            notepad: "",
         },
     });
 
     const watchedDate = watch("revalidationDate");
     const watchedWorkSetting = watch("workSetting");
     const watchedScope = watch("scope");
+    const watchedProfessionalRegistrations = watch("professionalRegistrations") || [];
 
     const selectedWorkSetting = config.workSettings.find((w) => w.value === watchedWorkSetting)?.label ?? "Select work setting";
     const selectedScope = config.scopeOfPractice.find((s) => s.value === watchedScope)?.label ?? "Select scope of practice";
+
+    const professionalRegistrationsOptions = [
+        { value: "gmc", label: "GMC (General Medical Council)" },
+        { value: "nmc", label: "NMC (Nursing and Midwifery Council)" },
+        { value: "gphc", label: "GPhC (General Pharmaceutical Council)" },
+        { value: "gdc", label: "GDC (General Dental Council)" },
+        { value: "hcpcc", label: "HCPC (Health and Care Professions Council)" },
+        { value: "other", label: "Other" },
+    ];
+
+    const toggleProfessionalRegistration = (value: string) => {
+        const current = watchedProfessionalRegistrations;
+        if (current.includes(value as any)) {
+            setValue("professionalRegistrations", current.filter((r) => r !== value) as any);
+        } else {
+            setValue("professionalRegistrations", [...current, value] as any);
+        }
+    };
+
+    const getSelectedRegistrationsLabel = () => {
+        if (watchedProfessionalRegistrations.length === 0) return "Select Items";
+        if (watchedProfessionalRegistrations.length === 1) {
+            return professionalRegistrationsOptions.find((opt) => opt.value === watchedProfessionalRegistrations[0])?.label || "Select Items";
+        }
+        return `${watchedProfessionalRegistrations.length} items selected`;
+    };
 
     const formatDate = (date: Date | undefined): string => {
         if (!date) return "";
@@ -504,6 +540,443 @@ export default function ProfessionalDetails() {
                                 </Text>
                             )}
                         </View>
+
+                        {/* Professional Registrations */}
+                        <View>
+                            <View className="flex-row items-center mb-3">
+                                <Text
+                                    className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                                >
+                                    Professional Registration(s)
+                                </Text>
+                                <Text className="text-red-500 ml-1">*</Text>
+                            </View>
+                            <Pressable
+                                onPress={() => setShowProfessionalRegistrationsModal(true)}
+                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${
+                                    isDark
+                                        ? "bg-slate-800/90 border border-slate-700/50"
+                                        : "bg-white border border-gray-200 shadow-sm"
+                                } ${errors.professionalRegistrations ? "border-red-500" : ""}`}
+                                style={{
+                                    shadowColor: isDark ? "#000" : "#000",
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: isDark ? 0.1 : 0.05,
+                                    shadowRadius: 4,
+                                    elevation: 2,
+                                }}
+                            >
+                                <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center z-10">
+                                    <MaterialIcons
+                                        name="badge"
+                                        size={22}
+                                        color={isDark ? "#6B7280" : "#9CA3AF"}
+                                    />
+                                </View>
+                                <Text
+                                    className={`flex-1 ${
+                                        watchedProfessionalRegistrations.length > 0
+                                            ? isDark
+                                                ? "text-white"
+                                                : "text-gray-900"
+                                            : isDark
+                                            ? "text-gray-400"
+                                            : "text-gray-400"
+                                    }`}
+                                >
+                                    {getSelectedRegistrationsLabel()}
+                                </Text>
+                                <MaterialIcons
+                                    name="expand-more"
+                                    size={22}
+                                    color={isDark ? "#6B7280" : "#9CA3AF"}
+                                />
+                            </Pressable>
+                            {errors.professionalRegistrations && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.professionalRegistrations.message}
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Registration Reference/Pin */}
+                        <View>
+                            <Text
+                                className={`text-sm font-semibold mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                            >
+                                Registration Reference/Pin
+                            </Text>
+                            <Controller
+                                control={control}
+                                name="registrationPin"
+                                render={({ field: { value, onChange, onBlur } }) => (
+                                    <View className="relative">
+                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                            <MaterialIcons
+                                                name="lock"
+                                                size={22}
+                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                            />
+                                        </View>
+                                        <TextInput
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                isDark
+                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                            } ${errors.registrationPin ? "border-red-500" : ""}`}
+                                            style={{
+                                                shadowColor: isDark ? "#000" : "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                            }}
+                                            placeholder="Pin"
+                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                            value={value}
+                                            onChangeText={onChange}
+                                            onBlur={onBlur}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                )}
+                            />
+                            {errors.registrationPin && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.registrationPin.message}
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Hourly Rate */}
+                        <View>
+                            <View className="flex-row items-center mb-3">
+                                <Text
+                                    className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                                >
+                                    Hourly rate
+                                </Text>
+                                <Text className="text-red-500 ml-1">*</Text>
+                                <View className="ml-2 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                                    <MaterialIcons name="info" size={14} color="#1E5AF3" />
+                                </View>
+                            </View>
+                            <Controller
+                                control={control}
+                                name="hourlyRate"
+                                render={({ field: { value, onChange, onBlur } }) => (
+                                    <View className="relative">
+                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                            <MaterialIcons
+                                                name="attach-money"
+                                                size={22}
+                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                            />
+                                        </View>
+                                        <TextInput
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                isDark
+                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                            } ${errors.hourlyRate ? "border-red-500" : ""}`}
+                                            style={{
+                                                shadowColor: isDark ? "#000" : "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                            }}
+                                            placeholder="0.00"
+                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                            value={value?.toString() || ""}
+                                            onChangeText={(text) => {
+                                                const num = parseFloat(text) || 0;
+                                                onChange(num);
+                                            }}
+                                            onBlur={onBlur}
+                                            keyboardType="decimal-pad"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                )}
+                            />
+                            {errors.hourlyRate && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.hourlyRate.message}
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Work Hours Completed */}
+                        <View>
+                            <View className="flex-row items-center mb-3">
+                                <Text
+                                    className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                                >
+                                    How many work hours have you completed already?
+                                </Text>
+                                <Text className="text-red-500 ml-1">*</Text>
+                                <View className="ml-2 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                                    <MaterialIcons name="info" size={14} color="#1E5AF3" />
+                                </View>
+                            </View>
+                            <Controller
+                                control={control}
+                                name="workHoursCompleted"
+                                render={({ field: { value, onChange, onBlur } }) => (
+                                    <View className="relative">
+                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                            <MaterialIcons
+                                                name="access-time"
+                                                size={22}
+                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                            />
+                                        </View>
+                                        <TextInput
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                isDark
+                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                            } ${errors.workHoursCompleted ? "border-red-500" : ""}`}
+                                            style={{
+                                                shadowColor: isDark ? "#000" : "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                            }}
+                                            placeholder="0.00"
+                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                            value={value?.toString() || ""}
+                                            onChangeText={(text) => {
+                                                const num = parseFloat(text) || 0;
+                                                onChange(num);
+                                            }}
+                                            onBlur={onBlur}
+                                            keyboardType="decimal-pad"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                )}
+                            />
+                            {errors.workHoursCompleted && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.workHoursCompleted.message}
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Training Hours Completed */}
+                        <View>
+                            <View className="flex-row items-center mb-3">
+                                <Text
+                                    className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                                >
+                                    How many training hours have you completed already?
+                                </Text>
+                                <Text className="text-red-500 ml-1">*</Text>
+                                <View className="ml-2 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                                    <MaterialIcons name="info" size={14} color="#1E5AF3" />
+                                </View>
+                            </View>
+                            <Controller
+                                control={control}
+                                name="trainingHoursCompleted"
+                                render={({ field: { value, onChange, onBlur } }) => (
+                                    <View className="relative">
+                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                            <MaterialIcons
+                                                name="school"
+                                                size={22}
+                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                            />
+                                        </View>
+                                        <TextInput
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                isDark
+                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                            } ${errors.trainingHoursCompleted ? "border-red-500" : ""}`}
+                                            style={{
+                                                shadowColor: isDark ? "#000" : "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                            }}
+                                            placeholder="0"
+                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                            value={value?.toString() || ""}
+                                            onChangeText={(text) => {
+                                                const num = parseFloat(text) || 0;
+                                                onChange(num);
+                                            }}
+                                            onBlur={onBlur}
+                                            keyboardType="decimal-pad"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                )}
+                            />
+                            {errors.trainingHoursCompleted && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.trainingHoursCompleted.message}
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Earnings Current Year */}
+                        <View>
+                            <View className="flex-row items-center mb-3">
+                                <Text
+                                    className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                                >
+                                    How much have you earned in the current financial year?
+                                </Text>
+                                <Text className="text-red-500 ml-1">*</Text>
+                                <View className="ml-2 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                                    <MaterialIcons name="info" size={14} color="#1E5AF3" />
+                                </View>
+                            </View>
+                            <Controller
+                                control={control}
+                                name="earningsCurrentYear"
+                                render={({ field: { value, onChange, onBlur } }) => (
+                                    <View className="relative">
+                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                            <MaterialIcons
+                                                name="account-balance-wallet"
+                                                size={22}
+                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                            />
+                                        </View>
+                                        <TextInput
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                isDark
+                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                            } ${errors.earningsCurrentYear ? "border-red-500" : ""}`}
+                                            style={{
+                                                shadowColor: isDark ? "#000" : "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                            }}
+                                            placeholder="0.00"
+                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                            value={value?.toString() || ""}
+                                            onChangeText={(text) => {
+                                                const num = parseFloat(text) || 0;
+                                                onChange(num);
+                                            }}
+                                            onBlur={onBlur}
+                                            keyboardType="decimal-pad"
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                )}
+                            />
+                            {errors.earningsCurrentYear && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.earningsCurrentYear.message}
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Work Description */}
+                        <View>
+                            <View className="flex-row items-center mb-3">
+                                <Text
+                                    className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                                >
+                                    Brief description of your work
+                                </Text>
+                                <Text className="text-red-500 ml-1">*</Text>
+                            </View>
+                            <Controller
+                                control={control}
+                                name="workDescription"
+                                render={({ field: { value, onChange, onBlur } }) => (
+                                    <View className="relative">
+                                        <TextInput
+                                            className={`w-full px-4 py-4 rounded-2xl min-h-[120px] text-align-top ${
+                                                isDark
+                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                            } ${errors.workDescription ? "border-red-500" : ""}`}
+                                            style={{
+                                                shadowColor: isDark ? "#000" : "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                                textAlignVertical: "top",
+                                            }}
+                                            placeholder="Brief description of your work:"
+                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                            value={value}
+                                            onChangeText={onChange}
+                                            onBlur={onBlur}
+                                            multiline
+                                            numberOfLines={5}
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                )}
+                            />
+                            {errors.workDescription && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.workDescription.message}
+                                </Text>
+                            )}
+                        </View>
+
+                        {/* Notepad */}
+                        <View>
+                            <Text
+                                className={`text-sm font-semibold mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                            >
+                                Notepad
+                            </Text>
+                            <Controller
+                                control={control}
+                                name="notepad"
+                                render={({ field: { value, onChange, onBlur } }) => (
+                                    <View className="relative">
+                                        <TextInput
+                                            className={`w-full px-4 py-4 rounded-2xl min-h-[120px] text-align-top ${
+                                                isDark
+                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                            } ${errors.notepad ? "border-red-500" : ""}`}
+                                            style={{
+                                                shadowColor: isDark ? "#000" : "#000",
+                                                shadowOffset: { width: 0, height: 2 },
+                                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                                shadowRadius: 4,
+                                                elevation: 2,
+                                                textAlignVertical: "top",
+                                            }}
+                                            placeholder="Add any notes here..."
+                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                            value={value || ""}
+                                            onChangeText={onChange}
+                                            onBlur={onBlur}
+                                            multiline
+                                            numberOfLines={5}
+                                            autoCorrect={false}
+                                        />
+                                    </View>
+                                )}
+                            />
+                            {errors.notepad && (
+                                <Text className="text-red-500 text-sm mt-1.5">
+                                    {errors.notepad.message}
+                                </Text>
+                            )}
+                        </View>
                     </View>
                 </View>
             </ScrollView>
@@ -650,6 +1123,74 @@ export default function ProfessionalDetails() {
                         >
                             <Text className={`text-center font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
                                 Cancel
+                            </Text>
+                        </Pressable>
+                    </View>
+                </Pressable>
+            </Modal>
+
+            {/* Professional Registrations Modal */}
+            <Modal
+                visible={showProfessionalRegistrationsModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowProfessionalRegistrationsModal(false)}
+            >
+                <Pressable
+                    className="flex-1 bg-black/50 justify-end"
+                    onPress={() => setShowProfessionalRegistrationsModal(false)}
+                >
+                    <View
+                        className={`${
+                            isDark ? "bg-slate-800" : "bg-white"
+                        } rounded-t-3xl p-6 max-h-[80%]`}
+                    >
+                        <Text
+                            className={`text-lg font-bold mb-4 ${
+                                isDark ? "text-white" : "text-gray-900"
+                            }`}
+                        >
+                            Select Professional Registration(s)
+                        </Text>
+                        <ScrollView>
+                            {professionalRegistrationsOptions.map((option) => {
+                                const isSelected = watchedProfessionalRegistrations.includes(option.value as any);
+                                return (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        onPress={() => toggleProfessionalRegistration(option.value)}
+                                        className={`py-4 px-4 rounded-xl mb-2 flex-row items-center justify-between ${
+                                            isSelected
+                                                ? "bg-primary/10"
+                                                : isDark
+                                                ? "bg-slate-700"
+                                                : "bg-gray-50"
+                                        }`}
+                                    >
+                                        <Text
+                                            className={`flex-1 ${
+                                                isSelected
+                                                    ? "text-primary font-semibold"
+                                                    : isDark
+                                                    ? "text-white"
+                                                    : "text-gray-900"
+                                            }`}
+                                        >
+                                            {option.label}
+                                        </Text>
+                                        {isSelected && (
+                                            <MaterialIcons name="check-circle" size={24} color="#1E5AF3" />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                        <Pressable
+                            onPress={() => setShowProfessionalRegistrationsModal(false)}
+                            className={`mt-4 py-3 rounded-xl ${isDark ? "bg-slate-700" : "bg-gray-100"}`}
+                        >
+                            <Text className={`text-center font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>
+                                Done
                             </Text>
                         </Pressable>
                     </View>

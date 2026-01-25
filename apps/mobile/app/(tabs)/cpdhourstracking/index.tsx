@@ -193,7 +193,7 @@ export default function CPDHoursTrackingScreen() {
         <View className="px-6 mb-6">
           <View className="flex-row p-1 bg-slate-200/50 rounded-xl" style={{ gap: 4 }}>
             <Pressable
-              // onPress={() => setActiveFilter('all')}
+              onPress={() => setActiveFilter('all')}
               className={`flex-1 py-2 rounded-lg ${
                 activeFilter === 'all' ? 'bg-white shadow-sm' : ''
               }`}
@@ -205,7 +205,7 @@ export default function CPDHoursTrackingScreen() {
               </Text>
             </Pressable>
             <Pressable
-              // onPress={() => setActiveFilter('participatory')}
+              onPress={() => setActiveFilter('participatory')}
               className={`flex-1 py-2 rounded-lg ${
                 activeFilter === 'participatory' ? 'bg-white shadow-sm' : ''
               }`}
@@ -217,7 +217,7 @@ export default function CPDHoursTrackingScreen() {
               </Text>
             </Pressable>
             <Pressable
-              // onPress={() => setActiveFilter('non-participatory')}
+              onPress={() => setActiveFilter('non-participatory')}
               className={`flex-1 py-2 rounded-lg ${
                 activeFilter === 'non-participatory' ? 'bg-white shadow-sm' : ''
               }`}
@@ -235,9 +235,11 @@ export default function CPDHoursTrackingScreen() {
         <View className="px-6" style={{ gap: 16 }}>
           <View className="flex-row items-center justify-between">
             <Text className="text-lg font-bold text-slate-800">Activities</Text>
-            <Pressable>
-              <Text className="text-[#2563EB] text-sm font-semibold">View All</Text>
-            </Pressable>
+            {filteredActivities.length > 0 && (
+              <Pressable onPress={() => setActiveFilter('all')}>
+                <Text className="text-[#2563EB] text-sm font-semibold">View All</Text>
+              </Pressable>
+            )}
           </View>
 
           <View style={{ gap: 12 }}>
@@ -246,9 +248,11 @@ export default function CPDHoursTrackingScreen() {
                 <Pressable
                   key={activity.id}
                   onPress={() => {
-                    router.push('/(tabs)/workinghours');
+                    // Navigate to activity details or edit screen
+                    // For now, we'll keep it as a placeholder
+                    console.log('View activity:', activity.id);
                   }}
-                  className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex-row items-center"
+                  className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex-row items-center active:bg-slate-50"
                   style={{ gap: 16 }}
                 >
                   <View className={`w-12 h-12 rounded-xl ${activity.iconBgColor} items-center justify-center flex-shrink-0`}>
@@ -302,9 +306,11 @@ export default function CPDHoursTrackingScreen() {
       >
         <Pressable
           onPress={() => {
-            router.push('/(tabs)/workinghours');
+            // Add new CPD activity
+            // This could open a modal or navigate to an add activity screen
+            console.log('Addi new CPD activity');
           }}
-          className="w-14 h-14 bg-[#2563EB] rounded-full shadow-lg items-center justify-center"
+          className="w-14 h-14 bg-[#2563EB] rounded-full shadow-lg items-center justify-center active:opacity-80"
         >
           <MaterialIcons name="add" size={32} color="#FFFFFF" />
         </Pressable>

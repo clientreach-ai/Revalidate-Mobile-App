@@ -140,11 +140,11 @@ export default function PlanChoose() {
                                     : isDark 
                                     ? "rgba(51, 65, 85, 0.5)" 
                                     : "#e5e7eb",
-                                shadowColor: watchedPlan === "free" ? "#1E5AF3" : isDark ? "#000" : "#000",
+                                shadowColor: isDark ? "#000" : "#000",
                                 shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: watchedPlan === "free" ? 0.15 : isDark ? 0.1 : 0.05,
+                                shadowOpacity: isDark ? 0.1 : 0.05,
                                 shadowRadius: 4,
-                                elevation: watchedPlan === "free" ? 4 : 2,
+                                elevation: 2,
                             }}
                         >
                             <View className="flex-row items-center justify-between mb-4">
@@ -230,11 +230,11 @@ export default function PlanChoose() {
                                     : isDark 
                                     ? "rgba(51, 65, 85, 0.5)" 
                                     : "#e5e7eb",
-                                shadowColor: watchedPlan === "premium" ? "#1E5AF3" : isDark ? "#000" : "#000",
+                                shadowColor: isDark ? "#000" : "#000",
                                 shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: watchedPlan === "premium" ? 0.15 : isDark ? 0.1 : 0.05,
+                                shadowOpacity: isDark ? 0.1 : 0.05,
                                 shadowRadius: 4,
-                                elevation: watchedPlan === "premium" ? 4 : 2,
+                                elevation: 2,
                             }}
                         >
                             {/* Popular Badge */}

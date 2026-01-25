@@ -13,13 +13,13 @@ import {
 } from "@/validation/schema";
 import "../global.css";
 
-const roles: { value: Role; label: string; icon: string; description: string }[] = [
-    { value: "doctor", label: "Doctor / GP", icon: "healing", description: "General practitioners and medical doctors" },
-    { value: "nurse", label: "Nurse / Midwife", icon: "local-hospital", description: "Registered nurses and midwives" },
-    { value: "pharmacist", label: "Pharmacist", icon: "science", description: "Registered pharmacists" },
-    { value: "dentist", label: "Dentist", icon: "health-and-safety", description: "Dental practitioners" },
-    { value: "other", label: "Other Healthcare Professional", icon: "person", description: "Other regulated healthcare roles" },
-];
+const roles = [
+    { value: "doctor" as const, label: "Doctor / GP", icon: "healing", description: "General practitioners and medical doctors" },
+    { value: "nurse" as const, label: "Nurse / Midwife", icon: "local-hospital", description: "Registered nurses and midwives" },
+    { value: "pharmacist" as const, label: "Pharmacist", icon: "science", description: "Registered pharmacists" },
+    { value: "dentist" as const, label: "Dentist", icon: "health-and-safety", description: "Dental practitioners" },
+    { value: "other" as const, label: "Other Healthcare Professional", icon: "person", description: "Other regulated healthcare roles" },
+] as const;
 
 export default function RoleSelection() {
     const router = useRouter();
@@ -40,7 +40,7 @@ export default function RoleSelection() {
     const onSubmit: SubmitHandler<OnboardingRoleInput> = (data) => {
         console.log("Onboarding role submitted:", data);
         router.push({
-            pathname: "/(onboarding)/professional-details",
+            pathname: "/(onboarding)/personal-details",
             params: { role: data.role },
         });
     };
@@ -84,23 +84,30 @@ export default function RoleSelection() {
                     <View className="gap-4 mb-6">
                         {roles.map((role) => {
                             const isSelected = watchedRole === role.value;
+
                             return (
                                 <Pressable
                                     key={role.value}
                                     onPress={() => setValue("role", role.value)}
-                                    className={`w-full rounded-2xl border-2 p-5 flex-row items-center gap-4 ${
+                                    className={`w-full rounded-2xl p-5 flex-row items-center gap-4 ${
                                         isSelected
-                                            ? "bg-primary/10 border-primary"
+                                            ? "bg-primary/10"
                                             : isDark
-                                            ? "bg-slate-800/90 border-slate-700/50"
-                                            : "bg-white border-gray-200 shadow-sm"
+                                            ? "bg-slate-800/90"
+                                            : "bg-white"
                                     }`}
                                     style={{
-                                        shadowColor: isSelected ? "#1E5AF3" : isDark ? "#000" : "#000",
+                                        borderWidth: isSelected ? 3 : 1,
+                                        borderColor: isSelected 
+                                            ? "#1E5AF3" 
+                                            : isDark 
+                                            ? "rgba(51, 65, 85, 0.5)" 
+                                            : "#E5E7EB",
+                                        shadowColor: isDark ? "#000" : "#000",
                                         shadowOffset: { width: 0, height: 2 },
-                                        shadowOpacity: isSelected ? 0.15 : isDark ? 0.1 : 0.05,
+                                        shadowOpacity: isDark ? 0.1 : 0.05,
                                         shadowRadius: 4,
-                                        elevation: isSelected ? 4 : 2,
+                                        elevation: 2,
                                     }}
                                 >
                                     {/* Icon Container */}
