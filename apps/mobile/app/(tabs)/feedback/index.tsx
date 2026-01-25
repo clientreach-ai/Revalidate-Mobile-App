@@ -3,6 +3,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface FeedbackEntry {
@@ -19,6 +20,7 @@ interface FeedbackEntry {
 export default function FeedbackScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDark } = useThemeStore();
   const [activeFilter, setActiveFilter] = useState<'all' | 'patient' | 'colleague' | 'manager'>('all');
 
   const allFeedback: FeedbackEntry[] = [
@@ -94,18 +96,20 @@ export default function FeedbackScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F6F7F8]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       {/* Header */}
-      <View className="bg-[#F6F7F8]/80 border-b border-[#DDE0E4]/50">
+      <View className={`border-b ${
+        isDark ? "bg-slate-800/80 border-slate-700" : "bg-[#F6F7F8]/80 border-[#DDE0E4]/50"
+      }`}>
         <View className="flex-row items-center px-4 py-2 justify-between">
           <Pressable onPress={() => router.back()} className="w-12 h-12 shrink-0 items-center justify-center">
-            <MaterialIcons name="arrow-back-ios" size={20} color="#121417" />
+            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
           </Pressable>
-          <Text className="text-lg font-bold text-[#121417] flex-1 text-center">
+          <Text className={`text-lg font-bold flex-1 text-center ${isDark ? "text-white" : "text-[#121417]"}`}>
             Feedback Log ({allFeedback.length})
           </Text>
           <Pressable className="w-12 h-12 items-center justify-center">
-            <MaterialIcons name="search" size={20} color="#121417" />
+            <MaterialIcons name="search" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
           </Pressable>
         </View>
 
@@ -122,7 +126,7 @@ export default function FeedbackScreen() {
               style={{ borderBottomWidth: activeFilter === 'all' ? 3 : 0, borderBottomColor: activeFilter === 'all' ? '#2B5E9C' : 'transparent' }}
             >
               <Text className={`text-sm font-bold ${
-                activeFilter === 'all' ? 'text-[#2B5E9C]' : 'text-[#687482]'
+                activeFilter === 'all' ? 'text-[#2B5E9C]' : (isDark ? 'text-gray-400' : 'text-[#687482]')
               }`}>
                 All
               </Text>
@@ -133,7 +137,7 @@ export default function FeedbackScreen() {
               style={{ borderBottomWidth: activeFilter === 'patient' ? 3 : 0, borderBottomColor: activeFilter === 'patient' ? '#2B5E9C' : 'transparent' }}
             >
               <Text className={`text-sm font-bold ${
-                activeFilter === 'patient' ? 'text-[#2B5E9C]' : 'text-[#687482]'
+                activeFilter === 'patient' ? 'text-[#2B5E9C]' : (isDark ? 'text-gray-400' : 'text-[#687482]')
               }`}>
                 Patient
               </Text>
@@ -144,7 +148,7 @@ export default function FeedbackScreen() {
               style={{ borderBottomWidth: activeFilter === 'colleague' ? 3 : 0, borderBottomColor: activeFilter === 'colleague' ? '#2B5E9C' : 'transparent' }}
             >
               <Text className={`text-sm font-bold ${
-                activeFilter === 'colleague' ? 'text-[#2B5E9C]' : 'text-[#687482]'
+                activeFilter === 'colleague' ? 'text-[#2B5E9C]' : (isDark ? 'text-gray-400' : 'text-[#687482]')
               }`}>
                 Colleague
               </Text>
@@ -155,7 +159,7 @@ export default function FeedbackScreen() {
               style={{ borderBottomWidth: activeFilter === 'manager' ? 3 : 0, borderBottomColor: activeFilter === 'manager' ? '#2B5E9C' : 'transparent' }}
             >
               <Text className={`text-sm font-bold ${
-                activeFilter === 'manager' ? 'text-[#2B5E9C]' : 'text-[#687482]'
+                activeFilter === 'manager' ? 'text-[#2B5E9C]' : (isDark ? 'text-gray-400' : 'text-[#687482]')
               }`}>
                 Manager
               </Text>
@@ -183,7 +187,9 @@ export default function FeedbackScreen() {
                     // Navigate to gallery to view feedback details
                     router.push('/(tabs)/gallery');
                   }}
-                  className="bg-white rounded-lg shadow-sm border border-gray-100 p-4"
+                  className={`rounded-lg shadow-sm border p-4 ${
+                    isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"
+                  }`}
                 >
                   <View className="flex-row justify-between items-start mb-2">
                     <View className="flex-row flex-1 min-w-0" style={{ gap: 12 }}>
@@ -197,7 +203,7 @@ export default function FeedbackScreen() {
                         </View>
                       )}
                       <View className="flex-1 min-w-0">
-                        <Text className="text-base font-bold text-[#121417]" numberOfLines={1}>
+                        <Text className={`text-base font-bold ${isDark ? "text-white" : "text-[#121417]"}`} numberOfLines={1}>
                           {entry.reviewerName}
                         </Text>
                         <View className="flex-row items-center mt-0.5 flex-wrap" style={{ gap: 8 }}>
@@ -214,20 +220,24 @@ export default function FeedbackScreen() {
                         </View>
                       </View>
                     </View>
-                    <Text className="text-[#687482] text-xs font-medium ml-2 flex-shrink-0">
+                    <Text className={`text-xs font-medium ml-2 flex-shrink-0 ${
+                      isDark ? "text-gray-400" : "text-[#687482]"
+                    }`}>
                       {entry.date}
                     </Text>
                   </View>
-                  <Text className="text-[#687482] text-sm font-normal leading-relaxed" numberOfLines={2}>
+                  <Text className={`text-sm font-normal leading-relaxed ${isDark ? "text-gray-400" : "text-[#687482]"}`} numberOfLines={2}>
                     {entry.feedback}
                   </Text>
                 </Pressable>
               );
             })
           ) : (
-            <View className="bg-white p-8 rounded-lg border border-gray-100 items-center">
-              <MaterialIcons name="inbox" size={48} color="#CBD5E1" />
-              <Text className="text-slate-400 mt-4 text-center">
+            <View className={`p-8 rounded-lg border items-center ${
+              isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"
+            }`}>
+              <MaterialIcons name="inbox" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
+              <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
                 No {activeFilter === 'all' ? '' : activeFilter} feedback found
               </Text>
             </View>

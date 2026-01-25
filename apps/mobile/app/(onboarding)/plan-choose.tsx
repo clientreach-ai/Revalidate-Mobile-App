@@ -10,6 +10,7 @@ import {
     onboardingPlanSchema,
     type OnboardingPlanInput,
 } from "@/validation/schema";
+import { useThemeStore } from "@/features/theme/theme.store";
 import "../global.css";
 
 // Plan selection component
@@ -39,7 +40,7 @@ const premiumFeatures = [
 
 export default function PlanChoose() {
     const router = useRouter();
-    const [isDark] = useState(false);
+    const { isDark } = useThemeStore();
     const [isNavigating, setIsNavigating] = useState(false);
 
     const {

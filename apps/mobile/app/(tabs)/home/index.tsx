@@ -3,10 +3,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { isDark } = useThemeStore();
   const [timer, setTimer] = useState({ hours: 1, minutes: 45, seconds: 22 });
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function DashboardScreen() {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -144,24 +146,34 @@ export default function DashboardScreen() {
         {/* Main Content */}
         <View className="flex-1 -mt-12 px-6 relative z-10" style={{ gap: 24 }}>
           {/* Active Clinical Session Card */}
-          <View className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100">
+          <View className={`p-5 rounded-3xl shadow-lg border ${
+            isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+          }`}>
             <View className="flex-row justify-between items-center mb-4">
               <View className="flex-row items-center gap-2">
                 <View className="w-2 h-2 rounded-full bg-[#EF4444]" />
-                <Text className="text-sm font-semibold text-slate-500 uppercase tracking-tight">
+                <Text className={`text-sm font-semibold uppercase tracking-tight ${
+                  isDark ? "text-gray-400" : "text-slate-500"
+                }`}>
                   Active Clinical Session
                 </Text>
               </View>
-              <View className="bg-slate-100 px-2 py-1 rounded-lg">
-                <Text className="text-xs text-slate-600">Started 08:30 AM</Text>
+              <View className={`px-2 py-1 rounded-lg ${
+                isDark ? "bg-slate-700" : "bg-slate-100"
+              }`}>
+                <Text className={`text-xs ${isDark ? "text-gray-300" : "text-slate-600"}`}>
+                  Started 08:30 AM
+                </Text>
               </View>
             </View>
             <View className="flex-row items-center justify-between">
               <View className="flex-col">
-                <Text className="text-4xl font-mono font-bold tracking-tighter text-slate-800">
+                <Text className={`text-4xl font-mono font-bold tracking-tighter ${
+                  isDark ? "text-white" : "text-slate-800"
+                }`}>
                   {formatTime(timer.hours)}:{formatTime(timer.minutes)}:{formatTime(timer.seconds)}
                 </Text>
-                <Text className="text-xs text-slate-400 mt-1">
+                <Text className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
                   St. Mary's General Ward
                 </Text>
               </View>
@@ -182,14 +194,20 @@ export default function DashboardScreen() {
                     router.push(stat.route as any);
                   }
                 }}
-                className="bg-white p-4 rounded-3xl border border-slate-100"
+                className={`p-4 rounded-3xl border ${
+                  isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                }`}
                 style={{ width: '47%' }}
               >
                 <View className={`w-10 h-10 ${stat.bgColor} rounded-2xl items-center justify-center mb-3`}>
                   <MaterialIcons name={stat.icon} size={24} color={stat.iconColor} />
                 </View>
-                <Text className="text-2xl font-bold text-slate-800">{stat.value}</Text>
-                <Text className="text-sm text-slate-500 mt-1">{stat.label}</Text>
+                <Text className={`text-2xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                  {stat.value}
+                </Text>
+                <Text className={`text-sm mt-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+                  {stat.label}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -197,7 +215,9 @@ export default function DashboardScreen() {
           {/* Recent Activity Section */}
           <View>
             <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-lg font-bold text-slate-800">Recent Activity</Text>
+              <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                Recent Activity
+              </Text>
               <Pressable>
                 <Text className="text-[#2B5F9E] text-sm font-semibold">View All</Text>
               </Pressable>
@@ -211,7 +231,9 @@ export default function DashboardScreen() {
                       router.push('/(tabs)/reflections');
                     }
                   }}
-                  className="flex-row items-center gap-4 bg-white p-4 rounded-2xl border border-slate-50"
+                  className={`flex-row items-center gap-4 p-4 rounded-2xl border ${
+                    isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-50"
+                  }`}
                 >
                   <View className={`${activity.bgColor} p-2.5 rounded-xl`}>
                     <MaterialIcons 
@@ -221,14 +243,16 @@ export default function DashboardScreen() {
                     />
                   </View>
                   <View className="flex-1">
-                    <Text className="font-semibold text-sm text-slate-800">
+                    <Text className={`font-semibold text-sm ${isDark ? "text-white" : "text-slate-800"}`}>
                       {activity.title}
                     </Text>
-                    <Text className="text-xs text-slate-500 mt-0.5">
+                    <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                       {activity.subtitle}
                     </Text>
                   </View>
-                  <Text className="text-xs text-slate-400">{activity.time}</Text>
+                  <Text className={`text-xs ${isDark ? "text-gray-500" : "text-slate-400"}`}>
+                    {activity.time}
+                  </Text>
                 </Pressable>
               ))}
             </View>

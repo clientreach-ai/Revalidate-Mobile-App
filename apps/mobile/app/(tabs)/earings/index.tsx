@@ -2,6 +2,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useThemeStore } from '@/features/theme/theme.store';
 import '../../global.css';
 
 interface EarningsEntry {
@@ -23,6 +24,7 @@ interface MonthGroup {
 
 export default function EarningsScreen() {
   const router = useRouter();
+  const { isDark } = useThemeStore();
 
   const totalEarnings = '£14,250.00';
   const percentageChange = '12%';
@@ -103,18 +105,18 @@ export default function EarningsScreen() {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F6F7F8]" edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       {/* Header */}
-      <View className="bg-white/80 border-b border-zinc-100">
+      <View className={`border-b ${isDark ? "bg-slate-800/80 border-slate-700" : "bg-white/80 border-zinc-100"}`}>
         <View className="flex-row items-center px-4 py-2 justify-between">
           <Pressable onPress={() => router.back()} className="w-12 h-12 shrink-0 items-center justify-center">
-            <MaterialIcons name="arrow-back-ios" size={20} color="#121417" />
+            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
           </Pressable>
-          <Text className="text-lg font-bold text-[#121417] flex-1 text-center">
+          <Text className={`text-lg font-bold flex-1 text-center ${isDark ? "text-white" : "text-[#121417]"}`}>
             Earnings & Financials
           </Text>
           <Pressable className="w-12 h-12 items-center justify-center">
-            <MaterialIcons name="settings" size={20} color="#121417" />
+            <MaterialIcons name="settings" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
           </Pressable>
         </View>
       </View>
@@ -126,8 +128,12 @@ export default function EarningsScreen() {
       >
         {/* Total Earnings Card */}
         <View className="p-4">
-          <View className="flex-col gap-2 rounded-xl p-6 bg-white shadow-sm border border-zinc-100">
-            <Text className="text-[#687482] text-sm font-medium uppercase tracking-wider">
+          <View className={`flex-col gap-2 rounded-xl p-6 shadow-sm border ${
+            isDark ? "bg-slate-800 border-slate-700" : "bg-white border-zinc-100"
+          }`}>
+            <Text className={`text-sm font-medium uppercase tracking-wider ${
+              isDark ? "text-gray-400" : "text-[#687482]"
+            }`}>
               Total Earnings
             </Text>
             <View className="flex-row items-baseline" style={{ gap: 8 }}>
@@ -141,7 +147,7 @@ export default function EarningsScreen() {
                 </Text>
               </View>
             </View>
-            <Text className="text-[#687482] text-xs mt-1">
+            <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-[#687482]"}`}>
               Updated 2 mins ago
             </Text>
           </View>
@@ -149,17 +155,19 @@ export default function EarningsScreen() {
 
         {/* Monthly Performance Card */}
         <View className="px-4 py-2">
-          <View className="flex-col gap-4 bg-white rounded-xl p-6 shadow-sm border border-zinc-100">
+          <View className={`flex-col gap-4 rounded-xl p-6 shadow-sm border ${
+            isDark ? "bg-slate-800 border-slate-700" : "bg-white border-zinc-100"
+          }`}>
             <View className="flex-row justify-between items-center">
               <View>
-                <Text className="text-base font-bold text-[#121417]">
+                <Text className={`text-base font-bold ${isDark ? "text-white" : "text-[#121417]"}`}>
                   Monthly Performance
                 </Text>
-                <Text className="text-[#687482] text-sm font-normal mt-0.5">
+                <Text className={`text-sm font-normal mt-0.5 ${isDark ? "text-gray-400" : "text-[#687482]"}`}>
                   Last 6 Months
                 </Text>
               </View>
-              <MaterialIcons name="info" size={20} color="#687482" />
+              <MaterialIcons name="info" size={20} color={isDark ? "#9CA3AF" : "#687482"} />
             </View>
             
             {/* Bar Chart */}
@@ -173,7 +181,7 @@ export default function EarningsScreen() {
                     style={{ height: `${data.height}%` }}
                   />
                   <Text className={`text-[11px] font-bold text-center ${
-                    data.isCurrent ? 'text-[#2B5E9C]' : 'text-[#687482]'
+                    data.isCurrent ? 'text-[#2B5E9C]' : (isDark ? 'text-gray-400' : 'text-[#687482]')
                   }`}>
                     {data.month}
                   </Text>
@@ -209,7 +217,7 @@ export default function EarningsScreen() {
           {groupedEarnings.map((group) => (
             <View key={`${group.month}-${group.year}`}>
               <View className="flex-row justify-between items-center pb-2 pt-6">
-                <Text className="text-lg font-bold text-[#121417]">
+                <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-[#121417]"}`}>
                   {group.month} {group.year}
                 </Text>
                 <Pressable onPress={() => router.push('/(tabs)/gallery')}>
@@ -217,36 +225,38 @@ export default function EarningsScreen() {
                 </Pressable>
               </View>
               
-              <View className="flex-col divide-y divide-zinc-100">
+              <View className={`flex-col ${isDark ? "divide-y divide-slate-700" : "divide-y divide-zinc-100"}`}>
                 {group.entries.map((entry) => (
                   <Pressable
                     key={entry.id}
                     onPress={() => {
                       router.push('/(tabs)/gallery');
                     }}
-                    className="flex-row gap-4 bg-white px-4 py-4 justify-between items-center"
+                    className={`flex-row gap-4 px-4 py-4 justify-between items-center ${
+                      isDark ? "bg-slate-800" : "bg-white"
+                    }`}
                   >
                     <View className="flex-row items-start flex-1 min-w-0" style={{ gap: 16 }}>
                       <View className="text-[#2B5E9C] items-center justify-center rounded-lg bg-[#2B5E9C]/10 shrink-0 w-12 h-12">
                         <MaterialIcons name={entry.icon} size={24} color="#2B5E9C" />
                       </View>
                       <View className="flex-1 flex-col justify-center min-w-0">
-                        <Text className="text-base font-semibold text-[#121417] mb-1" numberOfLines={1}>
+                        <Text className={`text-base font-semibold mb-1 ${isDark ? "text-white" : "text-[#121417]"}`} numberOfLines={1}>
                           {entry.date} - {entry.location}
                         </Text>
-                        <Text className="text-[#687482] text-xs font-normal">
+                        <Text className={`text-xs font-normal ${isDark ? "text-gray-400" : "text-[#687482]"}`}>
                           {entry.hours} hrs @ £{entry.rate}/hr
                         </Text>
                       </View>
                     </View>
                     <View className="shrink-0 text-right ml-2">
                       <Text className={`text-base font-bold ${
-                        entry.status === 'paid' ? 'text-[#00C853]' : 'text-[#121417]'
+                        entry.status === 'paid' ? 'text-[#00C853]' : (isDark ? 'text-white' : 'text-[#121417]')
                       }`}>
                         {entry.amount}
                       </Text>
                       <Text className={`text-[10px] uppercase ${
-                        entry.status === 'paid' ? 'text-[#00C853]' : 'text-[#687482]'
+                        entry.status === 'paid' ? 'text-[#00C853]' : (isDark ? 'text-gray-400' : 'text-[#687482]')
                       }`}>
                         {entry.status === 'paid' ? 'Paid' : 'Pending'}
                       </Text>

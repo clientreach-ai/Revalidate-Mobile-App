@@ -1,16 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { View, Text, Pressable, Animated, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useThemeStore } from "@/features/theme/theme.store";
 import "./global.css";
 
 export default function SplashScreen() {
     const spinAnim = useRef(new Animated.Value(0)).current;
     const router = useRouter();
-
-    // ✅ Default theme: day mode
-    const [isDark, setIsDark] = useState(false);
+    const { isDark, toggleTheme } = useThemeStore();
 
     // Spin animation for loader
     useEffect(() => {
@@ -91,11 +90,13 @@ export default function SplashScreen() {
 
             {/* Dark mode toggle button */}
             <Pressable
-                className="absolute top-4 right-4 p-2 rounded-full shadow-lg"
-                onPress={() => setIsDark(!isDark)}
+                className={`absolute top-4 right-4 p-2 rounded-full shadow-lg ${
+                    isDark ? "bg-slate-800/80" : "bg-white/80"
+                }`}
+                onPress={toggleTheme}
             >
                 <MaterialIcons
-                    name="contrast"
+                    name={isDark ? "light-mode" : "dark-mode"}
                     size={20}
                     color={isDark ? "#D1D5DB" : "#4B5563"}
                 />

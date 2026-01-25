@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { useForm, Controller, type SubmitHandler, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput, type Role } from "@/validation/schema";
+import { useThemeStore } from "@/features/theme/theme.store";
 import "../global.css";
 
 const roles: { value: Role; label: string }[] = [
@@ -26,7 +27,7 @@ const roles: { value: Role; label: string }[] = [
 
 export default function Register() {
     const router = useRouter();
-    const [isDark, setIsDark] = useState(false);
+    const { isDark, toggleTheme } = useThemeStore();
     const [showPassword, setShowPassword] = useState(false);
     const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
@@ -70,10 +71,10 @@ export default function Register() {
                         ? "bg-slate-800/80 border border-slate-700" 
                         : "bg-white/80 border border-gray-200"
                 } shadow-lg`}
-                onPress={() => setIsDark(!isDark)}
+                onPress={toggleTheme}
             >
                 <MaterialIcons
-                    name="dark-mode"
+                    name={isDark ? "light-mode" : "dark-mode"}
                     size={22}
                     color={isDark ? "#D1D5DB" : "#4B5563"}
                 />

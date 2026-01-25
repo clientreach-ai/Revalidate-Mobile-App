@@ -3,6 +3,7 @@ import { View, Text, Pressable, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useThemeStore } from "@/features/theme/theme.store";
 import "../global.css";
 
 const onboardingSteps = [
@@ -34,7 +35,7 @@ const onboardingSteps = [
 
 export default function OnboardingIndex() {
     const router = useRouter();
-    const [isDark] = useState(false);
+    const { isDark } = useThemeStore();
     const [currentStep, setCurrentStep] = useState(0);
     const bounceAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(0)).current;

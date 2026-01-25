@@ -12,11 +12,12 @@ import { useRouter } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginInput } from "@/validation/schema";
+import { useThemeStore } from "@/features/theme/theme.store";
 import "../global.css";
 
 export default function Login() {
     const router = useRouter();
-    const [isDark, setIsDark] = useState(false);
+    const { isDark, toggleTheme } = useThemeStore();
     const [showPassword, setShowPassword] = useState(false);
 
     const {
@@ -48,10 +49,10 @@ export default function Login() {
                         ? "bg-slate-800/80 border border-slate-700" 
                         : "bg-white/80 border border-gray-200"
                 } shadow-lg`}
-                onPress={() => setIsDark(!isDark)}
+                onPress={toggleTheme}
             >
                 <MaterialIcons
-                    name="dark-mode"
+                    name={isDark ? "light-mode" : "dark-mode"}
                     size={22}
                     color={isDark ? "#D1D5DB" : "#4B5563"}
                 />
