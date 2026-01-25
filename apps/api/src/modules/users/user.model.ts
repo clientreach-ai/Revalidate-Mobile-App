@@ -40,11 +40,18 @@ export interface OnboardingStep2Personal {
 }
 
 export interface OnboardingStep3Professional {
-  registration_number: string;
+  gmc_registration_number: string;
   revalidation_date: string;
   work_setting?: string;
   scope_of_practice?: string;
-  organization_name?: string;
+  professional_registrations?: string; // Can be comma-separated or JSON
+  registration_reference_pin?: string; // Optional
+  hourly_rate?: number;
+  work_hours_completed_already?: number;
+  training_hours_completed_already?: number;
+  earned_current_financial_year?: number;
+  brief_description_of_work?: string;
+  notepad?: string; // Optional
 }
 
 export interface OnboardingStep4Plan {

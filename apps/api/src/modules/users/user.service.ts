@@ -236,22 +236,61 @@ export async function updateOnboardingStep2(userId: string, data: OnboardingStep
  * Update onboarding step 3: Professional details
  */
 export async function updateOnboardingStep3(userId: string, data: OnboardingStep3Professional): Promise<User> {
-  const dbUpdates = mapUserToDb({
-    registration_number: data.registration_number,
-    revalidation_date: data.revalidation_date,
-    work_setting: data.work_setting,
-    scope_of_practice: data.scope_of_practice,
-  });
-
   const updateData: any = {
-    registration: dbUpdates.registration,
-    due_date: dbUpdates.due_date,
+    registration: data.gmc_registration_number,
+    due_date: data.revalidation_date,
     updated_at: new Date(),
   };
 
-  if (dbUpdates.work_settings !== undefined) updateData.work_settings = dbUpdates.work_settings || null;
-  if (dbUpdates.scope_practice !== undefined) updateData.scope_practice = dbUpdates.scope_practice || null;
-  if (data.organization_name !== undefined) updateData.organization_name = data.organization_name;
+  // Work setting and scope of practice (stored as Int in DB, but we accept string)
+  if (data.work_setting !== undefined) {
+    updateData.work_settings = data.work_setting ? parseInt(data.work_setting) || null : null;
+  }
+  if (data.scope_of_practice !== undefined) {
+    updateData.scope_practice = data.scope_of_practice ? parseInt(data.scope_of_practice) || null : null;
+  }
+
+  // Numeric fields
+  if (data.hourly_rate !== undefined) updateData.hourly_rate = data.hourly_rate;
+  if (data.work_hours_completed_already !== undefined) updateData.hours_completed_already = data.work_hours_completed_already;
+  if (data.training_hours_completed_already !== undefined) updateData.training_hours_completed_already = data.training_hours_completed_already;
+  if (data.earned_current_financial_year !== undefined) updateData.earned = data.earned_current_financial_year;
+
+  // Notepad field
+  if (data.notepad !== undefined) updateData.notepad = data.notepad;
+
+  // Store professional registrations, registration reference/pin, and brief description in description JSON
+  // Get existing description to preserve other data (like professionalRole from step 1)
+  const existingUser = await prisma.users.findUnique({
+    where: { id: parseInt(userId) },
+    select: { description: true },
+  });
+
+  let descriptionData: any = {};
+  if (existingUser?.description) {
+    try {
+      descriptionData = typeof existingUser.description === 'string' 
+        ? JSON.parse(existingUser.description) 
+        : existingUser.description;
+    } catch (e) {
+      // If not JSON, start fresh but preserve any existing data if needed
+      descriptionData = {};
+    }
+  }
+
+  // Update description with new professional data
+  if (data.professional_registrations !== undefined) {
+    descriptionData.professionalRegistrations = data.professional_registrations;
+  }
+  if (data.registration_reference_pin !== undefined) {
+    descriptionData.registrationReferencePin = data.registration_reference_pin;
+  }
+  if (data.brief_description_of_work !== undefined) {
+    descriptionData.briefDescriptionOfWork = data.brief_description_of_work;
+  }
+
+  // Store as JSON string (preserves professionalRole from step 1 and adds new fields)
+  updateData.description = JSON.stringify(descriptionData);
 
   const updated = await prisma.users.update({
     where: { id: parseInt(userId) },

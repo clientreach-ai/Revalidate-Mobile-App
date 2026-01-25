@@ -230,11 +230,18 @@ export const onboardingStep2 = asyncHandler(async (req: Request, res: Response) 
  * POST /api/v1/users/onboarding/step-3
  */
 const step3Schema = z.object({
-  registration_number: z.string().min(1, 'Registration number is required'),
+  gmc_registration_number: z.string().min(1, 'GMC registration number is required'),
   revalidation_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format. Use YYYY-MM-DD'),
   work_setting: z.string().optional(),
   scope_of_practice: z.string().optional(),
-  organization_name: z.string().optional(),
+  professional_registrations: z.string().optional(),
+  registration_reference_pin: z.string().optional(),
+  hourly_rate: z.number().min(0).optional(),
+  work_hours_completed_already: z.number().int().min(0).optional(),
+  training_hours_completed_already: z.number().int().min(0).optional(),
+  earned_current_financial_year: z.number().min(0).optional(),
+  brief_description_of_work: z.string().optional(),
+  notepad: z.string().optional(),
 });
 
 export const onboardingStep3 = asyncHandler(async (req: Request, res: Response) => {
@@ -243,16 +250,24 @@ export const onboardingStep3 = asyncHandler(async (req: Request, res: Response) 
   }
 
   const validated = step3Schema.parse(req.body) as OnboardingStep3Professional;
-  const updated = await updateOnboardingStep3(req.user.userId, validated);
+  await updateOnboardingStep3(req.user.userId, validated);
 
   res.json({
     success: true,
     message: 'Professional details saved successfully',
     data: {
-      registrationNumber: updated.registration_number,
-      revalidationDate: updated.revalidation_date,
-      workSetting: updated.work_setting,
-      scopeOfPractice: updated.scope_of_practice,
+      gmc_registration_number: validated.gmc_registration_number,
+      revalidation_date: validated.revalidation_date,
+      work_setting: validated.work_setting,
+      scope_of_practice: validated.scope_of_practice,
+      professional_registrations: validated.professional_registrations,
+      registration_reference_pin: validated.registration_reference_pin,
+      hourly_rate: validated.hourly_rate,
+      work_hours_completed_already: validated.work_hours_completed_already,
+      training_hours_completed_already: validated.training_hours_completed_already,
+      earned_current_financial_year: validated.earned_current_financial_year,
+      brief_description_of_work: validated.brief_description_of_work,
+      notepad: validated.notepad,
     },
   });
 });
