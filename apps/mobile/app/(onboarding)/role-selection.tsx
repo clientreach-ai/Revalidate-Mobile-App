@@ -9,7 +9,6 @@ import type { Resolver, SubmitHandler } from "react-hook-form";
 import {
     onboardingRoleSchema,
     type OnboardingRoleInput,
-    type Role,
 } from "@/validation/schema";
 import "../global.css";
 

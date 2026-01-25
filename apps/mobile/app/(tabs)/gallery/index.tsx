@@ -128,6 +128,56 @@ export default function GalleryScreen() {
     },
   ];
 
+  const validateDocumentForm = () => {
+    const errors: Record<string, string> = {};
+
+    if (!documentForm.title.trim()) {
+      errors.title = 'Document title is required';
+    }
+
+    if (!documentForm.category) {
+      errors.category = 'Please select a category';
+    }
+
+    if (!documentForm.file) {
+      errors.file = 'Please upload a file';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleFileSelect = (source: 'gallery' | 'camera' | 'files') => {
+    const mockFiles = {
+      gallery: { name: 'Document_Image.jpg', size: '2.4 MB', type: 'image/jpeg' },
+      camera: { name: 'Photo_Capture.jpg', size: '1.8 MB', type: 'image/jpeg' },
+      files: { name: 'Report_2024.pdf', size: '3.2 MB', type: 'application/pdf' },
+    };
+
+    setDocumentForm({ ...documentForm, file: mockFiles[source] });
+    if (formErrors.file) {
+      setFormErrors({ ...formErrors, file: '' });
+    }
+  };
+
+  const handleUploadDocument = () => {
+    if (validateDocumentForm()) {
+      setIsUploading(true);
+      setTimeout(() => {
+        console.log('Document uploaded:', documentForm);
+        setIsUploading(false);
+        setShowAddDocumentModal(false);
+        setFormErrors({});
+        setDocumentForm({
+          title: '',
+          description: '',
+          category: '',
+          file: null,
+        });
+      }, 1500);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
       <ScrollView 
@@ -246,58 +296,6 @@ export default function GalleryScreen() {
           </View>
         </View>
       </ScrollView>
-
-  const validateDocumentForm = () => {
-    const errors: Record<string, string> = {};
-    
-    if (!documentForm.title.trim()) {
-      errors.title = 'Document title is required';
-    }
-    
-    if (!documentForm.category) {
-      errors.category = 'Please select a category';
-    }
-    
-    if (!documentForm.file) {
-      errors.file = 'Please upload a file';
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleFileSelect = (source: 'gallery' | 'camera' | 'files') => {
-    // Simulate file selection
-    const mockFiles = {
-      gallery: { name: 'Document_Image.jpg', size: '2.4 MB', type: 'image/jpeg' },
-      camera: { name: 'Photo_Capture.jpg', size: '1.8 MB', type: 'image/jpeg' },
-      files: { name: 'Report_2024.pdf', size: '3.2 MB', type: 'application/pdf' },
-    };
-    
-    setDocumentForm({ ...documentForm, file: mockFiles[source] });
-    if (formErrors.file) {
-      setFormErrors({ ...formErrors, file: '' });
-    }
-  };
-
-  const handleUploadDocument = () => {
-    if (validateDocumentForm()) {
-      setIsUploading(true);
-      // Simulate upload
-      setTimeout(() => {
-        console.log('Document uploaded:', documentForm);
-        setIsUploading(false);
-        setShowAddDocumentModal(false);
-        setFormErrors({});
-        setDocumentForm({
-          title: '',
-          description: '',
-          category: '',
-          file: null,
-        });
-      }, 1500);
-    }
-  };
 
       {/* Floating Action Button */}
       <View 
