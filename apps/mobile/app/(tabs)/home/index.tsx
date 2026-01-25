@@ -96,7 +96,7 @@ export default function DashboardScreen() {
       >
         {/* Header Section with Gradient */}
         <View className="px-6 pt-6 pb-20 rounded-b-[40px]" style={{ backgroundColor: '#2B5F9E' }}>
-          <View className="flex-row justify-between items-center">
+          <View className="flex-row justify-between items-center mb-4">
             {/* Profile Section */}
             <View className="flex-row items-center gap-3">
               <View className="relative">
@@ -115,7 +115,23 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            {/* Revalidation Status */}
+            {/* Notification Button */}
+            <Pressable 
+              onPress={() => router.push('/(tabs)/notifications')}
+              className="relative"
+            >
+              <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
+                <MaterialIcons name="notifications-active" size={22} color="#FFFFFF" />
+              </View>
+              {/* Notification Badge */}
+              <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-[#2B5F9E] items-center justify-center">
+                <Text className="text-white text-[10px] font-bold" style={{ lineHeight: 12 }}>2</Text>
+              </View>
+            </Pressable>
+          </View>
+
+          {/* Revalidation Status */}
+          <View className="flex-row justify-between items-center">
             <View className="bg-white/10 px-3 py-2 rounded-2xl items-center border border-white/20">
               <Text className="text-[10px] text-white/80 font-semibold uppercase">
                 Revalidation

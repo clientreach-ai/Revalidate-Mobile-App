@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Notification Center</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b5e9c",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#13181f",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+        .fill-1 {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="relative flex h-screen w-full flex-col overflow-x-hidden max-w-[430px] mx-auto bg-white dark:bg-background-dark shadow-2xl">
+<header class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 ios-blur px-4 pt-4 pb-2">
+<div class="flex items-center justify-between mb-4">
+<button class="text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[28px]">chevron_left</span>
+<span class="text-base font-medium">Back</span>
+</button>
+<button class="text-primary text-sm font-semibold tracking-tight">Mark all as read</button>
+</div>
+<h1 class="text-3xl font-bold tracking-tight text-[#121417] dark:text-white px-0.5">Notifications</h1>
+</header>
+<main class="flex-1 overflow-y-auto">
+<section>
+<div class="px-4 py-2 mt-2 bg-background-light dark:bg-zinc-900/50">
+<h3 class="text-xs font-semibold uppercase tracking-wider text-[#687482] dark:text-zinc-400">Today</h3>
+</div>
+<div class="relative group overflow-hidden bg-white dark:bg-background-dark border-b border-zinc-100 dark:border-zinc-800">
+<div class="flex items-center gap-4 px-4 py-4 active:bg-zinc-50 dark:active:bg-zinc-800 transition-colors">
+<div class="relative">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 text-primary size-12 shrink-0">
+<span class="material-symbols-outlined text-[24px]">calendar_today</span>
+</div>
+<div class="absolute -top-1 -right-1 size-3 bg-primary border-2 border-white dark:border-background-dark rounded-full"></div>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<p class="text-[15px] font-bold text-[#121417] dark:text-white truncate">Upcoming appraisal meeting</p>
+<span class="text-xs font-medium text-primary ml-2 shrink-0">10:30 AM</span>
+</div>
+<p class="text-sm font-normal text-[#687482] dark:text-zinc-400 leading-snug line-clamp-2">Your meeting starts in 30 minutes. Please ensure your portfolio is ready for review.</p>
+</div>
+</div>
+</div>
+<div class="relative group overflow-hidden bg-white dark:bg-background-dark border-b border-zinc-100 dark:border-zinc-800">
+<div class="flex items-center gap-4 px-4 py-4 active:bg-zinc-50 dark:active:bg-zinc-800 transition-colors">
+<div class="relative">
+<div class="flex items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 size-12 shrink-0">
+<span class="material-symbols-outlined text-[24px]">info</span>
+</div>
+<div class="absolute -top-1 -right-1 size-3 bg-primary border-2 border-white dark:border-background-dark rounded-full"></div>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<p class="text-[15px] font-bold text-[#121417] dark:text-white truncate">New CPD requirements</p>
+<span class="text-xs font-medium text-primary ml-2 shrink-0">8:15 AM</span>
+</div>
+<p class="text-sm font-normal text-[#687482] dark:text-zinc-400 leading-snug line-clamp-2">GMC has updated the guidance for the 2024 revalidation cycle. Tap to read more.</p>
+</div>
+</div>
+</div>
+</section>
+<section>
+<div class="px-4 py-2 mt-4 bg-background-light dark:bg-zinc-900/50">
+<h3 class="text-xs font-semibold uppercase tracking-wider text-[#687482] dark:text-zinc-400">Yesterday</h3>
+</div>
+<div class="relative group overflow-hidden bg-white dark:bg-background-dark border-b border-zinc-100 dark:border-zinc-800">
+<div class="flex items-center gap-4 px-4 py-4 active:bg-zinc-50 dark:active:bg-zinc-800 transition-colors opacity-80">
+<div class="flex items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 size-12 shrink-0">
+<span class="material-symbols-outlined text-[24px]">task_alt</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<p class="text-[15px] font-medium text-[#121417] dark:text-white truncate">Evidence upload confirmed</p>
+<span class="text-xs font-normal text-[#687482] dark:text-zinc-500 ml-2 shrink-0">4:20 PM</span>
+</div>
+<p class="text-sm font-normal text-[#687482] dark:text-zinc-400 leading-snug line-clamp-2">"Audit of Surgical Outcomes 2023" has been successfully uploaded to your gallery.</p>
+</div>
+</div>
+</div>
+<div class="relative group overflow-hidden bg-white dark:bg-background-dark border-b border-zinc-100 dark:border-zinc-800">
+<div class="flex items-center gap-4 px-4 py-4 active:bg-zinc-50 dark:active:bg-zinc-800 transition-colors opacity-80">
+<div class="flex items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-800 text-[#687482] dark:text-zinc-400 size-12 shrink-0">
+<span class="material-symbols-outlined text-[24px]">verified_user</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<p class="text-[15px] font-medium text-[#121417] dark:text-white truncate">System Security Update</p>
+<span class="text-xs font-normal text-[#687482] dark:text-zinc-500 ml-2 shrink-0">9:00 AM</span>
+</div>
+<p class="text-sm font-normal text-[#687482] dark:text-zinc-400 leading-snug line-clamp-2">Multi-factor authentication is now mandatory for all users in your trust.</p>
+</div>
+</div>
+</div>
+</section>
+<section>
+<div class="px-4 py-2 mt-4 bg-background-light dark:bg-zinc-900/50">
+<h3 class="text-xs font-semibold uppercase tracking-wider text-[#687482] dark:text-zinc-400">Earlier</h3>
+</div>
+<div class="relative group overflow-hidden bg-white dark:bg-background-dark border-b border-zinc-100 dark:border-zinc-800">
+<div class="flex items-center gap-4 px-4 py-4 active:bg-zinc-50 dark:active:bg-zinc-800 transition-colors opacity-80">
+<div class="flex items-center justify-center rounded-xl bg-primary/10 text-primary size-12 shrink-0">
+<span class="material-symbols-outlined text-[24px]">history_edu</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<div class="flex justify-between items-baseline mb-0.5">
+<p class="text-[15px] font-medium text-[#121417] dark:text-white truncate">Colleague feedback ready</p>
+<span class="text-xs font-normal text-[#687482] dark:text-zinc-500 ml-2 shrink-0">Mon</span>
+</div>
+<p class="text-sm font-normal text-[#687482] dark:text-zinc-400 leading-snug line-clamp-2">The results of your 360-degree multi-source feedback are now available.</p>
+</div>
+</div>
+</div>
+</section>
+<div class="py-12 flex flex-col items-center justify-center opacity-40">
+<span class="material-symbols-outlined text-4xl mb-2">notifications_off</span>
+<p class="text-sm">End of notifications</p>
+</div>
+</main>
+<nav class="border-t border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-background-dark/90 ios-blur flex justify-around items-center pt-2 pb-8">
+<div class="flex flex-col items-center text-primary">
+<span class="material-symbols-outlined text-[26px] fill-1">home</span>
+<span class="text-[10px] mt-0.5 font-bold">Home</span>
+</div>
+<div class="flex flex-col items-center text-zinc-400">
+<span class="material-symbols-outlined text-[26px]">calendar_month</span>
+<span class="text-[10px] mt-0.5 font-medium">Calendar</span>
+</div>
+<div class="flex flex-col items-center text-zinc-400">
+<div class="relative">
+<span class="material-symbols-outlined text-[26px]">photo_library</span>
+<div class="absolute -top-0.5 -right-0.5 size-2 bg-red-500 rounded-full"></div>
+</div>
+<span class="text-[10px] mt-0.5 font-medium">Gallery</span>
+</div>
+<div class="flex flex-col items-center text-zinc-400">
+<span class="material-symbols-outlined text-[26px]">person</span>
+<span class="text-[10px] mt-0.5 font-medium">Profile</span>
+</div>
+</nav>
+<div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-zinc-300 dark:bg-zinc-700 rounded-full"></div>
+</div>
+
+</body></html>

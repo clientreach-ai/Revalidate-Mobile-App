@@ -1,7 +1,8 @@
-import { View, Text, ScrollView, Pressable, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, Modal } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import '../../global.css';
 
 interface Category {
@@ -29,6 +30,15 @@ interface RecentFile {
 export default function GalleryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [showAddDocumentModal, setShowAddDocumentModal] = useState(false);
+  const [documentForm, setDocumentForm] = useState({
+    title: '',
+    description: '',
+    category: '',
+    file: null as { name: string; size: string; type: string } | null,
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isUploading, setIsUploading] = useState(false);
   
   const categories: Category[] = [
     {
@@ -237,15 +247,294 @@ export default function GalleryScreen() {
         </View>
       </ScrollView>
 
+  const validateDocumentForm = () => {
+    const errors: Record<string, string> = {};
+    
+    if (!documentForm.title.trim()) {
+      errors.title = 'Document title is required';
+    }
+    
+    if (!documentForm.category) {
+      errors.category = 'Please select a category';
+    }
+    
+    if (!documentForm.file) {
+      errors.file = 'Please upload a file';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleFileSelect = (source: 'gallery' | 'camera' | 'files') => {
+    // Simulate file selection
+    const mockFiles = {
+      gallery: { name: 'Document_Image.jpg', size: '2.4 MB', type: 'image/jpeg' },
+      camera: { name: 'Photo_Capture.jpg', size: '1.8 MB', type: 'image/jpeg' },
+      files: { name: 'Report_2024.pdf', size: '3.2 MB', type: 'application/pdf' },
+    };
+    
+    setDocumentForm({ ...documentForm, file: mockFiles[source] });
+    if (formErrors.file) {
+      setFormErrors({ ...formErrors, file: '' });
+    }
+  };
+
+  const handleUploadDocument = () => {
+    if (validateDocumentForm()) {
+      setIsUploading(true);
+      // Simulate upload
+      setTimeout(() => {
+        console.log('Document uploaded:', documentForm);
+        setIsUploading(false);
+        setShowAddDocumentModal(false);
+        setFormErrors({});
+        setDocumentForm({
+          title: '',
+          description: '',
+          category: '',
+          file: null,
+        });
+      }, 1500);
+    }
+  };
+
       {/* Floating Action Button */}
       <View 
         className="absolute left-0 right-0 items-center"
         style={{ bottom: 80 + insets.bottom }}
       >
-        <Pressable className="w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center">
+        <Pressable 
+          onPress={() => {
+            setDocumentForm({
+              title: '',
+              description: '',
+              category: '',
+              file: null,
+            });
+            setFormErrors({});
+            setShowAddDocumentModal(true);
+          }}
+          className="w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center active:opacity-80"
+        >
           <MaterialIcons name="add" size={32} color="#FFFFFF" />
         </Pressable>
       </View>
+
+      {/* Add Document Modal */}
+      <Modal
+        visible={showAddDocumentModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddDocumentModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl max-h-[90%]">
+            <SafeAreaView edges={['bottom']}>
+              {/* Header */}
+              <View className="flex-row items-center justify-between px-6 pt-4 pb-4 border-b border-slate-100">
+                <Text className="text-2xl font-bold text-slate-800">Add Document</Text>
+                <Pressable onPress={() => setShowAddDocumentModal(false)}>
+                  <MaterialIcons name="close" size={24} color="#64748B" />
+                </Pressable>
+              </View>
+
+              <ScrollView 
+                className="flex-1"
+                contentContainerStyle={{ paddingBottom: 20 }}
+                showsVerticalScrollIndicator={false}
+              >
+                <View className="px-6 pt-6" style={{ gap: 20 }}>
+                  {/* Document Title */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Document Title *</Text>
+                    <TextInput
+                      value={documentForm.title}
+                      onChangeText={(text) => {
+                        setDocumentForm({ ...documentForm, title: text });
+                        if (formErrors.title) {
+                          setFormErrors({ ...formErrors, title: '' });
+                        }
+                      }}
+                      placeholder="Enter document title"
+                      placeholderTextColor="#94A3B8"
+                      className={`bg-white border rounded-2xl px-4 py-4 text-slate-800 text-base ${
+                        formErrors.title ? 'border-red-500' : 'border-slate-200'
+                      }`}
+                    />
+                    {formErrors.title && (
+                      <Text className="text-red-500 text-xs mt-1">{formErrors.title}</Text>
+                    )}
+                  </View>
+
+                  {/* Category Selection */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Category *</Text>
+                    <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                      {categories.map((category) => {
+                        const isSelected = documentForm.category === category.title;
+                        return (
+                          <Pressable
+                            key={category.id}
+                            onPress={() => {
+                              setDocumentForm({ ...documentForm, category: category.title });
+                              if (formErrors.category) {
+                                setFormErrors({ ...formErrors, category: '' });
+                              }
+                            }}
+                            className={`px-4 py-3 rounded-2xl border-2 flex-row items-center ${
+                              isSelected ? 'bg-white' : 'bg-white'
+                            }`}
+                            style={{
+                              borderColor: isSelected ? category.iconColor : formErrors.category ? '#EF4444' : '#E2E8F0',
+                              backgroundColor: isSelected ? `${category.iconColor}15` : '#FFFFFF',
+                            }}
+                          >
+                            <View className={`w-8 h-8 rounded-xl ${category.iconBgColor} items-center justify-center mr-2`}>
+                              <MaterialIcons name={category.icon} size={18} color={category.iconColor} />
+                            </View>
+                            <Text className={`text-sm font-medium ${
+                              isSelected ? 'text-slate-800' : 'text-slate-600'
+                            }`}>
+                              {category.title}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    {formErrors.category && (
+                      <Text className="text-red-500 text-xs mt-1">{formErrors.category}</Text>
+                    )}
+                  </View>
+
+                  {/* File Upload */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Upload File *</Text>
+                    <Pressable 
+                      onPress={() => {
+                        // Show upload options
+                        handleFileSelect('files');
+                      }}
+                      className={`bg-slate-50 border-2 border-dashed rounded-2xl p-6 items-center ${
+                        formErrors.file ? 'border-red-500' : 'border-slate-300'
+                      }`}
+                    >
+                      {documentForm.file ? (
+                        <View className="items-center w-full">
+                          <View className="w-16 h-16 bg-blue-100 rounded-xl items-center justify-center mb-3">
+                            <MaterialIcons name="description" size={32} color="#2563EB" />
+                          </View>
+                          <Text className="text-slate-800 font-semibold text-sm" numberOfLines={1}>
+                            {documentForm.file.name}
+                          </Text>
+                          <Text className="text-slate-500 text-xs mt-1">{documentForm.file.size}</Text>
+                          <Pressable 
+                            onPress={() => {
+                              setDocumentForm({ ...documentForm, file: null });
+                              if (formErrors.file) {
+                                setFormErrors({ ...formErrors, file: '' });
+                              }
+                            }}
+                            className="mt-3 px-4 py-2 bg-red-50 rounded-xl"
+                          >
+                            <Text className="text-red-600 text-xs font-semibold">Remove</Text>
+                          </Pressable>
+                        </View>
+                      ) : (
+                        <View className="items-center">
+                          <View className="w-16 h-16 bg-slate-200 rounded-xl items-center justify-center mb-3">
+                            <MaterialIcons name="cloud-upload" size={32} color="#64748B" />
+                          </View>
+                          <Text className="text-slate-600 font-semibold text-sm mb-1">Tap to upload</Text>
+                          <Text className="text-slate-400 text-xs">PDF, JPG, PNG up to 10MB</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                    {formErrors.file && (
+                      <Text className="text-red-500 text-xs mt-1">{formErrors.file}</Text>
+                    )}
+                  </View>
+
+                  {/* Description */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Description</Text>
+                    <TextInput
+                      value={documentForm.description}
+                      onChangeText={(text) => setDocumentForm({ ...documentForm, description: text })}
+                      placeholder="Enter document description or notes"
+                      placeholderTextColor="#94A3B8"
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                      className="bg-white border border-slate-200 rounded-2xl px-4 py-4 text-slate-800 text-base min-h-[100px]"
+                    />
+                  </View>
+
+                  {/* Upload Options */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-3">Upload From</Text>
+                    <View className="flex-row" style={{ gap: 12 }}>
+                      <Pressable 
+                        onPress={() => handleFileSelect('gallery')}
+                        className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 items-center active:bg-blue-50"
+                      >
+                        <View className="w-12 h-12 bg-blue-50 rounded-xl items-center justify-center mb-2">
+                          <MaterialIcons name="photo-library" size={24} color="#2563EB" />
+                        </View>
+                        <Text className="text-slate-700 font-medium text-sm">Gallery</Text>
+                      </Pressable>
+                      <Pressable 
+                        onPress={() => handleFileSelect('camera')}
+                        className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 items-center active:bg-green-50"
+                      >
+                        <View className="w-12 h-12 bg-green-50 rounded-xl items-center justify-center mb-2">
+                          <MaterialIcons name="camera-alt" size={24} color="#10B981" />
+                        </View>
+                        <Text className="text-slate-700 font-medium text-sm">Camera</Text>
+                      </Pressable>
+                      <Pressable 
+                        onPress={() => handleFileSelect('files')}
+                        className="flex-1 bg-white border border-slate-200 rounded-2xl p-4 items-center active:bg-purple-50"
+                      >
+                        <View className="w-12 h-12 bg-purple-50 rounded-xl items-center justify-center mb-2">
+                          <MaterialIcons name="folder" size={24} color="#9333EA" />
+                        </View>
+                        <Text className="text-slate-700 font-medium text-sm">Files</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Footer Actions */}
+              <View className="px-6 pt-4 pb-6 border-t border-slate-100 flex-row" style={{ gap: 12 }}>
+                <Pressable
+                  onPress={() => setShowAddDocumentModal(false)}
+                  className="flex-1 py-4 rounded-2xl bg-slate-100 items-center"
+                >
+                  <Text className="text-slate-700 font-semibold text-base">Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleUploadDocument}
+                  disabled={isUploading}
+                  className={`flex-1 py-4 rounded-2xl items-center ${
+                    isUploading ? 'bg-[#2B5F9E]/50' : 'bg-[#2B5F9E]'
+                  }`}
+                >
+                  {isUploading ? (
+                    <View className="flex-row items-center">
+                      <MaterialIcons name="hourglass-empty" size={20} color="#FFFFFF" />
+                      <Text className="text-white font-semibold text-base ml-2">Uploading...</Text>
+                    </View>
+                  ) : (
+                    <Text className="text-white font-semibold text-base">Upload Document</Text>
+                  )}
+                </Pressable>
+              </View>
+            </SafeAreaView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

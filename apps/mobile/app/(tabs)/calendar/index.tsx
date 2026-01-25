@@ -1,8 +1,9 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, Modal, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import '../../global.css';
+import { useRouter } from 'expo-router';
 
 type EventType = 'all' | 'official' | 'personal';
 
@@ -18,10 +19,26 @@ interface Event {
 }
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [currentDate, setCurrentDate] = useState(new Date(2024, 2, 13)); // March 13, 2024
   const [selectedDate, setSelectedDate] = useState(new Date(2024, 2, 13));
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    description: '',
+    location: '',
+    date: selectedDate,
+    startTime: '',
+    endTime: '',
+    type: 'official' as 'official' | 'personal',
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -137,6 +154,78 @@ export default function CalendarScreen() {
 
   const calendarDays = getDaysInMonth(currentDate);
 
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    
+    if (!eventForm.title.trim()) {
+      errors.title = 'Event title is required';
+    }
+    
+    if (!eventForm.startTime.trim()) {
+      errors.startTime = 'Start time is required';
+    } else if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eventForm.startTime)) {
+      errors.startTime = 'Please enter time in HH:MM format';
+    }
+    
+    if (!eventForm.endTime.trim()) {
+      errors.endTime = 'End time is required';
+    } else if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eventForm.endTime)) {
+      errors.endTime = 'Please enter time in HH:MM format';
+    }
+    
+    if (eventForm.startTime && eventForm.endTime) {
+      const startParts = eventForm.startTime.split(':');
+      const endParts = eventForm.endTime.split(':');
+      if (startParts.length === 2 && endParts.length === 2) {
+        const startHourStr = startParts[0];
+        const startMinStr = startParts[1];
+        const endHourStr = endParts[0];
+        const endMinStr = endParts[1];
+        if (startHourStr && startMinStr && endHourStr && endMinStr) {
+          const startHour = parseInt(startHourStr);
+          const startMin = parseInt(startMinStr);
+          const endHour = parseInt(endHourStr);
+          const endMin = parseInt(endMinStr);
+          const startMinutes = startHour * 60 + startMin;
+          const endMinutes = endHour * 60 + endMin;
+          
+          if (endMinutes <= startMinutes) {
+            errors.endTime = 'End time must be after start time';
+          }
+        }
+      }
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSaveEvent = () => {
+    if (validateForm()) {
+      setIsSubmitting(true);
+      // Simulate API call
+      setTimeout(() => {
+        console.log('Event saved:', { ...eventForm, date: eventForm.date });
+        setIsSubmitting(false);
+        setShowAddEventModal(false);
+        setFormErrors({});
+        setEventForm({
+          title: '',
+          description: '',
+          location: '',
+          date: selectedDate,
+          startTime: '',
+          endTime: '',
+          type: 'official',
+        });
+      }, 1000);
+    }
+  };
+
+  const formatTime = (hour: number, minute: number) => {
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top']}>
       <ScrollView 
@@ -154,8 +243,15 @@ export default function CalendarScreen() {
               UK Revalidation Tracker
             </Text>
           </View>
-          <Pressable className="w-10 h-10 rounded-full bg-white shadow-sm items-center justify-center border border-slate-100">
+          <Pressable 
+            onPress={() => router.push('/(tabs)/notifications')}
+            className="relative w-10 h-10 rounded-full bg-white shadow-sm items-center justify-center border border-slate-100"
+          >
             <MaterialIcons name="notifications" size={20} color="#2B5F9E" />
+            {/* Notification Badge */}
+            <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white items-center justify-center">
+              <Text className="text-white text-[8px] font-bold" style={{ lineHeight: 10 }}>2</Text>
+            </View>
           </Pressable>
         </View>
 
@@ -358,11 +454,493 @@ export default function CalendarScreen() {
 
       {/* Floating Action Button */}
       <Pressable 
-        className="absolute right-6 w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center"
+        onPress={() => {
+          setEventForm({
+            title: '',
+            description: '',
+            location: '',
+            date: selectedDate,
+            startTime: '',
+            endTime: '',
+            type: 'official',
+          });
+          setFormErrors({});
+          setShowAddEventModal(true);
+        }}
+        className="absolute right-6 w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center active:opacity-80"
         style={{ bottom: 80 + insets.bottom }}
       >
         <MaterialIcons name="add" size={32} color="#FFFFFF" />
       </Pressable>
+
+      {/* Add Event Modal */}
+      <Modal
+        visible={showAddEventModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddEventModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl max-h-[90%]">
+            <SafeAreaView edges={['bottom']}>
+              {/* Header */}
+              <View className="flex-row items-center justify-between px-6 pt-4 pb-4 border-b border-slate-100">
+                <Text className="text-2xl font-bold text-slate-800">Add New Event</Text>
+                <Pressable onPress={() => setShowAddEventModal(false)}>
+                  <MaterialIcons name="close" size={24} color="#64748B" />
+                </Pressable>
+              </View>
+
+              <ScrollView 
+                className="flex-1"
+                contentContainerStyle={{ paddingBottom: 20 }}
+                showsVerticalScrollIndicator={false}
+              >
+                <View className="px-6 pt-6" style={{ gap: 20 }}>
+                  {/* Event Title */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Event Title *</Text>
+                    <TextInput
+                      value={eventForm.title}
+                      onChangeText={(text) => {
+                        setEventForm({ ...eventForm, title: text });
+                        if (formErrors.title) {
+                          setFormErrors({ ...formErrors, title: '' });
+                        }
+                      }}
+                      placeholder="Enter event title"
+                      placeholderTextColor="#94A3B8"
+                      className={`bg-white border rounded-2xl px-4 py-4 text-slate-800 text-base ${
+                        formErrors.title ? 'border-red-500' : 'border-slate-200'
+                      }`}
+                    />
+                    {formErrors.title && (
+                      <Text className="text-red-500 text-xs mt-1">{formErrors.title}</Text>
+                    )}
+                  </View>
+
+                  {/* Description */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Description</Text>
+                    <TextInput
+                      value={eventForm.description}
+                      onChangeText={(text) => setEventForm({ ...eventForm, description: text })}
+                      placeholder="Enter event description"
+                      placeholderTextColor="#94A3B8"
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                      className="bg-white border border-slate-200 rounded-2xl px-4 py-4 text-slate-800 text-base min-h-[100px]"
+                    />
+                  </View>
+
+                  {/* Location */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Location</Text>
+                    <View className="relative">
+                      <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
+                        <MaterialIcons name="location-on" size={20} color="#94A3B8" />
+                      </View>
+                      <TextInput
+                        value={eventForm.location}
+                        onChangeText={(text) => setEventForm({ ...eventForm, location: text })}
+                        placeholder="Enter location"
+                        placeholderTextColor="#94A3B8"
+                        className="bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-4 text-slate-800 text-base"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Date Selection */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Date</Text>
+                    <Pressable 
+                      onPress={() => setShowDatePicker(true)}
+                      className="bg-white border border-slate-200 rounded-2xl px-4 py-4 flex-row items-center justify-between active:bg-slate-50"
+                    >
+                      <Text className="text-slate-800 text-base">
+                        {eventForm.date.toLocaleDateString('en-GB', { 
+                          weekday: 'long', 
+                          day: 'numeric', 
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}
+                      </Text>
+                      <MaterialIcons name="calendar-today" size={20} color="#94A3B8" />
+                    </Pressable>
+                  </View>
+
+                  {/* Time Selection */}
+                  <View className="flex-row" style={{ gap: 12 }}>
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-slate-700 mb-2">Start Time *</Text>
+                      <Pressable
+                        onPress={() => setShowStartTimePicker(true)}
+                        className={`bg-white border rounded-2xl pl-12 pr-4 py-4 flex-row items-center ${
+                          formErrors.startTime ? 'border-red-500' : 'border-slate-200'
+                        }`}
+                      >
+                        <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
+                          <MaterialIcons name="access-time" size={20} color="#94A3B8" />
+                        </View>
+                        <Text className={`text-base ${eventForm.startTime ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {eventForm.startTime || '09:00'}
+                        </Text>
+                      </Pressable>
+                      {formErrors.startTime && (
+                        <Text className="text-red-500 text-xs mt-1">{formErrors.startTime}</Text>
+                      )}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-slate-700 mb-2">End Time *</Text>
+                      <Pressable
+                        onPress={() => setShowEndTimePicker(true)}
+                        className={`bg-white border rounded-2xl pl-12 pr-4 py-4 flex-row items-center ${
+                          formErrors.endTime ? 'border-red-500' : 'border-slate-200'
+                        }`}
+                      >
+                        <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
+                          <MaterialIcons name="access-time" size={20} color="#94A3B8" />
+                        </View>
+                        <Text className={`text-base ${eventForm.endTime ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {eventForm.endTime || '10:30'}
+                        </Text>
+                      </Pressable>
+                      {formErrors.endTime && (
+                        <Text className="text-red-500 text-xs mt-1">{formErrors.endTime}</Text>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Event Type */}
+                  <View>
+                    <Text className="text-sm font-semibold text-slate-700 mb-2">Event Type *</Text>
+                    <View className="flex-row" style={{ gap: 12 }}>
+                      <Pressable
+                        onPress={() => setEventForm({ ...eventForm, type: 'official' })}
+                        className={`flex-1 py-4 rounded-2xl border-2 items-center ${
+                          eventForm.type === 'official'
+                            ? 'bg-blue-50 border-[#2B5F9E]'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <MaterialIcons 
+                          name="business" 
+                          size={24} 
+                          color={eventForm.type === 'official' ? '#2B5F9E' : '#94A3B8'} 
+                        />
+                        <Text className={`text-sm font-semibold mt-2 ${
+                          eventForm.type === 'official' ? 'text-[#2B5F9E]' : 'text-slate-600'
+                        }`}>
+                          Official CPD
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setEventForm({ ...eventForm, type: 'personal' })}
+                        className={`flex-1 py-4 rounded-2xl border-2 items-center ${
+                          eventForm.type === 'personal'
+                            ? 'bg-amber-50 border-amber-400'
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <MaterialIcons 
+                          name="person" 
+                          size={24} 
+                          color={eventForm.type === 'personal' ? '#F59E0B' : '#94A3B8'} 
+                        />
+                        <Text className={`text-sm font-semibold mt-2 ${
+                          eventForm.type === 'personal' ? 'text-amber-600' : 'text-slate-600'
+                        }`}>
+                          Personal
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Footer Actions */}
+              <View className="px-6 pt-4 pb-6 border-t border-slate-100 flex-row" style={{ gap: 12 }}>
+                <Pressable
+                  onPress={() => setShowAddEventModal(false)}
+                  className="flex-1 py-4 rounded-2xl bg-slate-100 items-center"
+                >
+                  <Text className="text-slate-700 font-semibold text-base">Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleSaveEvent}
+                  disabled={isSubmitting}
+                  className={`flex-1 py-4 rounded-2xl items-center ${
+                    isSubmitting ? 'bg-[#2B5F9E]/50' : 'bg-[#2B5F9E]'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <Text className="text-white font-semibold text-base">Saving...</Text>
+                  ) : (
+                    <Text className="text-white font-semibold text-base">Save Event</Text>
+                  )}
+                </Pressable>
+              </View>
+            </SafeAreaView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Date Picker Modal */}
+      <Modal
+        visible={showDatePicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <Pressable 
+          className="flex-1 bg-black/50 justify-center items-center"
+          onPress={() => setShowDatePicker(false)}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-6 w-[90%] max-w-sm"
+          >
+            <Text className="text-xl font-bold text-slate-800 mb-4">Select Date</Text>
+            <ScrollView className="max-h-64">
+              {calendarDays.filter(day => day.isCurrentMonth).map((day, index) => (
+                <Pressable
+                  key={index}
+                  onPress={() => {
+                    setEventForm({ ...eventForm, date: day.date });
+                    setShowDatePicker(false);
+                  }}
+                  className={`py-3 px-4 rounded-xl mb-2 ${
+                    isSameDay(day.date, eventForm.date) ? 'bg-[#2B5F9E]' : 'bg-slate-50'
+                  }`}
+                >
+                  <Text className={`font-medium ${
+                    isSameDay(day.date, eventForm.date) ? 'text-white' : 'text-slate-800'
+                  }`}>
+                    {day.date.toLocaleDateString('en-GB', { 
+                      weekday: 'long', 
+                      day: 'numeric', 
+                      month: 'long' 
+                    })}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              onPress={() => setShowDatePicker(false)}
+              className="mt-4 py-3 rounded-xl bg-slate-100"
+            >
+              <Text className="text-center font-semibold text-slate-700">Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Start Time Picker Modal */}
+      <Modal
+        visible={showStartTimePicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStartTimePicker(false)}
+      >
+        <Pressable 
+          className="flex-1 bg-black/50 justify-center items-center"
+          onPress={() => setShowStartTimePicker(false)}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-6 w-[90%] max-w-sm"
+          >
+            <Text className="text-xl font-bold text-slate-800 mb-4">Select Start Time</Text>
+            <View className="flex-row justify-center mb-4" style={{ gap: 8 }}>
+              <View className="flex-1">
+                <Text className="text-xs text-slate-500 text-center mb-2">Hour</Text>
+                <ScrollView className="max-h-32">
+                  {Array.from({ length: 24 }, (_, hour) => (
+                    <Pressable
+                      key={hour}
+                      onPress={() => {
+                        const currentMin = eventForm.startTime ? parseInt(eventForm.startTime.split(':')[1] || '0') : 0;
+                        setEventForm({ ...eventForm, startTime: formatTime(hour, currentMin) });
+                        if (formErrors.startTime) {
+                          setFormErrors({ ...formErrors, startTime: '' });
+                        }
+                      }}
+                      className={`py-2 rounded-lg mb-1 ${
+                        eventForm.startTime && parseInt(eventForm.startTime.split(':')[0] || '0') === hour
+                          ? 'bg-[#2B5F9E]' : 'bg-slate-50'
+                      }`}
+                    >
+                      <Text className={`text-center text-sm ${
+                        eventForm.startTime && parseInt(eventForm.startTime.split(':')[0] || '0') === hour
+                          ? 'text-white font-bold' : 'text-slate-700'
+                      }`}>
+                        {hour.toString().padStart(2, '0')}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs text-slate-500 text-center mb-2">Minute</Text>
+                <ScrollView className="max-h-32">
+                  {[0, 15, 30, 45].map((minute) => (
+                    <Pressable
+                      key={minute}
+                      onPress={() => {
+                        const currentHour = eventForm.startTime ? parseInt(eventForm.startTime.split(':')[0] || '9') : 9;
+                        setEventForm({ ...eventForm, startTime: formatTime(currentHour, minute) });
+                        if (formErrors.startTime) {
+                          setFormErrors({ ...formErrors, startTime: '' });
+                        }
+                      }}
+                      className={`py-2 rounded-lg mb-1 ${
+                        eventForm.startTime && parseInt(eventForm.startTime.split(':')[1] || '0') === minute
+                          ? 'bg-[#2B5F9E]' : 'bg-slate-50'
+                      }`}
+                    >
+                      <Text className={`text-center text-sm ${
+                        eventForm.startTime && parseInt(eventForm.startTime.split(':')[1] || '0') === minute
+                          ? 'text-white font-bold' : 'text-slate-700'
+                      }`}>
+                        {minute.toString().padStart(2, '0')}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+            <View className="flex-row" style={{ gap: 12 }}>
+              <Pressable
+                onPress={() => setShowStartTimePicker(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-100"
+              >
+                <Text className="text-center font-semibold text-slate-700">Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowStartTimePicker(false)}
+                className="flex-1 py-3 rounded-xl bg-[#2B5F9E]"
+              >
+                <Text className="text-center font-semibold text-white">Done</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* End Time Picker Modal */}
+      <Modal
+        visible={showEndTimePicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEndTimePicker(false)}
+      >
+        <Pressable 
+          className="flex-1 bg-black/50 justify-center items-center"
+          onPress={() => setShowEndTimePicker(false)}
+        >
+          <Pressable 
+            onPress={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-6 w-[90%] max-w-sm"
+          >
+            <Text className="text-xl font-bold text-slate-800 mb-4">Select End Time</Text>
+            <View className="flex-row justify-center mb-4" style={{ gap: 8 }}>
+              <View className="flex-1">
+                <Text className="text-xs text-slate-500 text-center mb-2">Hour</Text>
+                <ScrollView className="max-h-32">
+                  {Array.from({ length: 24 }, (_, hour) => (
+                    <Pressable
+                      key={hour}
+                      onPress={() => {
+                        const currentMin = eventForm.endTime ? (() => {
+                          const parts = eventForm.endTime.split(':');
+                          return parts[1] ? parseInt(parts[1]) : 30;
+                        })() : 30;
+                        setEventForm({ ...eventForm, endTime: formatTime(hour, currentMin) });
+                        if (formErrors.endTime) {
+                          setFormErrors({ ...formErrors, endTime: '' });
+                        }
+                      }}
+                      className={`py-2 rounded-lg mb-1 ${
+                        (() => {
+                          if (!eventForm.endTime) return false;
+                          const parts = eventForm.endTime.split(':');
+                          return parts[0] ? parseInt(parts[0]) === hour : false;
+                        })()
+                          ? 'bg-[#2B5F9E]' : 'bg-slate-50'
+                      }`}
+                    >
+                      <Text className={`text-center text-sm ${
+                        (() => {
+                          if (!eventForm.endTime) return false;
+                          const parts = eventForm.endTime.split(':');
+                          return parts[0] ? parseInt(parts[0]) === hour : false;
+                        })()
+                          ? 'text-white font-bold' : 'text-slate-700'
+                      }`}>
+                        {hour.toString().padStart(2, '0')}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs text-slate-500 text-center mb-2">Minute</Text>
+                <ScrollView className="max-h-32">
+                  {[0, 15, 30, 45].map((minute) => (
+                    <Pressable
+                      key={minute}
+                      onPress={() => {
+                        const currentHour = eventForm.endTime ? (() => {
+                          const parts = eventForm.endTime.split(':');
+                          return parts[0] ? parseInt(parts[0]) : 10;
+                        })() : 10;
+                        setEventForm({ ...eventForm, endTime: formatTime(currentHour, minute) });
+                        if (formErrors.endTime) {
+                          setFormErrors({ ...formErrors, endTime: '' });
+                        }
+                      }}
+                      className={`py-2 rounded-lg mb-1 ${
+                        (() => {
+                          if (!eventForm.endTime) return false;
+                          const parts = eventForm.endTime.split(':');
+                          return parts[1] ? parseInt(parts[1]) === minute : false;
+                        })()
+                          ? 'bg-[#2B5F9E]' : 'bg-slate-50'
+                      }`}
+                    >
+                      <Text className={`text-center text-sm ${
+                        (() => {
+                          if (!eventForm.endTime) return false;
+                          const parts = eventForm.endTime.split(':');
+                          return parts[1] ? parseInt(parts[1]) === minute : false;
+                        })()
+                          ? 'text-white font-bold' : 'text-slate-700'
+                      }`}>
+                        {minute.toString().padStart(2, '0')}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+            <View className="flex-row" style={{ gap: 12 }}>
+              <Pressable
+                onPress={() => setShowEndTimePicker(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-100"
+              >
+                <Text className="text-center font-semibold text-slate-700">Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowEndTimePicker(false)}
+                className="flex-1 py-3 rounded-xl bg-[#2B5F9E]"
+              >
+                <Text className="text-center font-semibold text-white">Done</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

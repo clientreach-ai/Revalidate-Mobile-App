@@ -18,6 +18,29 @@ interface MenuItem {
 export default function ProfileScreen() {
   const router = useRouter();
 
+  const handleMenuPress = (itemId: string) => {
+    switch (itemId) {
+      case '1':
+        router.push('/(tabs)/profile/account-settings');
+        break;
+      case '2':
+        router.push('/(tabs)/profile/all-stats');
+        break;
+      case '3':
+        router.push('/(tabs)/profile/subscription');
+        break;
+      case '4':
+        router.push('/(tabs)/profile/settings');
+        break;
+      case '5':
+        // Logout - redirect to login
+        router.replace('/(auth)/login');
+        break;
+      default:
+        break;
+    }
+  };
+
   const menuItems: MenuItem[] = [
     {
       id: '1',
@@ -25,6 +48,7 @@ export default function ProfileScreen() {
       icon: 'person',
       iconBgColor: 'bg-slate-100',
       iconColor: '#64748B',
+      onPress: () => handleMenuPress('1'),
     },
     {
       id: '2',
@@ -32,6 +56,7 @@ export default function ProfileScreen() {
       icon: 'analytics',
       iconBgColor: 'bg-slate-100',
       iconColor: '#64748B',
+      onPress: () => handleMenuPress('2'),
     },
     {
       id: '3',
@@ -40,6 +65,7 @@ export default function ProfileScreen() {
       icon: 'workspace-premium',
       iconBgColor: 'bg-amber-50',
       iconColor: '#F59E0B',
+      onPress: () => handleMenuPress('3'),
     },
     {
       id: '4',
@@ -47,6 +73,7 @@ export default function ProfileScreen() {
       icon: 'settings',
       iconBgColor: 'bg-slate-100',
       iconColor: '#64748B',
+      onPress: () => handleMenuPress('4'),
     },
     {
       id: '5',
@@ -55,6 +82,7 @@ export default function ProfileScreen() {
       iconBgColor: 'bg-red-100',
       iconColor: '#DC2626',
       isDestructive: true,
+      onPress: () => handleMenuPress('5'),
     },
   ];
 
@@ -130,6 +158,7 @@ export default function ProfileScreen() {
           {menuItems.map((item) => (
             <Pressable
               key={item.id}
+              onPress={item.onPress}
               className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${
                 item.isDestructive ? 'bg-red-50' : 'bg-white'
               }`}
