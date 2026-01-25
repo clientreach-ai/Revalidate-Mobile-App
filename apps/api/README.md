@@ -63,6 +63,24 @@ AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 AWS_REGION=
 AWS_BUCKET_NAME=
+
+# Gmail SMTP (for sending OTP emails)
+# Option 1: Use GMAIL_USER and GMAIL_APP_PASSWORD
+GMAIL_USER=your-email@gmail.com
+GMAIL_APP_PASSWORD=your-16-digit-app-password
+
+# Option 2: Use generic SMTP variables
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-16-digit-app-password
+```
+
+**Note:** To use Gmail for sending emails:
+1. Enable 2-Step Verification on your Google account
+2. Generate an App Password: https://myaccount.google.com/apppasswords
+3. Copy the 16-character password (no spaces) to `GMAIL_APP_PASSWORD` or `SMTP_PASSWORD`
+4. Use your full Gmail address for `GMAIL_USER` or `SMTP_USER`
 ```
 
 ### Database Setup

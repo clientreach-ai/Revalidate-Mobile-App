@@ -87,28 +87,57 @@ export async function updateUserProfile(
 
 /**
  * Delete user account
+ * Handles cascading deletes for all related user data
  */
 export async function deleteUser(userId: string): Promise<void> {
-  // Use Prisma transaction to delete all user data
+  const userIdNum = parseInt(userId);
+  
+  // Get user email first to clean up OTPs
+  const user = await prisma.users.findUnique({
+    where: { id: userIdNum },
+    select: { email: true },
+  });
+  
+  // Use Prisma transaction to delete all user data atomically
   await prisma.$transaction(async (tx) => {
-    const userIdNum = parseInt(userId);
-    
-    // Delete user's data from all tables
+    // Delete user's data from all related tables
     await tx.work_hours.deleteMany({ where: { user_id: userIdNum } });
+    await tx.working_hours.deleteMany({ where: { user_id: userIdNum } });
     await tx.cpd_hours.deleteMany({ where: { user_id: userIdNum } });
     await tx.feedback_log.deleteMany({ where: { user_id: userIdNum } });
+    await tx.user_feedback_logs.deleteMany({ where: { user_id: userIdNum } });
     await tx.reflective_accounts.deleteMany({ where: { user_id: userIdNum } });
+    await tx.reflective_account_forms.deleteMany({ where: { user_id: userIdNum } });
     await tx.appraisal_records.deleteMany({ where: { user_id: userIdNum } });
-    await tx.calendar_events.deleteMany({ where: { user_id: userIdNum } });
-    await tx.documents.deleteMany({ where: { user_id: userIdNum } });
+    await tx.user_calendars.deleteMany({ where: { user_id: userIdNum } });
+    await tx.user_calendars_old.deleteMany({ where: { user_id: userIdNum } });
+    await tx.personal_documents.deleteMany({ where: { user_id: userIdNum } });
+    await tx.user_documents.deleteMany({ where: { user_id: userIdNum } });
+    await tx.addressbooks.deleteMany({ where: { user_id: userIdNum } });
+    await tx.attendances.deleteMany({ where: { user_id: userIdNum } });
+    await tx.discussions.deleteMany({ where: { user_id: userIdNum } });
+    await tx.earnings.deleteMany({ where: { user_id: userIdNum } });
+    await tx.logs.deleteMany({ where: { user_id: userIdNum } });
+    await tx.notifications.deleteMany({ where: { user_id: userIdNum } });
+    
+    // Clean up OTPs if user email exists
+    if (user?.email) {
+      await tx.email_otps.deleteMany({ where: { email: user.email } });
+    }
+    
+    // Finally delete the user
     await tx.users.delete({ where: { id: userIdNum } });
   });
 }
 
 /**
  * Get role-specific requirements
+ * Handles undefined/null roles gracefully
  */
-export function getRoleRequirements(role: string) {
+export function getRoleRequirements(role?: string | null) {
+  if (!role) {
+    return ROLE_REQUIREMENTS.other;
+  }
   return ROLE_REQUIREMENTS[role as keyof typeof ROLE_REQUIREMENTS] || ROLE_REQUIREMENTS.other;
 }
 
@@ -131,12 +160,8 @@ export async function registerUser(email: string, passwordHash: string): Promise
     data: {
       email,
       password: passwordHash,
-      name: email.split('@')[0], // Use email prefix as name
+      name: email.split('@')[0],
       reg_type: 'email',
-      subscription_tier: 'free',
-      subscription_status: 'active',
-      status: '0', // Unverified
-      user_type: 'Customer',
     },
   });
 

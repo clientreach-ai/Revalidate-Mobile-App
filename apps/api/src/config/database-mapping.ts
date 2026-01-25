@@ -50,7 +50,7 @@ export function mapUserRow(dbRow: any): any {
   }
 
   return {
-    id: dbRow.id,
+    id: typeof dbRow.id === 'bigint' ? dbRow.id.toString() : dbRow.id,
     firebase_uid: dbRow.firebase_uid,
     email: dbRow.email,
     registration_number: dbRow.registration,
