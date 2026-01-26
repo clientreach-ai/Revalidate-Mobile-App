@@ -234,7 +234,7 @@ export default function Login() {
                                 >
                                     Password
                                 </Text>
-                                <Pressable onPress={() => {}}>
+                                <Pressable onPress={() => router.push("/(auth)/forgot-password")}>
                                     <Text className="text-primary font-semibold text-sm">
                                         Forgot Password?
                                     </Text>

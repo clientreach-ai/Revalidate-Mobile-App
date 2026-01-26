@@ -66,6 +66,10 @@ const resendOTPSchema = z.object({
   email: z.string().email('Invalid email address'),
 });
 
+const passwordResetRequestSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
+
 const resetPasswordWithOTPSchema = z.object({
   email: z.string().email('Invalid email address'),
   otp: z.string().length(6, 'OTP must be 6 digits'),
@@ -281,11 +285,9 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
-  const { email } = req.body as PasswordResetRequest;
-  
-  if (!email) {
-    throw new ApiError(400, 'Email is required');
-  }
+  // Validate email format using Zod schema
+  const validated = passwordResetRequestSchema.parse(req.body);
+  const email = validated.email.toLowerCase().trim();
 
   // Check if user exists and is registered
   const user = await prisma.users.findFirst({
@@ -294,12 +296,7 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
   });
 
   if (!user) {
-    // Don't reveal if email exists for security
-    res.json(serializeBigInt({
-      success: true,
-      message: 'If an account exists with this email, a password reset code has been sent.',
-    }));
-    return;
+    throw new ApiError(404, 'Account does not exist with this email address.');
   }
 
   // Check if user account is active
