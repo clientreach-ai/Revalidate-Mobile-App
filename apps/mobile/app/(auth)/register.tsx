@@ -5,37 +5,24 @@ import {
     TextInput,
     Pressable,
     ScrollView,
-    Modal,
-    TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useForm, Controller, type SubmitHandler, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { registerSchema, type RegisterInput, type Role } from "@/validation/schema";
+import { registerSchema, type RegisterInput } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
 import "../global.css";
-
-const roles: { value: Role; label: string }[] = [
-    { value: "doctor", label: "Doctor / GP" },
-    { value: "nurse", label: "Nurse / Midwife" },
-    { value: "pharmacist", label: "Pharmacist" },
-    { value: "dentist", label: "Dentist" },
-    { value: "other", label: "Other Healthcare Professional" },
-];
 
 export default function Register() {
     const router = useRouter();
     const { isDark, toggleTheme } = useThemeStore();
     const [showPassword, setShowPassword] = useState(false);
-    const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
     const {
         control,
         handleSubmit,
-        setValue,
-        watch,
         formState: { errors },
     } = useForm<RegisterInput>({
         resolver: zodResolver(registerSchema) as Resolver<RegisterInput>,
@@ -46,9 +33,6 @@ export default function Register() {
             marketingOptIn: false,
         },
     });
-
-    const watchedRole = watch("role");
-    const selectedRoleLabel = roles.find((r) => r.value === watchedRole)?.label ?? "Choose your profession";
 
     const onSubmit: SubmitHandler<RegisterInput> = (data) => {
         console.log("Register form submitted:", data);
@@ -219,61 +203,6 @@ export default function Register() {
                             )}
                         </View>
 
-                        {/* Role Selector */}
-                        <View>
-                            <Text
-                                className={`text-sm font-semibold mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}
-                            >
-                                Select Your Role
-                            </Text>
-                            <Pressable
-                                onPress={() => setShowRoleDropdown(true)}
-                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${
-                                    isDark
-                                        ? "bg-slate-800/90 border border-slate-700/50"
-                                        : "bg-white border border-gray-200 shadow-sm"
-                                } ${errors.role ? "border-red-500" : ""}`}
-                                style={{
-                                    shadowColor: isDark ? "#000" : "#000",
-                                    shadowOffset: { width: 0, height: 2 },
-                                    shadowOpacity: isDark ? 0.1 : 0.05,
-                                    shadowRadius: 4,
-                                    elevation: 2,
-                                }}
-                            >
-                                <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center z-10">
-                                    <MaterialIcons
-                                        name="badge"
-                                        size={22}
-                                        color={isDark ? "#6B7280" : "#9CA3AF"}
-                                    />
-                                </View>
-                                <Text
-                                    className={`flex-1 ${
-                                        watchedRole
-                                            ? isDark
-                                                ? "text-white"
-                                                : "text-gray-900"
-                                            : isDark
-                                            ? "text-gray-400"
-                                            : "text-gray-400"
-                                    }`}
-                                >
-                                    {selectedRoleLabel}
-                                </Text>
-                                <MaterialIcons
-                                    name="expand-more"
-                                    size={22}
-                                    color={isDark ? "#6B7280" : "#9CA3AF"}
-                                />
-                            </Pressable>
-                            {errors.role && (
-                                <Text className="text-red-500 text-sm mt-1.5">
-                                    {errors.role.message}
-                                </Text>
-                            )}
-                        </View>
-
                         {/* Checkboxes */}
                         <View className="gap-4 pt-3">
                             {/* Terms Checkbox */}
@@ -378,71 +307,6 @@ export default function Register() {
                     </Pressable>
                 </View>
             </View>
-
-            {/* Role Dropdown Modal */}
-            <Modal
-                visible={showRoleDropdown}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setShowRoleDropdown(false)}
-            >
-                <Pressable
-                    className="flex-1 bg-black/50 justify-end"
-                    onPress={() => setShowRoleDropdown(false)}
-                >
-                    <View
-                        className={`${
-                            isDark ? "bg-slate-800" : "bg-white"
-                        } rounded-t-3xl p-6 max-h-[80%]`}
-                    >
-                        <Text
-                            className={`text-lg font-bold mb-4 ${
-                                isDark ? "text-white" : "text-gray-900"
-                            }`}
-                        >
-                            Select Your Role
-                        </Text>
-                        <ScrollView>
-                            {roles.map((role) => (
-                                <TouchableOpacity
-                                    key={role.value}
-                                    onPress={() => {
-                                        setValue("role", role.value);
-                                        setShowRoleDropdown(false);
-                                    }}
-                                    className={`py-4 px-4 rounded-xl mb-2 ${
-                                        watchedRole === role.value
-                                            ? "bg-primary/10"
-                                            : isDark
-                                            ? "bg-slate-700"
-                                            : "bg-gray-50"
-                                    }`}
-                                >
-                                    <Text
-                                        className={`${
-                                            watchedRole === role.value
-                                                ? "text-primary font-semibold"
-                                                : isDark
-                                                ? "text-white"
-                                                : "text-gray-900"
-                                        }`}
-                                    >
-                                        {role.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                        <Pressable
-                            onPress={() => setShowRoleDropdown(false)}
-                            className="mt-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-700"
-                        >
-                            <Text className="text-center text-gray-700 dark:text-gray-300 font-semibold">
-                                Cancel
-                            </Text>
-                        </Pressable>
-                    </View>
-                </Pressable>
-            </Modal>
         </SafeAreaView>
     );
 }
