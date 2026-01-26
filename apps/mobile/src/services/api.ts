@@ -40,13 +40,22 @@ class ApiService {
   }
 
   /**
+   * Create an AbortController with timeout
+   */
+  private createTimeoutSignal(timeoutMs: number): AbortSignal {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), timeoutMs);
+    return controller.signal;
+  }
+
+  /**
    * Make a GET request
    */
   async get<T>(endpoint: string, token?: string): Promise<T> {
     const response = await fetch(this.getUrl(endpoint), {
       method: 'GET',
       headers: this.getHeaders(token),
-      signal: AbortSignal.timeout(this.timeout),
+      signal: this.createTimeoutSignal(this.timeout),
     });
 
     if (!response.ok) {
@@ -64,7 +73,7 @@ class ApiService {
       method: 'POST',
       headers: this.getHeaders(token),
       body: JSON.stringify(data),
-      signal: AbortSignal.timeout(this.timeout),
+      signal: this.createTimeoutSignal(this.timeout),
     });
 
     if (!response.ok) {
@@ -83,7 +92,7 @@ class ApiService {
       method: 'PUT',
       headers: this.getHeaders(token),
       body: JSON.stringify(data),
-      signal: AbortSignal.timeout(this.timeout),
+      signal: this.createTimeoutSignal(this.timeout),
     });
 
     if (!response.ok) {
@@ -102,7 +111,7 @@ class ApiService {
       method: 'PATCH',
       headers: this.getHeaders(token),
       body: JSON.stringify(data),
-      signal: AbortSignal.timeout(this.timeout),
+      signal: this.createTimeoutSignal(this.timeout),
     });
 
     if (!response.ok) {
@@ -120,7 +129,7 @@ class ApiService {
     const response = await fetch(this.getUrl(endpoint), {
       method: 'DELETE',
       headers: this.getHeaders(token),
-      signal: AbortSignal.timeout(this.timeout),
+      signal: this.createTimeoutSignal(this.timeout),
     });
 
     if (!response.ok) {
@@ -168,7 +177,7 @@ class ApiService {
       method: 'POST',
       headers,
       body: formData,
-      signal: AbortSignal.timeout(this.timeout * 2), // Longer timeout for file uploads
+      signal: this.createTimeoutSignal(this.timeout * 2), // Longer timeout for file uploads
     });
 
     if (!response.ok) {

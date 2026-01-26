@@ -13,12 +13,15 @@ import { useForm, Controller, type SubmitHandler, type Resolver } from "react-ho
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
+import { apiService, API_ENDPOINTS } from "@/services/api";
+import { Alert } from "react-native";
 import "../global.css";
 
 export default function Register() {
     const router = useRouter();
     const { isDark, toggleTheme } = useThemeStore();
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const {
         control,
@@ -34,8 +37,42 @@ export default function Register() {
         },
     });
 
-    const onSubmit: SubmitHandler<RegisterInput> = (data) => {
-        console.log("Register form submitted:", data);
+    const onSubmit: SubmitHandler<RegisterInput> = async (data) => {
+        try {
+            setIsLoading(true);
+            
+            // Call the register API
+            await apiService.post(
+                API_ENDPOINTS.AUTH.REGISTER,
+                {
+                    email: data.email,
+                    password: data.password,
+                    termsAccepted: data.termsAccepted,
+                    marketingOptIn: data.marketingOptIn,
+                }
+            );
+
+            // Success - navigate to login or onboarding
+            Alert.alert(
+                "Success",
+                "Account created successfully! Please log in.",
+                [
+                    {
+                        text: "OK",
+                        onPress: () => router.replace("/(auth)/login"),
+                    },
+                ]
+            );
+        } catch (error: unknown) {
+            // Handle error
+            const errorMessage = error instanceof Error 
+                ? error.message 
+                : "Failed to create account. Please try again.";
+            
+            Alert.alert("Registration Failed", errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const onFormSubmit = handleSubmit(onSubmit);
@@ -277,7 +314,10 @@ export default function Register() {
                         <View className="pt-6">
                             <Pressable
                                 onPress={onFormSubmit}
-                                className="w-full bg-primary py-4 rounded-2xl active:opacity-90 flex-row justify-center items-center gap-2 overflow-hidden"
+                                disabled={isLoading}
+                                className={`w-full py-4 rounded-2xl active:opacity-90 flex-row justify-center items-center gap-2 overflow-hidden ${
+                                    isLoading ? "bg-primary/50" : "bg-primary"
+                                }`}
                                 style={{
                                     shadowColor: "#2563eb",
                                     shadowOffset: { width: 0, height: 8 },
@@ -286,8 +326,14 @@ export default function Register() {
                                     elevation: 8,
                                 }}
                             >
-                                <Text className="text-white font-bold text-base">Create Account</Text>
-                                <MaterialIcons name="arrow-forward" size={22} color="white" />
+                                {isLoading ? (
+                                    <Text className="text-white font-bold text-base">Creating Account...</Text>
+                                ) : (
+                                    <>
+                                        <Text className="text-white font-bold text-base">Create Account</Text>
+                                        <MaterialIcons name="arrow-forward" size={22} color="white" />
+                                    </>
+                                )}
                             </Pressable>
                         </View>
                     </View>

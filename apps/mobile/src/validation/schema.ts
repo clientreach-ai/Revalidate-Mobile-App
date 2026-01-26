@@ -31,7 +31,7 @@ export const registerSchema = z
   .object({
     email: emailSchema,
     password: passwordCreateSchema,
-    role: roleEnum,
+    role: roleEnum.optional(),
     termsAccepted: z.boolean(),
     marketingOptIn: z.boolean().default(false),
   })
