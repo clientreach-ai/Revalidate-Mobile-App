@@ -187,17 +187,45 @@ export default function GalleryScreen() {
         });
         
         // Update categories with document counts
+        const normalize = (v?: string | number | null) => {
+          if (v === null || v === undefined) return '';
+          return String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
+        };
+
+        // Map API category values to UI category titles
+        const categoryMap: Record<string, string> = {
+          cpd: 'CPD Hours',
+          cpd_hours: 'CPD Hours',
+          working: 'Working Hours',
+          work: 'Working Hours',
+          feedback: 'Feedback Log',
+          feedback_log: 'Feedback Log',
+          reflection: 'Reflective Accounts',
+          reflections: 'Reflective Accounts',
+          appraisal: 'Appraisal',
+          gallery: 'General Gallery',
+          personal: 'General Gallery',
+        };
+
+        const mapToTitle = (docCat?: string | null) => {
+          if (!docCat) return '';
+          const key = normalize(docCat);
+          return categoryMap[key] || docCat;
+        };
+
         const updatedCategories = categoryDefinitions.map(cat => {
-          const categoryDocs = mappedDocuments.filter(doc => 
-            doc.category?.toLowerCase() === cat.title.toLowerCase() || 
-            (!doc.category && cat.id === '6') // General gallery for uncategorized
-          );
+          const catKey = normalize(cat.title);
+          const categoryDocs = mappedDocuments.filter(doc => {
+            const mappedTitle = mapToTitle(doc.category);
+            const mappedKey = normalize(mappedTitle);
+            return (mappedKey && mappedKey === catKey) || (!doc.category && cat.id === '6');
+          });
           const count = categoryDocs.length;
           const latestDoc = categoryDocs.sort((a, b) => 
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
           )[0];
           
-          const updated = latestDoc 
+          const updated = latestDoc
             ? getTimeAgo(new Date(latestDoc.updatedAt))
             : 'NO DOCUMENTS';
           

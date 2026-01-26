@@ -37,6 +37,7 @@ export default function DashboardScreen() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [revalidationDays, setRevalidationDays] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [isStartingSession, setIsStartingSession] = useState(false);
   const [isPausingSession, setIsPausingSession] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -59,6 +60,7 @@ export default function DashboardScreen() {
     loadActiveSession();
     loadDashboardStats();
     loadNotificationsCount();
+    loadRecentActivities();
   }, []);
 
   // Removed useFocusEffect to prevent auto-starting timer when switching tabs
@@ -599,6 +601,53 @@ export default function DashboardScreen() {
     }
   };
 
+  const formatTimeAgo = (iso?: string) => {
+    if (!iso) return '';
+    try {
+      const date = new Date(iso);
+      const diff = Date.now() - date.getTime();
+      const seconds = Math.floor(diff / 1000);
+      if (seconds < 60) return `${seconds}s`;
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h`;
+      const days = Math.floor(hours / 24);
+      return `${days}d`;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const loadRecentActivities = async () => {
+    setIsLoadingActivities(true);
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      // Fetch latest notifications and map them to activity items
+      const response = await apiService.get<{ success?: boolean; data: any[] }>(`/api/v1/notifications?limit=6`, token);
+      const items = Array.isArray(response?.data) ? response.data : [];
+
+      const mapped = items.map((it: any) => ({
+        title: it.title || it.type || 'Notification',
+        subtitle: it.message || it.body || it.summary || '',
+        time: formatTimeAgo(it.createdAt || it.created_at || it.time),
+        icon: it.icon || 'notifications',
+        iconColor: '#2B5F9E',
+        bgColor: 'bg-slate-100',
+        raw: it,
+      }));
+
+      setRecentActivities(mapped);
+    } catch (error) {
+      console.warn('Error loading recent activities:', error);
+      setRecentActivities([]);
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
@@ -607,6 +656,7 @@ export default function DashboardScreen() {
         loadActiveSession(),
         loadDashboardStats(),
         loadNotificationsCount(),
+        loadRecentActivities(),
       ]);
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -699,9 +749,8 @@ export default function DashboardScreen() {
 
   const statsList = getStats();
 
-  // Activities will be loaded from API in the future
-  // For now, show empty state if no activities
-  const activities: any[] = [];
+  // Use recent activities loaded from API
+  const activities = recentActivities;
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
@@ -1016,19 +1065,30 @@ export default function DashboardScreen() {
                 Recent Activity
               </Text>
               {activities.length > 0 && (
-                <Pressable>
+                <Pressable onPress={() => router.push('/(tabs)/notifications')}>
                   <Text className="text-[#2B5F9E] text-sm font-semibold">View All</Text>
                 </Pressable>
               )}
             </View>
-            {activities.length > 0 ? (
+            {isLoadingActivities ? (
+              <View className={`p-6 rounded-2xl border items-center ${
+                isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+              }`}>
+                <Text className={`text-sm ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+                  Loading recent activity...
+                </Text>
+              </View>
+            ) : activities.length > 0 ? (
               <View style={{ gap: 12 }}>
                 {activities.map((activity, index) => (
                   <Pressable
                     key={index}
                     onPress={() => {
-                      if (activity.title === 'New Reflection Added') {
+                      // route to reflections or notifications depending on item
+                      if (activity.raw?.type === 'reflection' || activity.title === 'New Reflection Added') {
                         router.push('/(tabs)/reflections');
+                      } else {
+                        router.push('/(tabs)/notifications');
                       }
                     }}
                     className={`flex-row items-center gap-4 p-4 rounded-2xl border ${
