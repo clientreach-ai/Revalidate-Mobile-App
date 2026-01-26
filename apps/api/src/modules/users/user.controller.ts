@@ -37,9 +37,10 @@ const updateProfileSchema = z.object({
 /**
  * Format user response consistently
  */
-function formatUserResponse(user: any, requirements?: any) {
+function formatUserResponse(user: any, name?: string | null, requirements?: any) {
   return {
     id: user.id,
+    name: name || null,
     email: user.email,
     registrationNumber: user.registration_number,
     revalidationDate: user.revalidation_date,
@@ -69,9 +70,16 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'User not found');
   }
 
+  // Get name directly from database
+  const { prisma } = await import('../../lib/prisma');
+  const userData = await prisma.users.findUnique({
+    where: { id: parseInt(req.user.userId) },
+    select: { name: true },
+  });
+
   res.json({
     success: true,
-    data: formatUserResponse(user),
+    data: formatUserResponse(user, userData?.name || null),
   });
 });
 
@@ -87,9 +95,16 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   const validated = updateProfileSchema.parse(req.body) as UpdateUserProfile;
   const updated = await updateUserProfile(req.user.userId, validated);
 
+  // Get name directly from database
+  const { prisma } = await import('../../lib/prisma');
+  const userData = await prisma.users.findUnique({
+    where: { id: parseInt(req.user.userId) },
+    select: { name: true },
+  });
+
   res.json({
     success: true,
-    data: formatUserResponse(updated),
+    data: formatUserResponse(updated, userData?.name || null),
   });
 });
 

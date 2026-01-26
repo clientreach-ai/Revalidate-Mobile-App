@@ -13,6 +13,15 @@ export default function TabsLayout() {
   
   const activeColor = isPremium ? '#D4AF37' : '#2B5F9E';
   
+  // Calculate consistent spacing for both platforms
+  const bottomPadding = Platform.OS === 'ios' 
+    ? Math.max(insets.bottom, 8) + 4  // iOS: safe area + 4px
+    : 8;  // Android: fixed 8px
+  
+  const tabBarHeight = Platform.OS === 'ios'
+    ? 70 + bottomPadding  // iOS: 70px content + bottom padding
+    : 70 + bottomPadding;  // Android: same for consistency
+  
   return (
     <Tabs
       screenOptions={{
@@ -27,9 +36,11 @@ export default function TabsLayout() {
           borderTopColor: isPremium 
             ? (isDark ? '#D4AF37' : '#D4AF37')
             : (isDark ? '#1F2937' : '#E5E7EB'),
-          height: 64 + insets.bottom,
-          paddingBottom: insets.bottom + 8,
-          paddingTop: 8,
+          height: tabBarHeight,
+          paddingBottom: bottomPadding,
+          paddingTop: 10,
+          paddingHorizontal: 0,
+          width: '100%',
           elevation: isPremium ? 8 : 0,
           shadowOpacity: isPremium ? 0.3 : 0,
           shadowColor: isPremium ? '#D4AF37' : undefined,
@@ -37,13 +48,25 @@ export default function TabsLayout() {
           shadowRadius: isPremium ? 4 : undefined,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: '500',
           marginTop: 4,
+          marginBottom: 0,
+          textAlign: 'center',
         },
         tabBarIconStyle: {
-          marginTop: 4,
+          marginTop: 0,
+          marginBottom: 0,
         },
+        tabBarItemStyle: {
+          paddingVertical: 8,
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          minWidth: 0,
+          maxWidth: '100%',
+        },
+        tabBarShowLabel: true,
       }}
     >
       <Tabs.Screen 
@@ -53,14 +76,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <MaterialIcons 
               name="home" 
-              size={24} 
+              size={28} 
               color={focused ? activeColor : '#9CA3AF'} 
             />
           ),
           tabBarLabel: ({ focused }) => (
             <Text 
               style={{ 
-                fontSize: 10, 
+                fontSize: 11, 
                 fontWeight: focused ? '700' : '500',
                 color: focused ? activeColor : '#9CA3AF',
                 marginTop: 4,
@@ -79,14 +102,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <MaterialIcons 
               name="calendar-month" 
-              size={24} 
+              size={28} 
               color={focused ? activeColor : '#9CA3AF'} 
             />
           ),
           tabBarLabel: ({ focused }) => (
             <Text 
               style={{ 
-                fontSize: 10, 
+                fontSize: 11, 
                 fontWeight: focused ? '700' : '500',
                 color: focused ? activeColor : '#9CA3AF',
                 marginTop: 4,
@@ -105,14 +128,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <MaterialIcons 
               name="photo-library" 
-              size={24} 
+              size={28} 
               color={focused ? activeColor : '#9CA3AF'} 
             />
           ),
           tabBarLabel: ({ focused }) => (
             <Text 
               style={{ 
-                fontSize: 10, 
+                fontSize: 11, 
                 fontWeight: focused ? '700' : '500',
                 color: focused ? activeColor : '#9CA3AF',
                 marginTop: 4,
@@ -131,14 +154,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <MaterialIcons 
               name="person" 
-              size={24} 
+              size={28} 
               color={focused ? activeColor : '#9CA3AF'} 
             />
           ),
           tabBarLabel: ({ focused }) => (
             <Text 
               style={{ 
-                fontSize: 10, 
+                fontSize: 11, 
                 fontWeight: focused ? '700' : '500',
                 color: focused ? activeColor : '#9CA3AF',
                 marginTop: 4,
@@ -149,16 +172,20 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen  name="workinghours/index" options={{href: null}} />
-      <Tabs.Screen  name="cpdhourstracking/index" options={{href: null}} />
-      <Tabs.Screen  name="feedback/index" options={{href: null}} />
-      <Tabs.Screen  name="earings/index" options={{href: null}} />
-      <Tabs.Screen  name="reflections/index" options={{href: null}} />
-      <Tabs.Screen  name="profile/account-settings" options={{href: null}} />
-      <Tabs.Screen  name="profile/all-stats" options={{href: null}} />
-      <Tabs.Screen  name="profile/subscription" options={{href: null}} />
-      <Tabs.Screen  name="profile/settings" options={{href: null}} />
-      <Tabs.Screen  name="notifications/index" options={{href: null}} />
+      
+      {/* Hide these screens from tab bar */}
+      <Tabs.Screen name="workinghours/index" options={{ href: null }} />
+      <Tabs.Screen name="workinghours/[id]" options={{ href: null }} />
+      <Tabs.Screen name="cpdhourstracking/index" options={{ href: null }} />
+      <Tabs.Screen name="feedback/index" options={{ href: null }} />
+      <Tabs.Screen name="earings/index" options={{ href: null }} />
+      <Tabs.Screen name="reflections/index" options={{ href: null }} />
+      <Tabs.Screen name="profile/account-settings" options={{ href: null }} />
+      <Tabs.Screen name="profile/all-stats" options={{ href: null }} />
+      <Tabs.Screen name="profile/subscription" options={{ href: null }} />
+      <Tabs.Screen name="profile/settings" options={{ href: null }} />
+      <Tabs.Screen name="notifications/index" options={{ href: null }} />
+      <Tabs.Screen name="calendar/all-events" options={{ href: null }} />
     </Tabs>
   );
 }

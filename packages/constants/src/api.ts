@@ -34,6 +34,9 @@ export const API_ENDPOINTS = {
   CALENDAR: {
     EVENTS: '/api/v1/calendar/events',
     CREATE_EVENT: '/api/v1/calendar/events',
+    GET_BY_ID: '/api/v1/calendar/events',
+    UPDATE_EVENT: '/api/v1/calendar/events',
+    DELETE_EVENT: '/api/v1/calendar/events',
   },
   DOCUMENTS: {
     UPLOAD: '/api/v1/documents/upload',

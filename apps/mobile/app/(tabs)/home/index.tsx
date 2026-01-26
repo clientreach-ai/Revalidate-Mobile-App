@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, Alert, Animated, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
@@ -60,11 +60,8 @@ export default function DashboardScreen() {
     loadNotificationsCount();
   }, []);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadActiveSession();
-    }, [])
-  );
+  // Removed useFocusEffect to prevent auto-starting timer when switching tabs
+  // Session will only load on initial mount and when explicitly refreshed
 
   useEffect(() => {
     if (activeSession && activeSession.isActive) {

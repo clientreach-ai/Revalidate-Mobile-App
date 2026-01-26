@@ -1,35 +1,28 @@
-import { View, Text, ScrollView, Pressable, Modal, TextInput, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, Modal, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { useCalendar } from '@/hooks/useCalendar';
+import { CreateCalendarEvent, UpdateCalendarEvent } from '@/features/calendar/calendar.types';
 import '../../global.css';
 import { useRouter } from 'expo-router';
 
 type EventType = 'all' | 'official' | 'personal';
 
-interface Event {
-  id: string;
-  title: string;
-  description: string;
-  location: string;
-  startTime: string;
-  endTime: string;
-  type: 'official' | 'personal';
-  date: Date;
-}
-
 export default function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 2, 13)); // March 13, 2024
-  const [selectedDate, setSelectedDate] = useState(new Date(2024, 2, 13));
+  const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, deleteEvent } = useCalendar();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
   const [showAddEventModal, setShowAddEventModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState({
     title: '',
     description: '',
@@ -41,7 +34,6 @@ export default function CalendarScreen() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -123,37 +115,34 @@ export default function CalendarScreen() {
     return `${dayName.toUpperCase()}, ${day} ${monthName.toUpperCase()}`;
   };
 
-  // Sample events data
-  const events: Event[] = [
-    {
-      id: '1',
-      title: 'Patient Safety Audit',
-      description: 'Reviewing quarterly surgical outcomes and complications.',
-      location: 'Main Hospital, Room 4B',
-      startTime: '09:00',
-      endTime: '10:30',
-      type: 'official',
-      date: new Date(2024, 2, 13),
-    },
-    {
-      id: '2',
-      title: 'Reflective Journaling',
-      description: 'Documenting learning from recent complex cases.',
-      location: 'Revalidation Portfolio',
-      startTime: '13:00',
-      endTime: '14:00',
-      type: 'personal',
-      date: new Date(2024, 2, 13),
-    },
-  ];
+  // Convert API events to local format and filter
+  const filteredEvents = events
+    .map(event => ({
+      id: event.id,
+      title: event.title,
+      description: event.description || '',
+      location: event.location || '',
+      startTime: event.startTime || '',
+      endTime: event.endTime || '',
+      type: event.type,
+      date: new Date(event.date),
+    }))
+    .filter((event) => {
+      if (!isSameDay(event.date, selectedDate)) return false;
+      if (activeFilter === 'all') return true;
+      if (activeFilter === 'official') return event.type === 'official';
+      if (activeFilter === 'personal') return event.type === 'personal';
+      return true;
+    });
 
-  const filteredEvents = events.filter((event) => {
-    if (!isSameDay(event.date, selectedDate)) return false;
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'official') return event.type === 'official';
-    if (activeFilter === 'personal') return event.type === 'personal';
-    return true;
-  });
+  // Load all events once on mount, then filter locally by month
+  // This allows users to navigate to past/future months and see events
+  useEffect(() => {
+    // Only fetch all events on initial load (no date filters)
+    if (events.length === 0 && !isLoading) {
+      refresh(); // Load all events without date filters
+    }
+  }, []); // Only run once on mount
 
   const calendarDays = getDaysInMonth(currentDate);
 
@@ -203,14 +192,39 @@ export default function CalendarScreen() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSaveEvent = () => {
+  const handleSaveEvent = async () => {
     if (validateForm()) {
       setIsSubmitting(true);
-      // Simulate API call
-      setTimeout(() => {
-        console.log('Event saved:', { ...eventForm, date: eventForm.date });
+      try {
+        const dateStr = eventForm.date.toISOString().split('T')[0] as string;
+        
+        if (editingEventId) {
+          const updateData: UpdateCalendarEvent = {
+            type: eventForm.type,
+            title: eventForm.title,
+            description: eventForm.description || undefined,
+            date: dateStr,
+            startTime: eventForm.startTime || undefined,
+            endTime: eventForm.endTime || undefined,
+            location: eventForm.location || undefined,
+          };
+          await updateEvent(editingEventId, updateData);
+        } else {
+          const createData: CreateCalendarEvent = {
+            type: eventForm.type,
+            title: eventForm.title,
+            description: eventForm.description || undefined,
+            date: dateStr,
+            startTime: eventForm.startTime || undefined,
+            endTime: eventForm.endTime || undefined,
+            location: eventForm.location || undefined,
+          };
+          await createEvent(createData);
+        }
+
         setIsSubmitting(false);
         setShowAddEventModal(false);
+        setEditingEventId(null);
         setFormErrors({});
         setEventForm({
           title: '',
@@ -221,7 +235,9 @@ export default function CalendarScreen() {
           endTime: '',
           type: 'official',
         });
-      }, 1000);
+      } catch (error) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -230,10 +246,8 @@ export default function CalendarScreen() {
   };
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    // Refresh all events, not just current month
+    await refresh(); // Load all events without date filters
   };
 
   return (
@@ -244,7 +258,7 @@ export default function CalendarScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isRefreshing}
             onRefresh={onRefresh}
             tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
             colors={['#D4AF37', '#2B5F9E']}
@@ -427,7 +441,11 @@ export default function CalendarScreen() {
             {formatDateLabel(selectedDate)}
           </Text>
           
-          {filteredEvents.length > 0 ? (
+          {isLoading ? (
+            <View className="items-center justify-center py-8">
+              <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+            </View>
+          ) : filteredEvents.length > 0 ? (
             filteredEvents.map((event) => (
               <View
                 key={event.id}
@@ -497,12 +515,79 @@ export default function CalendarScreen() {
               </Text>
             </View>
           )}
+
+          {/* All Events Card */}
+          {!isLoading && events.length > 0 && (
+            <View className="mt-4">
+              <Pressable
+                className={`p-5 rounded-2xl border shadow-sm ${
+                  isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                }`}
+                onPress={() => {
+                  router.push('/(tabs)/calendar/all-events');
+                }}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1">
+                    <View className="flex-row items-center mb-2">
+                      <MaterialIcons 
+                        name="event-note" 
+                        size={24} 
+                        color={isDark ? "#D4AF37" : "#2B5F9E"} 
+                      />
+                      <Text className={`ml-2 text-lg font-bold ${
+                        isDark ? "text-white" : "text-slate-800"
+                      }`}>
+                        All Events
+                      </Text>
+                    </View>
+                    <Text className={`text-sm mt-1 ${
+                      isDark ? "text-gray-400" : "text-slate-500"
+                    }`}>
+                      {events.length} {events.length === 1 ? 'event' : 'events'} total
+                    </Text>
+                    <View className="flex-row items-center mt-3" style={{ gap: 12 }}>
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full bg-blue-500" />
+                        <Text className={`text-xs ml-1.5 ${
+                          isDark ? "text-gray-400" : "text-slate-500"
+                        }`}>
+                          {events.filter(e => e.type === 'official').length} Official
+                        </Text>
+                      </View>
+                      <View className="flex-row items-center">
+                        <View className="w-3 h-3 rounded-full bg-amber-500" />
+                        <Text className={`text-xs ml-1.5 ${
+                          isDark ? "text-gray-400" : "text-slate-500"
+                        }`}>
+                          {events.filter(e => e.type === 'personal').length} Personal
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View className="items-center">
+                    <MaterialIcons 
+                      name="chevron-right" 
+                      size={24} 
+                      color={isDark ? "#9CA3AF" : "#64748B"} 
+                    />
+                    <Text className={`text-xs mt-1 font-medium ${
+                      isDark ? "text-gray-400" : "text-slate-500"
+                    }`}>
+                      See all
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            </View>
+          )}
         </View>
       </ScrollView>
 
       {/* Floating Action Button */}
       <Pressable 
         onPress={() => {
+          setEditingEventId(null);
           setEventForm({
             title: '',
             description: '',
