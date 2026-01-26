@@ -22,6 +22,13 @@ export const API_ENDPOINTS = {
     PROFILE: '/api/v1/users/profile',
     UPDATE_PROFILE: '/api/v1/users/profile',
     ME: '/api/v1/auth/me',
+    ONBOARDING: {
+      STEP_1: '/api/v1/users/onboarding/step-1',
+      STEP_2: '/api/v1/users/onboarding/step-2',
+      STEP_3: '/api/v1/users/onboarding/step-3',
+      STEP_4: '/api/v1/users/onboarding/step-4',
+      PROGRESS: '/api/v1/users/onboarding/progress',
+    },
   },
   CALENDAR: {
     EVENTS: '/api/v1/calendar/events',

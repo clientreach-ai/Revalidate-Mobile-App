@@ -1,16 +1,18 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Resolver, SubmitHandler } from "react-hook-form";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
     onboardingPlanSchema,
     type OnboardingPlanInput,
 } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
+import { apiService, API_ENDPOINTS } from "@/services/api";
 import "../global.css";
 
 // Plan selection component
@@ -59,18 +61,39 @@ export default function PlanChoose() {
     const watchedTrial = watch("trialSelected");
 
     const onSubmit: SubmitHandler<OnboardingPlanInput> = useCallback(
-        (data) => {
+        async (data) => {
             if (isNavigating) return;
-            console.log("Onboarding plan submitted:", data);
-            setIsNavigating(true);
-            setTimeout(() => {
-                try {
-                    router.replace("/(tabs)/home");
-                } catch (error) {
-                    console.error("Navigation error:", error);
-                    setIsNavigating(false);
+            
+            try {
+                setIsNavigating(true);
+
+                // Get auth token
+                const token = await AsyncStorage.getItem('authToken');
+                if (!token) {
+                    Alert.alert("Error", "Please log in again");
+                    router.replace("/(auth)/login");
+                    return;
                 }
-            }, 0);
+
+                // Call API to save subscription plan
+                await apiService.post(
+                    API_ENDPOINTS.USERS.ONBOARDING.STEP_4,
+                    {
+                        subscription_tier: data.selectedPlan,
+                    },
+                    token
+                );
+
+                // Navigate to home/dashboard
+                router.replace("/(tabs)/home");
+            } catch (error: unknown) {
+                const errorMessage = error instanceof Error 
+                    ? error.message 
+                    : "Failed to save subscription plan. Please try again.";
+                
+                Alert.alert("Error", errorMessage);
+                setIsNavigating(false);
+            }
         },
         [router, isNavigating]
     );

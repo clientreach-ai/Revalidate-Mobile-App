@@ -1,16 +1,18 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Pressable, ScrollView, Modal, TouchableOpacity } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView, Modal, TouchableOpacity, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Resolver, SubmitHandler } from "react-hook-form";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
     onboardingProfessionalDetailsSchema,
     type OnboardingProfessionalDetailsInput,
 } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
+import { apiService, API_ENDPOINTS } from "@/services/api";
 import "../global.css";
 
 const roleConfig = {
@@ -118,6 +120,7 @@ export default function ProfessionalDetails() {
     const config = roleConfig[role as keyof typeof roleConfig] || roleConfig.other;
 
     const { isDark } = useThemeStore();
+    const [isLoading, setIsLoading] = useState(false);
     const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
     const [showScopeModal, setShowScopeModal] = useState(false);
     const [showProfessionalRegistrationsModal, setShowProfessionalRegistrationsModal] = useState(false);
@@ -279,9 +282,83 @@ export default function ProfessionalDetails() {
         return days;
     };
 
-    const onSubmit: SubmitHandler<OnboardingProfessionalDetailsInput> = (data) => {
-        console.log("Onboarding professional details submitted:", data);
-        router.push("/(onboarding)/plan-choose");
+    // Format date to YYYY-MM-DD
+    const formatDateForAPI = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const onSubmit: SubmitHandler<OnboardingProfessionalDetailsInput> = async (data) => {
+        try {
+            setIsLoading(true);
+
+            // Get auth token
+            const token = await AsyncStorage.getItem('authToken');
+            if (!token) {
+                Alert.alert("Error", "Please log in again");
+                router.replace("/(auth)/login");
+                return;
+            }
+
+            // Map frontend fields to backend API format
+            const apiData: any = {
+                gmc_registration_number: data.registrationNumber,
+                revalidation_date: formatDateForAPI(data.revalidationDate),
+            };
+
+            // Add optional fields if they exist
+            if (data.workSetting) {
+                apiData.work_setting = data.workSetting;
+            }
+            if (data.scope) {
+                apiData.scope_of_practice = data.scope;
+            }
+            if (data.professionalRegistrations && data.professionalRegistrations.length > 0) {
+                // Convert array to comma-separated string
+                apiData.professional_registrations = data.professionalRegistrations.join(',');
+            }
+            if (data.registrationPin) {
+                apiData.registration_reference_pin = data.registrationPin;
+            }
+            if (data.hourlyRate !== undefined && data.hourlyRate > 0) {
+                apiData.hourly_rate = data.hourlyRate;
+            }
+            if (data.workHoursCompleted !== undefined && data.workHoursCompleted > 0) {
+                apiData.work_hours_completed_already = data.workHoursCompleted;
+            }
+            if (data.trainingHoursCompleted !== undefined && data.trainingHoursCompleted > 0) {
+                apiData.training_hours_completed_already = data.trainingHoursCompleted;
+            }
+            if (data.earningsCurrentYear !== undefined && data.earningsCurrentYear > 0) {
+                apiData.earned_current_financial_year = data.earningsCurrentYear;
+            }
+            if (data.workDescription) {
+                apiData.brief_description_of_work = data.workDescription;
+            }
+            if (data.notepad) {
+                apiData.notepad = data.notepad;
+            }
+
+            // Call API to save professional details
+            await apiService.post(
+                API_ENDPOINTS.USERS.ONBOARDING.STEP_3,
+                apiData,
+                token
+            );
+
+            // Navigate to next step
+            router.push("/(onboarding)/plan-choose");
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error 
+                ? error.message 
+                : "Failed to save professional details. Please try again.";
+            
+            Alert.alert("Error", errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const onFormSubmit = handleSubmit(onSubmit);
@@ -986,7 +1063,10 @@ export default function ProfessionalDetails() {
             <View className={`px-6 pb-8 pt-4 border-t ${isDark ? "border-slate-700/50" : "border-gray-200"}`}>
                 <Pressable
                     onPress={onFormSubmit}
-                    className="w-full py-4 rounded-2xl flex-row items-center justify-center bg-primary active:opacity-90"
+                    disabled={isLoading}
+                    className={`w-full py-4 rounded-2xl flex-row items-center justify-center active:opacity-90 ${
+                        isLoading ? "bg-primary/50" : "bg-primary"
+                    }`}
                     style={{
                         shadowColor: "#1E5AF3",
                         shadowOffset: { width: 0, height: 8 },
@@ -995,8 +1075,14 @@ export default function ProfessionalDetails() {
                         elevation: 8,
                     }}
                 >
-                    <Text className="text-white font-semibold text-base">Complete Setup</Text>
-                    <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
+                    {isLoading ? (
+                        <Text className="text-white font-semibold text-base">Saving...</Text>
+                    ) : (
+                        <>
+                            <Text className="text-white font-semibold text-base">Complete Setup</Text>
+                            <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
+                        </>
+                    )}
                 </Pressable>
             </View>
 
