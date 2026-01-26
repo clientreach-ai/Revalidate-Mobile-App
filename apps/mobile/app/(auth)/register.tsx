@@ -9,7 +9,7 @@ import {
     TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useForm, Controller, type SubmitHandler, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -361,87 +361,6 @@ export default function Register() {
                                 <MaterialIcons name="arrow-forward" size={22} color="white" />
                             </Pressable>
                         </View>
-                    </View>
-
-                    {/* Divider */}
-                    <View className="mt-8 relative">
-                        <View className="absolute inset-0 flex items-center">
-                            <View
-                                className={`w-full border-t ${
-                                    isDark ? "border-slate-700/50" : "border-gray-200"
-                                }`}
-                            />
-                        </View>
-                        <View className="relative flex items-center justify-center">
-                            <View className={`px-4 ${isDark ? "bg-background-dark" : "bg-background-light"}`}>
-                                <Text
-                                    className={`text-sm font-medium ${
-                                        isDark ? "text-gray-500" : "text-gray-400"
-                                    }`}
-                                >
-                                    Or sign up with
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Social Login Buttons */}
-                    <View className="mt-5 flex-row gap-3">
-                        <Pressable
-                            className={`flex-1 py-3.5 px-4 rounded-xl border flex-row items-center justify-center gap-2 ${
-                                isDark
-                                    ? "bg-slate-800/80 border-slate-700/50"
-                                    : "bg-white border-gray-200 shadow-sm"
-                            } active:opacity-80`}
-                            style={{
-                                shadowColor: isDark ? "#000" : "#000",
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: isDark ? 0.1 : 0.05,
-                                shadowRadius: 4,
-                                elevation: 2,
-                            }}
-                        >
-                            <FontAwesome5
-                                name="google"
-                                size={20}
-                                color={isDark ? "#FFFFFF" : "#4285F4"}
-                            />
-                            <Text
-                                className={`text-sm font-semibold ${
-                                    isDark ? "text-white" : "text-gray-700"
-                                }`}
-                            >
-                                Google
-                            </Text>
-                        </Pressable>
-
-                        <Pressable
-                            className={`flex-1 py-3.5 px-4 rounded-xl border flex-row items-center justify-center gap-2 ${
-                                isDark
-                                    ? "bg-slate-800/80 border-slate-700/50"
-                                    : "bg-white border-gray-200 shadow-sm"
-                            } active:opacity-80`}
-                            style={{
-                                shadowColor: isDark ? "#000" : "#000",
-                                shadowOffset: { width: 0, height: 2 },
-                                shadowOpacity: isDark ? 0.1 : 0.05,
-                                shadowRadius: 4,
-                                elevation: 2,
-                            }}
-                        >
-                            <FontAwesome5
-                                name="apple"
-                                size={20}
-                                color={isDark ? "#FFFFFF" : "#000000"}
-                            />
-                            <Text
-                                className={`text-sm font-semibold ${
-                                    isDark ? "text-white" : "text-gray-700"
-                                }`}
-                            >
-                                Apple
-                            </Text>
-                        </Pressable>
                     </View>
                 </View>
             </ScrollView>
