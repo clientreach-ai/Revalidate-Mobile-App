@@ -29,6 +29,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve uploaded documents
+import path from 'path';
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 

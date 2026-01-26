@@ -1,9 +1,14 @@
-import { View, Text, ScrollView, Pressable, TextInput, Modal, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, Modal, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { apiService, API_ENDPOINTS } from '@/services/api';
+import { showToast } from '@/utils/toast';
 import '../../global.css';
 
 interface Category {
@@ -28,6 +33,28 @@ interface RecentFile {
   iconColor: string;
 }
 
+interface Document {
+  id: number;
+  filename: string;
+  originalFilename: string;
+  fileSize: number;
+  mimeType: string;
+  category?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// API response format (snake_case)
+interface ApiDocument {
+  id: number;
+  name: string;
+  category?: string;
+  size?: string;
+  type?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function GalleryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -42,13 +69,16 @@ export default function GalleryScreen() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
-  const categories: Category[] = [
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+  const [fileUri, setFileUri] = useState<string | null>(null); // Store file URI for upload
+
+  // Static category definitions (these are UI categories, not API categories)
+  const categoryDefinitions: Array<Omit<Category, 'documentCount' | 'updated'>> = [
     {
       id: '1',
       title: 'Working Hours',
-      documentCount: '12 Documents',
-      updated: 'UPDATED 2D AGO',
       icon: 'schedule',
       iconBgColor: 'bg-blue-100',
       iconColor: '#2563EB',
@@ -58,8 +88,6 @@ export default function GalleryScreen() {
     {
       id: '2',
       title: 'CPD Hours',
-      documentCount: '45 Documents',
-      updated: 'UPDATED 4H AGO',
       icon: 'school',
       iconBgColor: 'bg-amber-100',
       iconColor: '#F59E0B',
@@ -69,8 +97,6 @@ export default function GalleryScreen() {
     {
       id: '3',
       title: 'Feedback Log',
-      documentCount: '8 Documents',
-      updated: 'UPDATED 1W AGO',
       icon: 'forum',
       iconBgColor: 'bg-emerald-100',
       iconColor: '#10B981',
@@ -80,8 +106,6 @@ export default function GalleryScreen() {
     {
       id: '4',
       title: 'Reflective Accounts',
-      documentCount: '5 Documents',
-      updated: 'UPDATED 3D AGO',
       icon: 'edit-note',
       iconBgColor: 'bg-purple-100',
       iconColor: '#9333EA',
@@ -91,8 +115,6 @@ export default function GalleryScreen() {
     {
       id: '5',
       title: 'Appraisal',
-      documentCount: '2 Documents',
-      updated: 'UPDATED DEC 2023',
       icon: 'verified',
       iconBgColor: 'bg-rose-100',
       iconColor: '#E11D48',
@@ -101,8 +123,6 @@ export default function GalleryScreen() {
     {
       id: '6',
       title: 'General Gallery',
-      documentCount: '32 Documents',
-      updated: 'UPDATED YESTERDAY',
       icon: 'folder',
       iconBgColor: 'bg-slate-100',
       iconColor: '#64748B',
@@ -110,26 +130,140 @@ export default function GalleryScreen() {
     },
   ];
 
-  const recentFiles: RecentFile[] = [
-    {
-      id: '1',
-      name: 'Reflection_Patient_04.pdf',
-      category: 'Reflective Accounts',
-      size: '2.4 MB',
-      icon: 'picture-as-pdf',
-      iconBgColor: 'bg-red-100',
-      iconColor: '#DC2626',
-    },
-    {
-      id: '2',
-      name: 'Seminar_Certificate.jpg',
-      category: 'CPD Hours',
-      size: '1.1 MB',
-      icon: 'image',
-      iconBgColor: 'bg-blue-100',
-      iconColor: '#2563EB',
-    },
-  ];
+  useEffect(() => {
+    loadDocuments();
+  }, []);
+
+  const loadDocuments = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      const response = await apiService.get<{
+        success: boolean;
+        data: ApiDocument[];
+      }>(API_ENDPOINTS.DOCUMENTS.LIST, token);
+
+      if (response.success && response.data) {
+        // Map API response (snake_case) to frontend format (camelCase)
+        const mappedDocuments: Document[] = response.data.map((apiDoc) => {
+          // Parse size string (e.g., "123.4 KB" or "1.2 MB") to bytes
+          let fileSize = 0;
+          if (apiDoc.size) {
+            const sizeMatch = apiDoc.size.match(/([\d.]+)\s*(KB|MB|GB)/i);
+            if (sizeMatch && sizeMatch[1] && sizeMatch[2]) {
+              const value = parseFloat(sizeMatch[1]);
+              const unit = sizeMatch[2].toUpperCase();
+              if (unit === 'KB') fileSize = value * 1024;
+              else if (unit === 'MB') fileSize = value * 1024 * 1024;
+              else if (unit === 'GB') fileSize = value * 1024 * 1024 * 1024;
+            }
+          }
+          
+          // Determine mime type from file type or name
+          let mimeType = 'application/octet-stream';
+          if (apiDoc.type === 'text') mimeType = 'text/plain';
+          else if (apiDoc.type === 'file') mimeType = 'application/pdf';
+          else if (apiDoc.name) {
+            const ext = apiDoc.name.split('.').pop()?.toLowerCase();
+            if (ext === 'pdf') mimeType = 'application/pdf';
+            else if (ext && ['jpg', 'jpeg', 'png', 'gif'].includes(ext)) mimeType = `image/${ext}`;
+          }
+          
+          return {
+            id: apiDoc.id,
+            filename: apiDoc.name,
+            originalFilename: apiDoc.name,
+            fileSize: fileSize || 1024, // Default to 1KB if size not available
+            mimeType: mimeType,
+            category: apiDoc.category,
+            createdAt: apiDoc.created_at,
+            updatedAt: apiDoc.updated_at,
+          };
+        });
+        
+        // Update categories with document counts
+        const updatedCategories = categoryDefinitions.map(cat => {
+          const categoryDocs = mappedDocuments.filter(doc => 
+            doc.category?.toLowerCase() === cat.title.toLowerCase() || 
+            (!doc.category && cat.id === '6') // General gallery for uncategorized
+          );
+          const count = categoryDocs.length;
+          const latestDoc = categoryDocs.sort((a, b) => 
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          )[0];
+          
+          const updated = latestDoc 
+            ? getTimeAgo(new Date(latestDoc.updatedAt))
+            : 'NO DOCUMENTS';
+          
+          return {
+            ...cat,
+            documentCount: `${count} Document${count !== 1 ? 's' : ''}`,
+            updated: updated.toUpperCase(),
+          };
+        });
+        setCategories(updatedCategories);
+
+        // Get recent files (last 5)
+        const recent = mappedDocuments
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 5)
+          .map(doc => {
+            const isPdf = doc.mimeType === 'application/pdf';
+            const sizeInMB = (doc.fileSize / (1024 * 1024)).toFixed(1);
+            return {
+              id: String(doc.id),
+              name: doc.originalFilename || doc.filename,
+              category: doc.category || 'General Gallery',
+              size: `${sizeInMB} MB`,
+              icon: (isPdf ? 'picture-as-pdf' : 'image') as keyof typeof MaterialIcons.glyphMap,
+              iconBgColor: isPdf ? 'bg-red-100' : 'bg-blue-100',
+              iconColor: isPdf ? '#DC2626' : '#2563EB',
+            };
+          });
+        setRecentFiles(recent);
+      }
+    } catch (error: any) {
+      console.error('Error loading documents:', error);
+      // Don't show error toast if it's a 500/Internal Server Error (API endpoint not implemented yet)
+      const errorMessage = error.message || '';
+      if (!errorMessage.includes('Internal server error') && !errorMessage.includes('500')) {
+        showToast.error(errorMessage || 'Failed to load documents', 'Error');
+      }
+      // Set default categories if API fails
+      setCategories(categoryDefinitions.map(cat => ({
+        ...cat,
+        documentCount: '0 Documents',
+        updated: 'NO DOCUMENTS',
+      })));
+      setRecentFiles([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const getTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+
+    if (diffMins < 60) return `${diffMins}M AGO`;
+    if (diffHours < 24) return `${diffHours}H AGO`;
+    if (diffDays < 7) return `${diffDays}D AGO`;
+    if (diffWeeks < 4) return `${diffWeeks}W AGO`;
+    if (diffMonths < 12) return `${diffMonths}MO AGO`;
+    return `${Math.floor(diffDays / 365)}Y AGO`;
+  };
 
   const validateDocumentForm = () => {
     const errors: Record<string, string> = {};
@@ -150,25 +284,121 @@ export default function GalleryScreen() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleFileSelect = (source: 'gallery' | 'camera' | 'files') => {
-    const mockFiles = {
-      gallery: { name: 'Document_Image.jpg', size: '2.4 MB', type: 'image/jpeg' },
-      camera: { name: 'Photo_Capture.jpg', size: '1.8 MB', type: 'image/jpeg' },
-      files: { name: 'Report_2024.pdf', size: '3.2 MB', type: 'application/pdf' },
-    };
-
-    setDocumentForm({ ...documentForm, file: mockFiles[source] });
-    if (formErrors.file) {
-      setFormErrors({ ...formErrors, file: '' });
+  const handleFileSelect = async (source: 'gallery' | 'camera' | 'files') => {
+    try {
+      let result;
+      
+      if (source === 'gallery') {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+          showToast.error('Permission to access gallery is required', 'Permission Denied');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.All,
+          allowsEditing: false,
+          quality: 1,
+        });
+        
+        if (!result.canceled && result.assets[0]) {
+          const asset = result.assets[0];
+          const sizeInMB = asset.fileSize ? (asset.fileSize / (1024 * 1024)).toFixed(2) : '0';
+          setFileUri(asset.uri);
+          setDocumentForm({ 
+            ...documentForm, 
+            file: {
+              name: asset.fileName || `image_${Date.now()}.jpg`,
+              size: `${sizeInMB} MB`,
+              type: asset.mimeType || 'image/jpeg',
+            }
+          });
+          if (formErrors.file) {
+            setFormErrors({ ...formErrors, file: '' });
+          }
+        }
+      } else if (source === 'camera') {
+        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permissionResult.granted) {
+          showToast.error('Permission to access camera is required', 'Permission Denied');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          allowsEditing: false,
+          quality: 1,
+        });
+        
+        if (!result.canceled && result.assets[0]) {
+          const asset = result.assets[0];
+          const sizeInMB = asset.fileSize ? (asset.fileSize / (1024 * 1024)).toFixed(2) : '0';
+          setFileUri(asset.uri);
+          setDocumentForm({ 
+            ...documentForm, 
+            file: {
+              name: asset.fileName || `photo_${Date.now()}.jpg`,
+              size: `${sizeInMB} MB`,
+              type: asset.mimeType || 'image/jpeg',
+            }
+          });
+          if (formErrors.file) {
+            setFormErrors({ ...formErrors, file: '' });
+          }
+        }
+      } else if (source === 'files') {
+        result = await DocumentPicker.getDocumentAsync({
+          type: '*/*',
+          copyToCacheDirectory: true,
+        });
+        
+        if (!result.canceled && result.assets[0]) {
+          const asset = result.assets[0];
+          const sizeInMB = asset.size ? (asset.size / (1024 * 1024)).toFixed(2) : '0';
+          setFileUri(asset.uri);
+          setDocumentForm({ 
+            ...documentForm, 
+            file: {
+              name: asset.name,
+              size: `${sizeInMB} MB`,
+              type: asset.mimeType || 'application/octet-stream',
+            }
+          });
+          if (formErrors.file) {
+            setFormErrors({ ...formErrors, file: '' });
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Error selecting file:', error);
+      showToast.error(error.message || 'Failed to select file', 'Error');
     }
   };
 
-  const handleUploadDocument = () => {
-    if (validateDocumentForm()) {
-      setIsUploading(true);
-      setTimeout(() => {
-        console.log('Document uploaded:', documentForm);
-        setIsUploading(false);
+  const handleUploadDocument = async () => {
+    if (validateDocumentForm() && documentForm.file && fileUri) {
+      try {
+        setIsUploading(true);
+        const token = await AsyncStorage.getItem('authToken');
+        if (!token) {
+          router.replace('/(auth)/login');
+          return;
+        }
+
+        // Upload file
+        await apiService.uploadFile(
+          API_ENDPOINTS.DOCUMENTS.UPLOAD,
+          {
+            uri: fileUri,
+            type: documentForm.file.type,
+            name: documentForm.file.name,
+          },
+          token,
+          {
+            title: documentForm.title,
+            description: documentForm.description || '',
+            category: documentForm.category || '',
+          }
+        );
+
+        showToast.success('Document uploaded successfully', 'Success');
         setShowAddDocumentModal(false);
         setFormErrors({});
         setDocumentForm({
@@ -177,15 +407,24 @@ export default function GalleryScreen() {
           category: '',
           file: null,
         });
-      }, 1500);
+        setFileUri(null);
+        
+        // Reload documents
+        await loadDocuments();
+      } catch (error: any) {
+        console.error('Error uploading document:', error);
+        showToast.error(error.message || 'Failed to upload document', 'Error');
+      } finally {
+        setIsUploading(false);
+      }
+    } else if (!fileUri) {
+      showToast.error('Please select a file first', 'Error');
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    await loadDocuments();
   };
 
   return (
@@ -237,7 +476,18 @@ export default function GalleryScreen() {
           </View>
         </View>
 
+        {/* Loading State */}
+        {loading && !refreshing && (
+          <View className="flex-1 items-center justify-center py-20">
+            <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+            <Text className={`mt-4 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+              Loading documents...
+            </Text>
+          </View>
+        )}
+
         {/* Category Grid */}
+        {!loading && (
         <View className="px-6 mt-2">
           <View className="flex-row flex-wrap" style={{ gap: 16 }}>
             {categories.map((category) => (
@@ -283,19 +533,24 @@ export default function GalleryScreen() {
             ))}
           </View>
         </View>
+        )}
 
         {/* Recent Files Section */}
+        {!loading && (
         <View className="px-6 mt-8">
           <View className="flex-row items-center justify-between mb-4">
             <Text className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-800"}`}>
               Recent Files
             </Text>
-            <Pressable>
-              <Text className="text-[#2B5F9E] text-sm font-semibold">View All</Text>
-            </Pressable>
+            {recentFiles.length > 0 && (
+              <Pressable>
+                <Text className="text-[#2B5F9E] text-sm font-semibold">View All</Text>
+              </Pressable>
+            )}
           </View>
-          <View style={{ gap: 12 }}>
-            {recentFiles.map((file) => (
+          {recentFiles.length > 0 ? (
+            <View style={{ gap: 12 }}>
+              {recentFiles.map((file) => (
               <View
                 key={file.id}
                 className={`p-3 rounded-2xl border flex-row items-center ${
@@ -322,9 +577,20 @@ export default function GalleryScreen() {
                   <MaterialIcons name="more-vert" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
                 </Pressable>
               </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <View className={`p-6 rounded-2xl border items-center ${
+              isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+            }`}>
+              <MaterialIcons name="folder-open" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
+              <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                No recent files
+              </Text>
+            </View>
+          )}
         </View>
+        )}
       </ScrollView>
 
       {/* Floating Action Button */}
@@ -340,6 +606,7 @@ export default function GalleryScreen() {
               category: '',
               file: null,
             });
+            setFileUri(null);
             setFormErrors({});
             setShowAddDocumentModal(true);
           }}
@@ -481,6 +748,7 @@ export default function GalleryScreen() {
                           <Pressable 
                             onPress={() => {
                               setDocumentForm({ ...documentForm, file: null });
+                              setFileUri(null);
                               if (formErrors.file) {
                                 setFormErrors({ ...formErrors, file: '' });
                               }
