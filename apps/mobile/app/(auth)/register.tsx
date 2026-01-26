@@ -52,17 +52,8 @@ export default function Register() {
                 }
             );
 
-            // Success - navigate to login or onboarding
-            Alert.alert(
-                "Success",
-                "Account created successfully! Please log in.",
-                [
-                    {
-                        text: "OK",
-                        onPress: () => router.replace("/(auth)/login"),
-                    },
-                ]
-            );
+            // Success - navigate to OTP verification page
+            router.push(`/(auth)/verify-otp?email=${encodeURIComponent(data.email)}`);
         } catch (error: unknown) {
             // Handle error
             const errorMessage = error instanceof Error 
