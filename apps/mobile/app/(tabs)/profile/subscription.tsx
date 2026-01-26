@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
+import { setSubscriptionInfo } from '@/utils/subscription';
 import '../../global.css';
 
 // Safe Stripe import
@@ -75,6 +76,13 @@ export default function SubscriptionScreen() {
         setIsPremium(isPremiumUser);
         setSubscriptionStatus(response.data.subscriptionStatus || 'free');
         setTrialEndsAt(response.data.trialEndsAt || null);
+        
+        await setSubscriptionInfo({
+          subscriptionTier: (response.data.subscriptionTier || 'free') as 'free' | 'premium',
+          subscriptionStatus: (response.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
+          isPremium: isPremiumUser,
+          canUseOffline: isPremiumUser,
+        });
       }
     } catch (error) {
       console.error('Error loading subscription status:', error);

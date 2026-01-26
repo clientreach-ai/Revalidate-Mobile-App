@@ -172,6 +172,9 @@ importers:
       '@react-native-async-storage/async-storage':
         specifier: ^2.2.0
         version: 2.2.0(react-native@0.81.5)
+      '@react-native-community/netinfo':
+        specifier: ^11.4.1
+        version: 11.4.1(react-native@0.81.5)
       '@react-navigation/native':
         specifier: ^7.1.28
         version: 7.1.28(react-native@0.81.5)(react@19.1.0)
@@ -3310,6 +3313,14 @@ packages:
       react-native: ^0.0.0-0 || >=0.65 <1.0
     dependencies:
       merge-options: 3.0.4
+      react-native: 0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)
+    dev: false
+
+  /@react-native-community/netinfo@11.4.1(react-native@0.81.5):
+    resolution: {integrity: sha512-B0BYAkghz3Q2V09BF88RA601XursIEA111tnc2JOaN7axJWmNefmfjZqw/KdSxKZp7CZUuPpjBmz/WCR9uaHYg==}
+    peerDependencies:
+      react-native: '>=0.59'
+    dependencies:
       react-native: 0.81.5(@babel/core@7.28.6)(@types/react@19.1.17)(react@19.1.0)
     dev: false
 

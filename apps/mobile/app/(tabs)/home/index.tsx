@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
+import { setSubscriptionInfo } from '@/utils/subscription';
 import '../../global.css';
 
 interface UserData {
@@ -153,10 +154,27 @@ export default function DashboardScreen() {
       }
     } catch (error: any) {
       console.error('Error starting session:', error);
-      showToast.error(
-        error?.message || 'Failed to start session. Please try again.',
-        'Error'
-      );
+      if (error?.message?.includes('OFFLINE_MODE')) {
+        showToast.info('Session queued for sync when connection is restored', 'Offline Mode');
+        setActiveSession({
+          id: Date.now(),
+          startTime: new Date().toISOString(),
+          endTime: null,
+          durationMinutes: null,
+          workDescription: '',
+          isActive: true,
+        });
+      } else if (error?.message?.includes('INTERNET_REQUIRED')) {
+        showToast.error(
+          'This feature requires an internet connection. Please connect to the internet and try again.',
+          'Internet Required'
+        );
+      } else {
+        showToast.error(
+          error?.message || 'Failed to start session. Please try again.',
+          'Error'
+        );
+      }
     } finally {
       setIsStartingSession(false);
     }
@@ -261,6 +279,8 @@ export default function DashboardScreen() {
           registrationNumber: string | null;
           revalidationDate: string | null;
           professionalRole: string | null;
+          subscriptionTier: string | null;
+          subscriptionStatus: string | null;
         };
       }>(API_ENDPOINTS.USERS.ME, token);
 
@@ -274,6 +294,15 @@ export default function DashboardScreen() {
           registrationNumber: response.data.registrationNumber,
           revalidationDate: response.data.revalidationDate,
         });
+
+        if (response.data.subscriptionTier) {
+          await setSubscriptionInfo({
+            subscriptionTier: (response.data.subscriptionTier || 'free') as 'free' | 'premium',
+            subscriptionStatus: (response.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
+            isPremium: response.data.subscriptionTier === 'premium',
+            canUseOffline: response.data.subscriptionTier === 'premium',
+          });
+        }
 
         if (response.data.revalidationDate) {
           try {

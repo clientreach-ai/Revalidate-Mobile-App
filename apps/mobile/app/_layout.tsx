@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text } from 'react-native';
 import { ThemeProvider } from '@/features/theme/ThemeProvider';
 import { useThemeStore } from '@/features/theme/theme.store';
 import Toast from 'react-native-toast-message';
+import { initializeSyncService, cleanupSyncService } from '@/services/sync-service';
 import "./global.css";
 
 // Safe Stripe import - handles cases where native modules aren't available
@@ -202,6 +203,13 @@ function StatusBarWrapper() {
 }
 
 export default function RootLayout() {
+    useEffect(() => {
+        initializeSyncService();
+        return () => {
+            cleanupSyncService();
+        };
+    }, []);
+
     return (
         <StripeProvider 
             publishableKey={isStripeAvailable ? STRIPE_PUBLISHABLE_KEY : ''}

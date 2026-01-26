@@ -16,6 +16,7 @@ import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { showToast } from "@/utils/toast";
+import { setSubscriptionInfo } from "@/utils/subscription";
 import "../global.css";
 
 export default function Login() {
@@ -155,12 +156,23 @@ export default function Login() {
                             data: {
                                 registrationNumber?: string | null;
                                 revalidationDate?: string | null;
+                                subscriptionTier?: string | null;
+                                subscriptionStatus?: string | null;
                             };
                         }>(API_ENDPOINTS.USERS.ME, token);
                         
                         const hasBasicData = 
                             userProfile?.data?.registrationNumber && 
                             userProfile?.data?.revalidationDate;
+                        
+                        if (userProfile?.data?.subscriptionTier) {
+                            await setSubscriptionInfo({
+                                subscriptionTier: (userProfile.data.subscriptionTier || 'free') as 'free' | 'premium',
+                                subscriptionStatus: (userProfile.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
+                                isPremium: userProfile.data.subscriptionTier === 'premium',
+                                canUseOffline: userProfile.data.subscriptionTier === 'premium',
+                            });
+                        }
                         
                         if (hasBasicData) {
                             router.replace("/(tabs)/home");
