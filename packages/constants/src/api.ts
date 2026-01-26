@@ -21,6 +21,7 @@ export const API_ENDPOINTS = {
   USERS: {
     PROFILE: '/api/v1/users/profile',
     UPDATE_PROFILE: '/api/v1/users/profile',
+    ME: '/api/v1/auth/me',
   },
   CALENDAR: {
     EVENTS: '/api/v1/calendar/events',

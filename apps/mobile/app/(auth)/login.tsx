@@ -13,12 +13,16 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginInput } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
+import { apiService, API_ENDPOINTS } from "@/services/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Alert } from "react-native";
 import "../global.css";
 
 export default function Login() {
     const router = useRouter();
     const { isDark, toggleTheme } = useThemeStore();
     const [showPassword, setShowPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const {
         control,
@@ -29,9 +33,93 @@ export default function Login() {
         defaultValues: { email: "", password: "" },
     });
 
-    const onSubmit = (data: LoginInput) => {
-        console.log("Login form submitted:", data);
-        router.replace("/(onboarding)");
+    const onSubmit = async (data: LoginInput) => {
+        try {
+            setIsLoading(true);
+
+            // Call the login API
+            const response = await apiService.post<{
+                success: boolean;
+                data: {
+                    user: {
+                        id: string;
+                        email: string;
+                        professionalRole?: string;
+                        revalidationDate?: string;
+                    };
+                    token: string;
+                };
+            }>(
+                API_ENDPOINTS.AUTH.LOGIN,
+                {
+                    email: data.email,
+                    password: data.password,
+                }
+            );
+
+            // Store token and user data
+            if (response?.data?.token) {
+                const token = response.data.token;
+                await AsyncStorage.setItem('authToken', token);
+                await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+                
+                // Fetch full user profile to check onboarding status
+                try {
+                    const userProfile = await apiService.get<{
+                        success: boolean;
+                        data: {
+                            id: string;
+                            email: string;
+                            registration?: string | null;
+                            dueDate?: string | null;
+                            workSettings?: number | null;
+                            scopePractice?: number | null;
+                            description?: string | null;
+                        };
+                    }>(API_ENDPOINTS.USERS.ME, token);
+                    
+                    // Check if user has completed onboarding
+                    // User needs: registration number and revalidation date (dueDate)
+                    const hasOnboardingData = 
+                        userProfile?.data?.registration && 
+                        userProfile?.data?.dueDate;
+                    
+                    if (!hasOnboardingData) {
+                        // User hasn't completed onboarding - navigate to onboarding
+                        router.replace("/(onboarding)");
+                    } else {
+                        // User has completed onboarding - navigate to dashboard
+                        router.replace("/(tabs)/home");
+                    }
+                } catch (profileError) {
+                    // If profile fetch fails, assume onboarding not complete
+                    console.warn("Failed to fetch user profile, redirecting to onboarding:", profileError);
+                    router.replace("/(onboarding)");
+                }
+            } else {
+                throw new Error("Invalid response from server");
+            }
+        } catch (error: unknown) {
+            // Handle error
+            let errorMessage = "Invalid email or password. Please try again.";
+            
+            if (error instanceof Error) {
+                // Extract error message from API response
+                if (error.message.includes("401") || error.message.includes("Invalid")) {
+                    errorMessage = "Invalid email or password. Please check your credentials.";
+                } else if (error.message.includes("403")) {
+                    errorMessage = "Account is inactive. Please contact support.";
+                } else if (error.message.includes("404")) {
+                    errorMessage = "User not found. Please register first.";
+                } else {
+                    errorMessage = error.message;
+                }
+            }
+            
+            Alert.alert("Login Failed", errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -210,7 +298,10 @@ export default function Login() {
                         <View className="pt-6">
                             <Pressable
                                 onPress={handleSubmit(onSubmit)}
-                                className="w-full bg-primary py-4 rounded-2xl active:opacity-90 flex-row justify-center items-center gap-2 overflow-hidden"
+                                disabled={isLoading}
+                                className={`w-full py-4 rounded-2xl active:opacity-90 flex-row justify-center items-center gap-2 overflow-hidden ${
+                                    isLoading ? "bg-primary/50" : "bg-primary"
+                                }`}
                                 style={{
                                     shadowColor: "#2563eb",
                                     shadowOffset: { width: 0, height: 8 },
@@ -219,8 +310,14 @@ export default function Login() {
                                     elevation: 8,
                                 }}
                             >
-                                <Text className="text-white font-bold text-base">Sign In</Text>
-                                <MaterialIcons name="arrow-forward" size={22} color="white" />
+                                {isLoading ? (
+                                    <Text className="text-white font-bold text-base">Signing In...</Text>
+                                ) : (
+                                    <>
+                                        <Text className="text-white font-bold text-base">Sign In</Text>
+                                        <MaterialIcons name="arrow-forward" size={22} color="white" />
+                                    </>
+                                )}
                             </Pressable>
                         </View>
                     </View>
