@@ -407,8 +407,8 @@ export default function Login() {
                                     <Text className="text-white font-bold text-base">Signing In...</Text>
                                 ) : (
                                     <>
-                                        <Text className="text-white font-bold text-base">Sign In</Text>
-                                        <MaterialIcons name="arrow-forward" size={22} color="white" />
+                                <Text className="text-white font-bold text-base">Sign In</Text>
+                                <MaterialIcons name="arrow-forward" size={22} color="white" />
                                     </>
                                 )}
                             </Pressable>

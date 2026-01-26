@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { mapUserRow } from '../../config/database-mapping';
 import { generateOTP, storeOTP, verifyOTP } from './otp.service';
 import { sendOTPEmail } from './email.service';
+import { getMySQLPool } from '../../config/database';
 
 function serializeBigInt(obj: any): any {
   if (obj === null || obj === undefined) {
@@ -180,24 +181,23 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const validated = loginSchema.parse(req.body) as LoginRequest;
 
-  const userData = await prisma.users.findFirst({
-    where: { email: validated.email },
-    select: {
-      id: true,
-      email: true,
-      password: true,
-      reg_type: true,
-      due_date: true,
-      registration: true,
-      work_settings: true,
-      scope_practice: true,
-      status: true,
-    },
-  });
+  // Use raw SQL to avoid Prisma enum validation issues with empty reg_type values
+  console.log('LOGIN: Using raw SQL query instead of Prisma');
+  const pool = getMySQLPool();
+  const [users] = await pool.execute(
+    `SELECT id, email, password, reg_type, due_date, registration, 
+     work_settings, scope_practice, status 
+     FROM users 
+     WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) 
+     LIMIT 1`,
+    [validated.email]
+  ) as any[];
 
-  if (!userData) {
+  if (!users || users.length === 0) {
     throw new ApiError(401, 'Invalid email or password');
   }
+
+  const userData = users[0];
 
   if (userData.status === '0') {
     throw new ApiError(403, 'Account is inactive. Please contact support.');

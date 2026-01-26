@@ -45,5 +45,14 @@ export const API_ENDPOINTS = {
     CREATE_SESSION: '/api/v1/payment/create-session',
     STATUS: '/api/v1/payment/status',
   },
+  WORK_HOURS: {
+    LIST: '/api/v1/work-hours',
+    CREATE: '/api/v1/work-hours',
+    ACTIVE: '/api/v1/work-hours/active',
+    GET_BY_ID: '/api/v1/work-hours',
+    UPDATE: '/api/v1/work-hours',
+    DELETE: '/api/v1/work-hours',
+    STATS_TOTAL: '/api/v1/work-hours/stats/total',
+  },
   HEALTH: '/health',
 } as const;

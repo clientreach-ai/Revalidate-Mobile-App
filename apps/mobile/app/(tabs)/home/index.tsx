@@ -1,11 +1,12 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, Pressable, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
+import { showToast } from '@/utils/toast';
 import '../../global.css';
 
 interface UserData {
@@ -16,40 +17,233 @@ interface UserData {
   revalidationDate: string | null;
 }
 
+interface ActiveSession {
+  id: number;
+  startTime: string;
+  endTime: string | null;
+  durationMinutes: number | null;
+  workDescription: string | null;
+  isActive: boolean;
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
-  const [timer, setTimer] = useState({ hours: 1, minutes: 45, seconds: 22 });
+  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  const [timer, setTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [userData, setUserData] = useState<UserData | null>(null);
   const [revalidationDays, setRevalidationDays] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStartingSession, setIsStartingSession] = useState(false);
+  const [isPausingSession, setIsPausingSession] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [pausedAt, setPausedAt] = useState<Date | null>(null);
+  const [totalPausedTime, setTotalPausedTime] = useState(0);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load user data
   useEffect(() => {
     loadUserData();
+    loadActiveSession();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadActiveSession();
+    }, [])
+  );
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer((prev) => {
-        let { hours, minutes, seconds } = prev;
-        seconds += 1;
-        
-        if (seconds >= 60) {
-          seconds = 0;
-          minutes += 1;
-        }
-        if (minutes >= 60) {
-          minutes = 0;
-          hours += 1;
-        }
-        
-        return { hours, minutes, seconds };
-      });
-    }, 1000);
+    if (activeSession && activeSession.isActive && !isPaused) {
+      updateTimerFromSession();
+      
+      timerIntervalRef.current = setInterval(() => {
+        updateTimerFromSession();
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      if (!activeSession || !activeSession.isActive) {
+        setTimer({ hours: 0, minutes: 0, seconds: 0 });
+        setIsPaused(false);
+        setPausedAt(null);
+        setTotalPausedTime(0);
+      }
+    }
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [activeSession, isPaused]);
+
+  const updateTimerFromSession = () => {
+    if (!activeSession || !activeSession.isActive || isPaused) return;
+
+    const startTime = new Date(activeSession.startTime);
+    const now = new Date();
+    const diffMs = now.getTime() - startTime.getTime() - totalPausedTime;
+    
+    const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    setTimer({ hours, minutes, seconds });
+  };
+
+  const loadActiveSession = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await apiService.get<{
+        success: boolean;
+        data: ActiveSession | null;
+      }>(API_ENDPOINTS.WORK_HOURS.ACTIVE, token);
+
+      if (response?.data && response.data.isActive) {
+        setActiveSession(response.data);
+        setIsPaused(false);
+        setPausedAt(null);
+        setTotalPausedTime(0);
+      } else {
+        setActiveSession(null);
+        setIsPaused(false);
+        setPausedAt(null);
+        setTotalPausedTime(0);
+      }
+    } catch (error) {
+      console.error('Error loading active session:', error);
+      setActiveSession(null);
+    }
+  };
+
+  const handleStartSession = async () => {
+    try {
+      setIsStartingSession(true);
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        showToast.error('Please log in again', 'Error');
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      const startTime = new Date().toISOString();
+      const response = await apiService.post<{
+        success: boolean;
+        data: ActiveSession;
+      }>(
+        API_ENDPOINTS.WORK_HOURS.CREATE,
+        {
+          start_time: startTime,
+          work_description: '',
+        },
+        token
+      );
+
+      if (response?.data) {
+        setActiveSession(response.data);
+        setIsPaused(false);
+        setPausedAt(null);
+        setTotalPausedTime(0);
+        showToast.success('Clinical session started', 'Success');
+      }
+    } catch (error: any) {
+      console.error('Error starting session:', error);
+      showToast.error(
+        error?.message || 'Failed to start session. Please try again.',
+        'Error'
+      );
+    } finally {
+      setIsStartingSession(false);
+    }
+  };
+
+  const handlePauseSession = () => {
+    if (!activeSession || isPaused) return;
+    
+    setIsPaused(true);
+    setPausedAt(new Date());
+    showToast.info('Session paused', 'Paused');
+  };
+
+  const handleResumeSession = () => {
+    if (!activeSession || !isPaused || !pausedAt) return;
+    
+    const pauseDuration = new Date().getTime() - pausedAt.getTime();
+    setTotalPausedTime(prev => prev + pauseDuration);
+    setIsPaused(false);
+    setPausedAt(null);
+    showToast.info('Session resumed', 'Resumed');
+  };
+
+  const handleRestartSession = async () => {
+    Alert.alert(
+      'Restart Session',
+      'This will stop the current session and start a new one. Continue?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Restart',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('authToken');
+              if (!token) {
+                showToast.error('Please log in again', 'Error');
+                router.replace('/(auth)/login');
+                return;
+              }
+
+              if (activeSession) {
+                const endTime = new Date().toISOString();
+                await apiService.put(
+                  `${API_ENDPOINTS.WORK_HOURS.UPDATE}/${activeSession.id}`,
+                  {
+                    end_time: endTime,
+                    work_description: '',
+                  },
+                  token
+                );
+              }
+
+              const startTime = new Date().toISOString();
+              const response = await apiService.post<{
+                success: boolean;
+                data: ActiveSession;
+              }>(
+                API_ENDPOINTS.WORK_HOURS.CREATE,
+                {
+                  start_time: startTime,
+                  work_description: '',
+                },
+                token
+              );
+
+              if (response?.data) {
+                setActiveSession(response.data);
+                setIsPaused(false);
+                setPausedAt(null);
+                setTotalPausedTime(0);
+                showToast.success('Session restarted', 'Success');
+              }
+            } catch (error: any) {
+              console.error('Error restarting session:', error);
+              showToast.error(
+                error?.message || 'Failed to restart session. Please try again.',
+                'Error'
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const loadUserData = async () => {
     try {
@@ -81,15 +275,33 @@ export default function DashboardScreen() {
           revalidationDate: response.data.revalidationDate,
         });
 
-        // Calculate days until revalidation
         if (response.data.revalidationDate) {
-          const revalidationDate = new Date(response.data.revalidationDate);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          revalidationDate.setHours(0, 0, 0, 0);
-          const diffTime = revalidationDate.getTime() - today.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          setRevalidationDays(diffDays);
+          try {
+            let revalidationDate: Date;
+            const dateStr = response.data.revalidationDate;
+            
+            if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+              const [year, month, day] = dateStr.split('-').map(Number);
+              revalidationDate = new Date(year, month - 1, day);
+            } else {
+              revalidationDate = new Date(dateStr);
+            }
+            
+            if (isNaN(revalidationDate.getTime())) {
+              console.warn('Invalid revalidation date:', dateStr);
+              setRevalidationDays(null);
+            } else {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              revalidationDate.setHours(0, 0, 0, 0);
+              const diffTime = revalidationDate.getTime() - today.getTime();
+              const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+              setRevalidationDays(diffDays);
+            }
+          } catch (error) {
+            console.error('Error parsing revalidation date:', error);
+            setRevalidationDays(null);
+          }
         }
       }
     } catch (error) {
@@ -134,6 +346,41 @@ export default function DashboardScreen() {
   };
 
   const formatTime = (value: number) => value.toString().padStart(2, '0');
+
+  const PulsingDot = ({ isDark }: { isDark: boolean }) => {
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.3,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }, []);
+
+    return (
+      <Animated.View
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: '#EF4444',
+          opacity: pulseAnim,
+        }}
+      />
+    );
+  };
 
   const stats = [
     {
@@ -196,10 +443,8 @@ export default function DashboardScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Section with Gradient */}
         <View className="px-6 pt-6 pb-20 rounded-b-[40px]" style={{ backgroundColor: '#2B5F9E' }}>
           <View className="flex-row justify-between items-center mb-4">
-            {/* Profile Section */}
             <View className="flex-row items-center gap-3">
               <View className="relative">
                 <View className="w-12 h-12 rounded-full bg-white/30 border-2 border-white/30 items-center justify-center">
@@ -217,7 +462,6 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            {/* Notification Button */}
             <Pressable 
               onPress={() => router.push('/(tabs)/notifications')}
               className="relative"
@@ -225,14 +469,12 @@ export default function DashboardScreen() {
               <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
                 <MaterialIcons name="notifications-active" size={22} color="#FFFFFF" />
               </View>
-              {/* Notification Badge */}
               <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-[#2B5F9E] items-center justify-center">
                 <Text className="text-white text-[10px] font-bold" style={{ lineHeight: 12 }}>2</Text>
               </View>
             </Pressable>
           </View>
 
-          {/* Revalidation Status */}
           {revalidationDays !== null && (
             <View className="flex-row justify-between items-center">
               <View className="bg-white/10 px-3 py-2 rounded-2xl items-center border border-white/20">
@@ -252,48 +494,129 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {/* Main Content */}
         <View className="flex-1 -mt-12 px-6 relative z-10" style={{ gap: 24 }}>
-          {/* Active Clinical Session Card */}
-          <View className={`p-5 rounded-3xl shadow-lg border ${
-            isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-          }`}>
-            <View className="flex-row justify-between items-center mb-4">
-              <View className="flex-row items-center gap-2">
-                <View className="w-2 h-2 rounded-full bg-[#EF4444]" />
-                <Text className={`text-sm font-semibold uppercase tracking-tight ${
-                  isDark ? "text-gray-400" : "text-slate-500"
+          {activeSession && activeSession.isActive ? (
+            <View className={`p-5 rounded-3xl shadow-lg border ${
+              isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+            }`}>
+              <View className="flex-row justify-between items-center mb-4">
+                <View className="flex-row items-center gap-2">
+                  {!isPaused && <PulsingDot isDark={isDark} />}
+                  {isPaused && (
+                    <View className="w-2 h-2 rounded-full bg-yellow-500" />
+                  )}
+                  <Text className={`text-sm font-semibold uppercase tracking-tight ${
+                    isDark ? "text-gray-400" : "text-slate-500"
+                  }`}>
+                    {isPaused ? 'Paused Clinical Session' : 'Active Clinical Session'}
+                  </Text>
+                </View>
+                <View className={`px-2 py-1 rounded-lg ${
+                  isDark ? "bg-slate-700" : "bg-slate-100"
                 }`}>
-                  Active Clinical Session
-                </Text>
+                  <Text className={`text-xs ${isDark ? "text-gray-300" : "text-slate-600"}`}>
+                    Started {new Date(activeSession.startTime).toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })}
+                  </Text>
+                </View>
               </View>
-              <View className={`px-2 py-1 rounded-lg ${
-                isDark ? "bg-slate-700" : "bg-slate-100"
-              }`}>
-                <Text className={`text-xs ${isDark ? "text-gray-300" : "text-slate-600"}`}>
-                  Started 08:30 AM
-                </Text>
+              <View className="flex-row items-center justify-between">
+                <View className="flex-col">
+                  <Text className={`text-4xl font-mono font-bold tracking-tighter ${
+                    isDark ? "text-white" : "text-slate-800"
+                  }`}>
+                    {formatTime(timer.hours)}:{formatTime(timer.minutes)}:{formatTime(timer.seconds)}
+                  </Text>
+                  <Text className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
+                    {activeSession.workDescription || 'Clinical session'}
+                  </Text>
+                </View>
+                <View className="flex-row gap-2">
+                  <Pressable
+                    onPress={handleRestartSession}
+                    disabled={isPausingSession}
+                    className={`px-4 py-3 rounded-2xl flex-row items-center gap-2 ${
+                      isDark ? "bg-slate-700" : "bg-slate-200"
+                    }`}
+                  >
+                    <MaterialIcons 
+                      name="refresh" 
+                      size={18} 
+                      color={isDark ? "#FFFFFF" : "#1F2937"} 
+                    />
+                    <Text className={`font-semibold text-xs ${isDark ? "text-white" : "text-slate-800"}`}>
+                      Restart
+                    </Text>
+                  </Pressable>
+                  {isPaused ? (
+                    <Pressable
+                      onPress={handleResumeSession}
+                      className="bg-[#10B981] px-6 py-3 rounded-2xl flex-row items-center gap-2 shadow-lg"
+                    >
+                      <MaterialIcons name="play-arrow" size={20} color="#FFFFFF" />
+                      <Text className="text-white font-bold">Resume</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={handlePauseSession}
+                      disabled={isPausingSession}
+                      className={`bg-[#F59E0B] px-6 py-3 rounded-2xl flex-row items-center gap-2 shadow-lg ${
+                        isPausingSession ? "opacity-50" : ""
+                      }`}
+                    >
+                      <MaterialIcons name="pause" size={20} color="#FFFFFF" />
+                      <Text className="text-white font-bold">Pause</Text>
+                    </Pressable>
+                  )}
+                </View>
               </View>
             </View>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-col">
-                <Text className={`text-4xl font-mono font-bold tracking-tighter ${
-                  isDark ? "text-white" : "text-slate-800"
-                }`}>
-                  {formatTime(timer.hours)}:{formatTime(timer.minutes)}:{formatTime(timer.seconds)}
-                </Text>
-                <Text className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
-                  St. Mary's General Ward
-                </Text>
+          ) : (
+            <View className={`p-5 rounded-3xl shadow-lg border ${
+              isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+            }`}>
+              <View className="flex-row justify-between items-center mb-4">
+                <View className="flex-row items-center gap-2">
+                  <View className={`w-2 h-2 rounded-full ${
+                    isDark ? "bg-gray-600" : "bg-gray-300"
+                  }`} />
+                  <Text className={`text-sm font-semibold uppercase tracking-tight ${
+                    isDark ? "text-gray-400" : "text-slate-500"
+                  }`}>
+                    Clinical Session
+                  </Text>
+                </View>
               </View>
-              <Pressable className="bg-[#EF4444] px-6 py-3 rounded-2xl flex-row items-center gap-2 shadow-lg">
-                <MaterialIcons name="stop" size={20} color="#FFFFFF" />
-                <Text className="text-white font-bold">Stop</Text>
-              </Pressable>
+              <View className="flex-row items-center justify-between">
+                <View className="flex-col">
+                  <Text className={`text-lg font-semibold ${
+                    isDark ? "text-gray-300" : "text-slate-600"
+                  }`}>
+                    No active session
+                  </Text>
+                  <Text className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
+                    Start a new clinical session to track your work hours
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={handleStartSession}
+                  disabled={isStartingSession}
+                  className={`bg-[#10B981] px-6 py-3 rounded-2xl flex-row items-center gap-2 shadow-lg ${
+                    isStartingSession ? "opacity-50" : ""
+                  }`}
+                >
+                  <MaterialIcons name="play-arrow" size={20} color="#FFFFFF" />
+                  <Text className="text-white font-bold">
+                    {isStartingSession ? 'Starting...' : 'Start'}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          )}
 
-          {/* Stats Grid */}
           <View className="flex-row flex-wrap" style={{ gap: 16 }}>
             {stats.map((stat, index) => (
               <Pressable
@@ -321,7 +644,6 @@ export default function DashboardScreen() {
             ))}
           </View>
 
-          {/* Recent Activity Section */}
           <View>
             <View className="flex-row justify-between items-center mb-4">
               <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>

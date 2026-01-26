@@ -814,41 +814,72 @@ export default function ProfessionalDetails() {
                             <Controller
                                 control={control}
                                 name="hourlyRate"
-                                render={({ field: { value, onChange, onBlur } }) => (
-                                    <View className="relative">
-                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
-                                            <MaterialIcons
-                                                name="attach-money"
-                                                size={22}
-                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                render={({ field: { value, onChange, onBlur } }) => {
+                                    const [displayValue, setDisplayValue] = useState(
+                                        value !== undefined && value !== null ? value.toString() : ""
+                                    );
+                                    
+                                    // Sync display value when form value changes externally (e.g., from saved data)
+                                    useEffect(() => {
+                                        if (value !== undefined && value !== null) {
+                                            setDisplayValue(value.toString());
+                                        }
+                                    }, [value]);
+
+                                    return (
+                                        <View className="relative">
+                                            <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                                <MaterialIcons
+                                                    name="attach-money"
+                                                    size={22}
+                                                    color={isDark ? "#6B7280" : "#9CA3AF"}
+                                                />
+                                            </View>
+                                            <TextInput
+                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                    isDark
+                                                        ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                        : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                                } ${errors.hourlyRate ? "border-red-500" : ""}`}
+                                                style={{
+                                                    shadowColor: isDark ? "#000" : "#000",
+                                                    shadowOffset: { width: 0, height: 2 },
+                                                    shadowOpacity: isDark ? 0.1 : 0.05,
+                                                    shadowRadius: 4,
+                                                    elevation: 2,
+                                                }}
+                                                placeholder="0.00"
+                                                placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                                value={displayValue}
+                                                onChangeText={(text) => {
+                                                    // Allow digits, decimal point, and empty string
+                                                    const cleaned = text.replace(/[^0-9.]/g, '');
+                                                    // Only allow one decimal point
+                                                    const parts = cleaned.split('.');
+                                                    const formatted = parts.length > 2 
+                                                        ? parts[0] + '.' + parts.slice(1).join('')
+                                                        : cleaned;
+                                                    setDisplayValue(formatted);
+                                                    // Convert to number for form validation
+                                                    const num = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
+                                                    onChange(isNaN(num) ? 0 : num);
+                                                }}
+                                                onBlur={() => {
+                                                    onBlur();
+                                                    // Ensure display value matches the numeric value
+                                                    const num = parseFloat(displayValue);
+                                                    if (!isNaN(num)) {
+                                                        setDisplayValue(num.toString());
+                                                    } else {
+                                                        setDisplayValue("");
+                                                    }
+                                                }}
+                                                keyboardType="decimal-pad"
+                                                autoCorrect={false}
                                             />
                                         </View>
-                                        <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
-                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
-                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.hourlyRate ? "border-red-500" : ""}`}
-                                            style={{
-                                                shadowColor: isDark ? "#000" : "#000",
-                                                shadowOffset: { width: 0, height: 2 },
-                                                shadowOpacity: isDark ? 0.1 : 0.05,
-                                                shadowRadius: 4,
-                                                elevation: 2,
-                                            }}
-                                            placeholder="0.00"
-                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                                            value={value?.toString() || ""}
-                                            onChangeText={(text) => {
-                                                const num = parseFloat(text) || 0;
-                                                onChange(num);
-                                            }}
-                                            onBlur={onBlur}
-                                            keyboardType="decimal-pad"
-                                            autoCorrect={false}
-                                        />
-                                    </View>
-                                )}
+                                    );
+                                }}
                             />
                             {errors.hourlyRate && (
                                 <Text className="text-red-500 text-sm mt-1.5">
@@ -873,41 +904,72 @@ export default function ProfessionalDetails() {
                             <Controller
                                 control={control}
                                 name="workHoursCompleted"
-                                render={({ field: { value, onChange, onBlur } }) => (
-                                    <View className="relative">
-                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
-                                            <MaterialIcons
-                                                name="access-time"
-                                                size={22}
-                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                render={({ field: { value, onChange, onBlur } }) => {
+                                    const [displayValue, setDisplayValue] = useState(
+                                        value !== undefined && value !== null ? value.toString() : ""
+                                    );
+                                    
+                                    // Sync display value when form value changes externally (e.g., from saved data)
+                                    useEffect(() => {
+                                        if (value !== undefined && value !== null) {
+                                            setDisplayValue(value.toString());
+                                        }
+                                    }, [value]);
+
+                                    return (
+                                        <View className="relative">
+                                            <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                                <MaterialIcons
+                                                    name="access-time"
+                                                    size={22}
+                                                    color={isDark ? "#6B7280" : "#9CA3AF"}
+                                                />
+                                            </View>
+                                            <TextInput
+                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                    isDark
+                                                        ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                        : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                                } ${errors.workHoursCompleted ? "border-red-500" : ""}`}
+                                                style={{
+                                                    shadowColor: isDark ? "#000" : "#000",
+                                                    shadowOffset: { width: 0, height: 2 },
+                                                    shadowOpacity: isDark ? 0.1 : 0.05,
+                                                    shadowRadius: 4,
+                                                    elevation: 2,
+                                                }}
+                                                placeholder="0.00"
+                                                placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                                value={displayValue}
+                                                onChangeText={(text) => {
+                                                    // Allow digits, decimal point, and empty string
+                                                    const cleaned = text.replace(/[^0-9.]/g, '');
+                                                    // Only allow one decimal point
+                                                    const parts = cleaned.split('.');
+                                                    const formatted = parts.length > 2 
+                                                        ? parts[0] + '.' + parts.slice(1).join('')
+                                                        : cleaned;
+                                                    setDisplayValue(formatted);
+                                                    // Convert to number for form validation
+                                                    const num = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
+                                                    onChange(isNaN(num) ? 0 : num);
+                                                }}
+                                                onBlur={() => {
+                                                    onBlur();
+                                                    // Ensure display value matches the numeric value
+                                                    const num = parseFloat(displayValue);
+                                                    if (!isNaN(num)) {
+                                                        setDisplayValue(num.toString());
+                                                    } else {
+                                                        setDisplayValue("");
+                                                    }
+                                                }}
+                                                keyboardType="decimal-pad"
+                                                autoCorrect={false}
                                             />
                                         </View>
-                                        <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
-                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
-                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.workHoursCompleted ? "border-red-500" : ""}`}
-                                            style={{
-                                                shadowColor: isDark ? "#000" : "#000",
-                                                shadowOffset: { width: 0, height: 2 },
-                                                shadowOpacity: isDark ? 0.1 : 0.05,
-                                                shadowRadius: 4,
-                                                elevation: 2,
-                                            }}
-                                            placeholder="0.00"
-                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                                            value={value?.toString() || ""}
-                                            onChangeText={(text) => {
-                                                const num = parseFloat(text) || 0;
-                                                onChange(num);
-                                            }}
-                                            onBlur={onBlur}
-                                            keyboardType="decimal-pad"
-                                            autoCorrect={false}
-                                        />
-                                    </View>
-                                )}
+                                    );
+                                }}
                             />
                             {errors.workHoursCompleted && (
                                 <Text className="text-red-500 text-sm mt-1.5">
@@ -932,41 +994,72 @@ export default function ProfessionalDetails() {
                             <Controller
                                 control={control}
                                 name="trainingHoursCompleted"
-                                render={({ field: { value, onChange, onBlur } }) => (
-                                    <View className="relative">
-                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
-                                            <MaterialIcons
-                                                name="school"
-                                                size={22}
-                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                render={({ field: { value, onChange, onBlur } }) => {
+                                    const [displayValue, setDisplayValue] = useState(
+                                        value !== undefined && value !== null ? value.toString() : ""
+                                    );
+                                    
+                                    // Sync display value when form value changes externally (e.g., from saved data)
+                                    useEffect(() => {
+                                        if (value !== undefined && value !== null) {
+                                            setDisplayValue(value.toString());
+                                        }
+                                    }, [value]);
+
+                                    return (
+                                        <View className="relative">
+                                            <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                                <MaterialIcons
+                                                    name="school"
+                                                    size={22}
+                                                    color={isDark ? "#6B7280" : "#9CA3AF"}
+                                                />
+                                            </View>
+                                            <TextInput
+                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                    isDark
+                                                        ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                        : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                                } ${errors.trainingHoursCompleted ? "border-red-500" : ""}`}
+                                                style={{
+                                                    shadowColor: isDark ? "#000" : "#000",
+                                                    shadowOffset: { width: 0, height: 2 },
+                                                    shadowOpacity: isDark ? 0.1 : 0.05,
+                                                    shadowRadius: 4,
+                                                    elevation: 2,
+                                                }}
+                                                placeholder="0.00"
+                                                placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                                value={displayValue}
+                                                onChangeText={(text) => {
+                                                    // Allow digits, decimal point, and empty string
+                                                    const cleaned = text.replace(/[^0-9.]/g, '');
+                                                    // Only allow one decimal point
+                                                    const parts = cleaned.split('.');
+                                                    const formatted = parts.length > 2 
+                                                        ? parts[0] + '.' + parts.slice(1).join('')
+                                                        : cleaned;
+                                                    setDisplayValue(formatted);
+                                                    // Convert to number for form validation
+                                                    const num = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
+                                                    onChange(isNaN(num) ? 0 : num);
+                                                }}
+                                                onBlur={() => {
+                                                    onBlur();
+                                                    // Ensure display value matches the numeric value
+                                                    const num = parseFloat(displayValue);
+                                                    if (!isNaN(num)) {
+                                                        setDisplayValue(num.toString());
+                                                    } else {
+                                                        setDisplayValue("");
+                                                    }
+                                                }}
+                                                keyboardType="decimal-pad"
+                                                autoCorrect={false}
                                             />
                                         </View>
-                                        <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
-                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
-                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.trainingHoursCompleted ? "border-red-500" : ""}`}
-                                            style={{
-                                                shadowColor: isDark ? "#000" : "#000",
-                                                shadowOffset: { width: 0, height: 2 },
-                                                shadowOpacity: isDark ? 0.1 : 0.05,
-                                                shadowRadius: 4,
-                                                elevation: 2,
-                                            }}
-                                            placeholder="0"
-                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                                            value={value?.toString() || ""}
-                                            onChangeText={(text) => {
-                                                const num = parseFloat(text) || 0;
-                                                onChange(num);
-                                            }}
-                                            onBlur={onBlur}
-                                            keyboardType="decimal-pad"
-                                            autoCorrect={false}
-                                        />
-                                    </View>
-                                )}
+                                    );
+                                }}
                             />
                             {errors.trainingHoursCompleted && (
                                 <Text className="text-red-500 text-sm mt-1.5">
@@ -991,41 +1084,72 @@ export default function ProfessionalDetails() {
                             <Controller
                                 control={control}
                                 name="earningsCurrentYear"
-                                render={({ field: { value, onChange, onBlur } }) => (
-                                    <View className="relative">
-                                        <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
-                                            <MaterialIcons
-                                                name="account-balance-wallet"
-                                                size={22}
-                                                color={isDark ? "#6B7280" : "#9CA3AF"}
+                                render={({ field: { value, onChange, onBlur } }) => {
+                                    const [displayValue, setDisplayValue] = useState(
+                                        value !== undefined && value !== null ? value.toString() : ""
+                                    );
+                                    
+                                    // Sync display value when form value changes externally (e.g., from saved data)
+                                    useEffect(() => {
+                                        if (value !== undefined && value !== null) {
+                                            setDisplayValue(value.toString());
+                                        }
+                                    }, [value]);
+
+                                    return (
+                                        <View className="relative">
+                                            <View className="absolute inset-y-0 left-0 pl-4 flex items-center justify-center pointer-events-none z-10">
+                                                <MaterialIcons
+                                                    name="account-balance-wallet"
+                                                    size={22}
+                                                    color={isDark ? "#6B7280" : "#9CA3AF"}
+                                                />
+                                            </View>
+                                            <TextInput
+                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
+                                                    isDark
+                                                        ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                        : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                                } ${errors.earningsCurrentYear ? "border-red-500" : ""}`}
+                                                style={{
+                                                    shadowColor: isDark ? "#000" : "#000",
+                                                    shadowOffset: { width: 0, height: 2 },
+                                                    shadowOpacity: isDark ? 0.1 : 0.05,
+                                                    shadowRadius: 4,
+                                                    elevation: 2,
+                                                }}
+                                                placeholder="0.00"
+                                                placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                                                value={displayValue}
+                                                onChangeText={(text) => {
+                                                    // Allow digits, decimal point, and empty string
+                                                    const cleaned = text.replace(/[^0-9.]/g, '');
+                                                    // Only allow one decimal point
+                                                    const parts = cleaned.split('.');
+                                                    const formatted = parts.length > 2 
+                                                        ? parts[0] + '.' + parts.slice(1).join('')
+                                                        : cleaned;
+                                                    setDisplayValue(formatted);
+                                                    // Convert to number for form validation
+                                                    const num = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
+                                                    onChange(isNaN(num) ? 0 : num);
+                                                }}
+                                                onBlur={() => {
+                                                    onBlur();
+                                                    // Ensure display value matches the numeric value
+                                                    const num = parseFloat(displayValue);
+                                                    if (!isNaN(num)) {
+                                                        setDisplayValue(num.toString());
+                                                    } else {
+                                                        setDisplayValue("");
+                                                    }
+                                                }}
+                                                keyboardType="decimal-pad"
+                                                autoCorrect={false}
                                             />
                                         </View>
-                                        <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
-                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
-                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.earningsCurrentYear ? "border-red-500" : ""}`}
-                                            style={{
-                                                shadowColor: isDark ? "#000" : "#000",
-                                                shadowOffset: { width: 0, height: 2 },
-                                                shadowOpacity: isDark ? 0.1 : 0.05,
-                                                shadowRadius: 4,
-                                                elevation: 2,
-                                            }}
-                                            placeholder="0.00"
-                                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                                            value={value?.toString() || ""}
-                                            onChangeText={(text) => {
-                                                const num = parseFloat(text) || 0;
-                                                onChange(num);
-                                            }}
-                                            onBlur={onBlur}
-                                            keyboardType="decimal-pad"
-                                            autoCorrect={false}
-                                        />
-                                    </View>
-                                )}
+                                    );
+                                }}
                             />
                             {errors.earningsCurrentYear && (
                                 <Text className="text-red-500 text-sm mt-1.5">

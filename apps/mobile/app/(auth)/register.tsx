@@ -389,8 +389,8 @@ export default function Register() {
                                     <Text className="text-white font-bold text-base">Creating Account...</Text>
                                 ) : (
                                     <>
-                                        <Text className="text-white font-bold text-base">Create Account</Text>
-                                        <MaterialIcons name="arrow-forward" size={22} color="white" />
+                                <Text className="text-white font-bold text-base">Create Account</Text>
+                                <MaterialIcons name="arrow-forward" size={22} color="white" />
                                     </>
                                 )}
                             </Pressable>
