@@ -5,6 +5,7 @@ import { prisma } from '../../lib/prisma';
 import { JWT_CONFIG } from '../../config/env';
 import { asyncHandler } from '../../common/middleware/async-handler';
 import { ApiError } from '../../common/middleware/error-handler';
+import { logger } from '../../common/logger';
 import { 
   LoginRequest, 
   AuthResponse,
@@ -285,75 +286,108 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response) =
 });
 
 export const requestPasswordReset = asyncHandler(async (req: Request, res: Response) => {
-  // Validate email format using Zod schema
-  const validated = passwordResetRequestSchema.parse(req.body);
-  const emailInput = validated.email.trim();
+  try {
+    // Validate email format using Zod schema
+    const validated = passwordResetRequestSchema.parse(req.body);
+    const emailInput = validated.email.toLowerCase().trim();
 
-  // Check if user exists and is registered
-  // Use case-insensitive search since MySQL email lookups can be case-sensitive
-  // Try exact match first (faster)
-  let user = await prisma.users.findFirst({
-    where: { email: emailInput },
-    select: { id: true, email: true, status: true },
-  });
+    logger.debug(`Password reset requested for email: ${emailInput}`);
 
-  // If not found with exact match, try case-insensitive using raw SQL
-  if (!user) {
-    const emailLower = emailInput.toLowerCase();
-    const result = await prisma.$queryRaw<Array<{ id: bigint; email: string; status: string }>>`
-      SELECT id, email, status 
-      FROM users 
-      WHERE LOWER(TRIM(email)) = LOWER(TRIM(${emailLower}))
-      LIMIT 1
-    `;
-    if (result && result.length > 0) {
-      user = {
-        id: result[0].id,
-        email: result[0].email,
-        status: result[0].status as any,
-      };
+    // Check if user exists and is registered
+    // Use case-insensitive search since MySQL email lookups can be case-sensitive
+    // Try exact match first (faster)
+    let user;
+    try {
+      user = await prisma.users.findFirst({
+        where: { email: emailInput },
+        select: { id: true, email: true, status: true },
+      });
+    } catch (dbError: any) {
+      logger.error('Database error during user lookup', dbError);
+      throw new ApiError(500, 'Database connection error. Please try again later.');
     }
-  }
 
-
-  if (!user) {
-    throw new ApiError(404, 'Account does not exist with this email address.');
-  }
-
-  // Check if user account is active
-  // Prisma enum: 'zero' maps to "0", 'one' maps to "1"
-  // Also handle string values for compatibility
-  const status = String(user.status);
-  if (status === 'zero' || status === '0') {
-    throw new ApiError(403, 'Account is not verified. Please verify your email first.');
-  }
-
-  // Generate and store OTP for password reset
-  const otp = generateOTP();
-  await storeOTP(emailInput, otp);
-
-  // Send OTP email
-  const emailResult = await sendOTPEmail(emailInput, otp);
-
-  const response: any = {
-    success: true,
-    message: 'Password reset code has been sent to your email.',
-  };
-
-  if (!emailResult.success) {
-    response.message = 'We could not send the password reset code. Please try again later.';
-    response.warning = emailResult.error;
-  }
-
-  // In development, include OTP in response
-  if (process.env.NODE_ENV === 'development') {
-    response.data = { otp };
-    if (emailResult.otp) {
-      response.data.devOtp = emailResult.otp;
+    // If not found with exact match, try case-insensitive using raw SQL
+    if (!user) {
+      try {
+        const emailLower = emailInput.toLowerCase();
+        const result = await prisma.$queryRaw<Array<{ id: bigint; email: string; status: string }>>`
+          SELECT id, email, status 
+          FROM users 
+          WHERE LOWER(TRIM(email)) = LOWER(TRIM(${emailLower}))
+          LIMIT 1
+        `;
+        if (result && result.length > 0) {
+          user = {
+            id: result[0].id,
+            email: result[0].email,
+            status: result[0].status as any,
+          };
+        }
+      } catch (dbError: any) {
+        logger.error('Database error during case-insensitive user lookup', dbError);
+        throw new ApiError(500, 'Database connection error. Please try again later.');
+      }
     }
-  }
 
-  res.json(serializeBigInt(response));
+    if (!user) {
+      logger.debug(`User not found for email: ${emailInput}`);
+      throw new ApiError(404, 'Account does not exist with this email address.');
+    }
+
+    // Check if user account is active
+    // Prisma enum: 'zero' maps to "0", 'one' maps to "1"
+    // Also handle string values for compatibility
+    const status = String(user.status);
+    if (status === 'zero' || status === '0') {
+      logger.debug(`User account not verified for email: ${emailInput}`);
+      throw new ApiError(403, 'Account is not verified. Please verify your email first.');
+    }
+
+    // Generate and store OTP for password reset
+    const otp = generateOTP();
+    try {
+      await storeOTP(emailInput, otp);
+      logger.debug(`OTP stored successfully for email: ${emailInput}`);
+    } catch (error: any) {
+      logger.error('Failed to store OTP', error);
+      throw new ApiError(500, 'Failed to generate password reset code. Please try again.');
+    }
+
+    // Send OTP email
+    const emailResult = await sendOTPEmail(emailInput, otp);
+
+    const response: any = {
+      success: true,
+      message: 'Password reset code has been sent to your email.',
+    };
+
+    if (!emailResult.success) {
+      logger.warn(`Failed to send OTP email to ${emailInput}: ${emailResult.error}`);
+      response.message = 'We could not send the password reset code. Please try again later.';
+      response.warning = emailResult.error;
+    } else {
+      logger.debug(`OTP email sent successfully to ${emailInput}`);
+    }
+
+    // In development, include OTP in response
+    if (process.env.NODE_ENV === 'development') {
+      response.data = { otp };
+      if (emailResult.otp) {
+        response.data.devOtp = emailResult.otp;
+      }
+    }
+
+    res.json(serializeBigInt(response));
+  } catch (error: any) {
+    // Re-throw ApiError to be handled by error handler
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    // Log unexpected errors
+    logger.error('Unexpected error in requestPasswordReset', error);
+    throw new ApiError(500, 'An unexpected error occurred. Please try again later.');
+  }
 });
 
 export const changePassword = asyncHandler(async (req: Request, res: Response) => {

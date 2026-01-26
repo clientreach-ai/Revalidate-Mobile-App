@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Pressable, ScrollView, Modal, TouchableOpacity, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView, Modal, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -13,6 +13,7 @@ import {
 } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
+import { showToast } from "@/utils/toast";
 import "../global.css";
 
 const roleConfig = {
@@ -297,7 +298,7 @@ export default function ProfessionalDetails() {
             // Get auth token
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
-                Alert.alert("Error", "Please log in again");
+                showToast.error("Please log in again", "Error");
                 router.replace("/(auth)/login");
                 return;
             }
@@ -349,13 +350,13 @@ export default function ProfessionalDetails() {
             );
 
             // Navigate to next step
-            router.push("/(onboarding)/plan-choose");
+        router.push("/(onboarding)/plan-choose");
         } catch (error: unknown) {
             const errorMessage = error instanceof Error 
                 ? error.message 
                 : "Failed to save professional details. Please try again.";
             
-            Alert.alert("Error", errorMessage);
+            showToast.error(errorMessage, "Error");
         } finally {
             setIsLoading(false);
         }
@@ -1079,8 +1080,8 @@ export default function ProfessionalDetails() {
                         <Text className="text-white font-semibold text-base">Saving...</Text>
                     ) : (
                         <>
-                            <Text className="text-white font-semibold text-base">Complete Setup</Text>
-                            <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
+                    <Text className="text-white font-semibold text-base">Complete Setup</Text>
+                    <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
                         </>
                     )}
                 </Pressable>

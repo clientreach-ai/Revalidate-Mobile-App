@@ -5,13 +5,13 @@ import {
     TextInput,
     Pressable,
     ScrollView,
-    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
+import { showToast } from "@/utils/toast";
 import "../global.css";
 
 export default function ForgotPassword() {
@@ -22,16 +22,19 @@ export default function ForgotPassword() {
 
     const handleSubmit = async () => {
         if (!email.trim()) {
-            Alert.alert("Error", "Please enter your email address");
+            showToast.error("Please enter your email address", "Error");
             return;
         }
 
         // Basic email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            Alert.alert("Error", "Please enter a valid email address");
+            showToast.error("Please enter a valid email address", "Error");
             return;
         }
+
+        // Normalize email to lowercase (matches API behavior)
+        const normalizedEmail = email.trim().toLowerCase();
 
         try {
             setIsLoading(true);
@@ -42,25 +45,20 @@ export default function ForgotPassword() {
             }>(
                 API_ENDPOINTS.AUTH.FORGOT_PASSWORD,
                 {
-                    email: email.trim(),
+                    email: normalizedEmail,
                 }
             );
 
             // Check if the response indicates success
             if (response?.success) {
-                Alert.alert(
-                    "Reset Code Sent",
-                    "Password reset code has been sent to your email. Please check your inbox.",
-                    [
-                        {
-                            text: "OK",
-                            onPress: () => router.push({
-                                pathname: "/(auth)/reset-password",
-                                params: { email: email.trim() },
-                            }),
-                        },
-                    ]
-                );
+            showToast.success("Password reset code has been sent to your email. Please check your inbox.", "Reset Code Sent");
+            // Navigate after a short delay to allow toast to be visible
+            setTimeout(() => {
+                router.push({
+                    pathname: "/(auth)/reset-password",
+                    params: { email: normalizedEmail },
+                });
+            }, 1500);
             }
         } catch (error: unknown) {
             let errorMessage = "Failed to send reset code. Please try again.";
@@ -77,7 +75,7 @@ export default function ForgotPassword() {
                 }
             }
             
-            Alert.alert("Error", errorMessage);
+            showToast.error(errorMessage, "Error");
             // Don't navigate if there's an error
             return;
         } finally {

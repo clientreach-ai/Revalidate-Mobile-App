@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     View,
     Text,
@@ -15,7 +15,7 @@ import { loginSchema, type LoginInput } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Alert } from "react-native";
+import { showToast } from "@/utils/toast";
 import "../global.css";
 
 export default function Login() {
@@ -23,6 +23,57 @@ export default function Login() {
     const { isDark, toggleTheme } = useThemeStore();
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+    // Check if user is already logged in
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const token = await AsyncStorage.getItem('authToken');
+                if (token) {
+                    // Verify token is still valid and check onboarding progress
+                    try {
+                        const progress = await apiService.get<{
+                            success: boolean;
+                            data: {
+                                completed: boolean;
+                                currentStep: number;
+                            };
+                        }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
+
+                        // User is already logged in, redirect to appropriate screen
+                        if (progress?.data?.completed) {
+                            router.replace("/(tabs)/home");
+                        } else {
+                            const step = progress?.data?.currentStep || 1;
+                            if (step === 1) {
+                                router.replace("/(onboarding)/role-selection");
+                            } else if (step === 2) {
+                                router.replace("/(onboarding)/personal-details");
+                            } else if (step === 3) {
+                                router.replace("/(onboarding)/professional-details");
+                            } else if (step === 4) {
+                                router.replace("/(onboarding)/plan-choose");
+                            } else {
+                                router.replace("/(onboarding)/role-selection");
+                            }
+                        }
+                        return;
+                    } catch (error) {
+                        // Token invalid, clear it and continue to login screen
+                        await AsyncStorage.removeItem('authToken');
+                        await AsyncStorage.removeItem('userData');
+                    }
+                }
+            } catch (error) {
+                console.warn("Auth check error:", error);
+            } finally {
+                setIsCheckingAuth(false);
+            }
+        };
+
+        checkAuth();
+    }, [router]);
 
     const {
         control,
@@ -63,38 +114,64 @@ export default function Login() {
                 await AsyncStorage.setItem('authToken', token);
                 await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
                 
-                // Fetch full user profile to check onboarding status
+                // Check onboarding progress to determine where to redirect
                 try {
-                    const userProfile = await apiService.get<{
+                    const progress = await apiService.get<{
                         success: boolean;
                         data: {
-                            id: string;
-                            email: string;
-                            registration?: string | null;
-                            dueDate?: string | null;
-                            workSettings?: number | null;
-                            scopePractice?: number | null;
-                            description?: string | null;
+                            step1_role: boolean;
+                            step2_personal: boolean;
+                            step3_professional: boolean;
+                            step4_plan: boolean;
+                            completed: boolean;
+                            currentStep: number; // 0 = all done, 1-4 = step to complete
                         };
-                    }>(API_ENDPOINTS.USERS.ME, token);
+                    }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
                     
-                    // Check if user has completed onboarding
-                    // User needs: registration number and revalidation date (dueDate)
-                    const hasOnboardingData = 
-                        userProfile?.data?.registration && 
-                        userProfile?.data?.dueDate;
-                    
-                    if (!hasOnboardingData) {
-                        // User hasn't completed onboarding - navigate to onboarding
-                        router.replace("/(onboarding)");
-                    } else {
-                        // User has completed onboarding - navigate to dashboard
+                    if (progress?.data?.completed) {
+                        // User has completed all onboarding steps - navigate to dashboard
                         router.replace("/(tabs)/home");
+                    } else {
+                        // User hasn't completed onboarding - redirect to the appropriate step
+                        const step = progress?.data?.currentStep || 1;
+                        if (step === 1) {
+                            router.replace("/(onboarding)/role-selection");
+                        } else if (step === 2) {
+                            router.replace("/(onboarding)/personal-details");
+                        } else if (step === 3) {
+                            router.replace("/(onboarding)/professional-details");
+                        } else if (step === 4) {
+                            router.replace("/(onboarding)/plan-choose");
+                        } else {
+                            // Default to role selection
+                            router.replace("/(onboarding)/role-selection");
+                        }
                     }
-                } catch (profileError) {
-                    // If profile fetch fails, assume onboarding not complete
-                    console.warn("Failed to fetch user profile, redirecting to onboarding:", profileError);
-                    router.replace("/(onboarding)");
+                } catch (progressError) {
+                    // If progress fetch fails, try to check basic profile data
+                    try {
+                        const userProfile = await apiService.get<{
+                            success: boolean;
+                            data: {
+                                registrationNumber?: string | null;
+                                revalidationDate?: string | null;
+                            };
+                        }>(API_ENDPOINTS.USERS.ME, token);
+                        
+                        const hasBasicData = 
+                            userProfile?.data?.registrationNumber && 
+                            userProfile?.data?.revalidationDate;
+                        
+                        if (hasBasicData) {
+                            router.replace("/(tabs)/home");
+                        } else {
+                            router.replace("/(onboarding)/role-selection");
+                        }
+                    } catch (profileError) {
+                        // If both fail, redirect to onboarding start
+                        console.warn("Failed to fetch onboarding progress, redirecting to onboarding:", progressError);
+                        router.replace("/(onboarding)/role-selection");
+                    }
                 }
             } else {
                 throw new Error("Invalid response from server");
@@ -116,11 +193,27 @@ export default function Login() {
                 }
             }
             
-            Alert.alert("Login Failed", errorMessage);
+            showToast.error(errorMessage, "Login Failed");
         } finally {
             setIsLoading(false);
         }
     };
+
+    // Show loading state while checking auth
+    if (isCheckingAuth) {
+        return (
+            <SafeAreaView
+                className={`flex-1 items-center justify-center ${isDark ? "bg-background-dark dark" : "bg-background-light"}`}
+            >
+                <View className="items-center">
+                    <MaterialIcons name="lock" size={48} color={isDark ? "#D1D5DB" : "#4B5563"} />
+                    <Text className={`mt-4 text-base ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                        Checking authentication...
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView

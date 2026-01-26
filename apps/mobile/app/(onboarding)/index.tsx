@@ -4,6 +4,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useThemeStore } from "@/features/theme/theme.store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiService, API_ENDPOINTS } from "@/services/api";
 import "../global.css";
 
 const onboardingSteps = [
@@ -37,8 +39,52 @@ export default function OnboardingIndex() {
     const router = useRouter();
     const { isDark } = useThemeStore();
     const [currentStep, setCurrentStep] = useState(0);
+    const [isCheckingProgress, setIsCheckingProgress] = useState(true);
     const bounceAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(0)).current;
+
+    // Check onboarding progress on mount
+    useEffect(() => {
+        const checkProgress = async () => {
+            try {
+                const token = await AsyncStorage.getItem('authToken');
+                if (token) {
+                    const progress = await apiService.get<{
+                        success: boolean;
+                        data: {
+                            completed: boolean;
+                            currentStep: number;
+                        };
+                    }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
+
+                    // If onboarding is completed, redirect to dashboard
+                    if (progress?.data?.completed) {
+                        router.replace("/(tabs)/home");
+                        return;
+                    }
+
+                    // If user has started onboarding, redirect to the appropriate step
+                    const step = progress?.data?.currentStep || 1;
+                    if (step > 1) {
+                        if (step === 2) {
+                            router.replace("/(onboarding)/personal-details");
+                        } else if (step === 3) {
+                            router.replace("/(onboarding)/professional-details");
+                        } else if (step === 4) {
+                            router.replace("/(onboarding)/plan-choose");
+                        }
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.warn("Failed to check onboarding progress:", error);
+            } finally {
+                setIsCheckingProgress(false);
+            }
+        };
+
+        checkProgress();
+    }, [router]);
 
     useEffect(() => {
         Animated.loop(
@@ -86,6 +132,22 @@ export default function OnboardingIndex() {
     };
 
     const isLastStep = currentStep === onboardingSteps.length - 1;
+
+    // Show loading state while checking progress
+    if (isCheckingProgress) {
+        return (
+            <SafeAreaView
+                className={`flex-1 items-center justify-center ${isDark ? "bg-background-dark" : "bg-background-light"}`}
+            >
+                <View className="items-center">
+                    <MaterialIcons name="hourglass-empty" size={48} color={isDark ? "#D1D5DB" : "#4B5563"} />
+                    <Text className={`mt-4 text-base ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                        Loading...
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView

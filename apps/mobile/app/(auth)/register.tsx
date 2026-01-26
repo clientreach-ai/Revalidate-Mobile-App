@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     View,
     Text,
@@ -14,7 +14,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterInput } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
-import { Alert } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { showToast } from "@/utils/toast";
 import "../global.css";
 
 export default function Register() {
@@ -22,6 +23,57 @@ export default function Register() {
     const { isDark, toggleTheme } = useThemeStore();
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+    // Check if user is already logged in
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const token = await AsyncStorage.getItem('authToken');
+                if (token) {
+                    // Verify token is still valid and check onboarding progress
+                    try {
+                        const progress = await apiService.get<{
+                            success: boolean;
+                            data: {
+                                completed: boolean;
+                                currentStep: number;
+                            };
+                        }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
+
+                        // User is already logged in, redirect to appropriate screen
+                        if (progress?.data?.completed) {
+                            router.replace("/(tabs)/home");
+                        } else {
+                            const step = progress?.data?.currentStep || 1;
+                            if (step === 1) {
+                                router.replace("/(onboarding)/role-selection");
+                            } else if (step === 2) {
+                                router.replace("/(onboarding)/personal-details");
+                            } else if (step === 3) {
+                                router.replace("/(onboarding)/professional-details");
+                            } else if (step === 4) {
+                                router.replace("/(onboarding)/plan-choose");
+                            } else {
+                                router.replace("/(onboarding)/role-selection");
+                            }
+                        }
+                        return;
+                    } catch (error) {
+                        // Token invalid, clear it and continue to register screen
+                        await AsyncStorage.removeItem('authToken');
+                        await AsyncStorage.removeItem('userData');
+                    }
+                }
+            } catch (error) {
+                console.warn("Auth check error:", error);
+            } finally {
+                setIsCheckingAuth(false);
+            }
+        };
+
+        checkAuth();
+    }, [router]);
 
     const {
         control,
@@ -60,13 +112,29 @@ export default function Register() {
                 ? error.message 
                 : "Failed to create account. Please try again.";
             
-            Alert.alert("Registration Failed", errorMessage);
+            showToast.error(errorMessage, "Registration Failed");
         } finally {
             setIsLoading(false);
         }
     };
 
     const onFormSubmit = handleSubmit(onSubmit);
+
+    // Show loading state while checking auth
+    if (isCheckingAuth) {
+        return (
+            <SafeAreaView
+                className={`flex-1 items-center justify-center ${isDark ? "bg-background-dark dark" : "bg-background-light"}`}
+            >
+                <View className="items-center">
+                    <MaterialIcons name="person-add" size={48} color={isDark ? "#D1D5DB" : "#4B5563"} />
+                    <Text className={`mt-4 text-base ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                        Checking authentication...
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView

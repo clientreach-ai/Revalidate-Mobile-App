@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Pressable, ScrollView, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -13,6 +13,7 @@ import {
 } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
+import { showToast } from "@/utils/toast";
 import "../global.css";
 
 export default function PersonalDetails() {
@@ -43,7 +44,7 @@ export default function PersonalDetails() {
             // Get auth token
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
-                Alert.alert("Error", "Please log in again");
+                showToast.error("Please log in again", "Error");
                 router.replace("/(auth)/login");
                 return;
             }
@@ -60,16 +61,16 @@ export default function PersonalDetails() {
             );
 
             // Navigate to next step
-            router.push({
-                pathname: "/(onboarding)/professional-details",
-                params: { role, ...data },
-            });
+        router.push({
+            pathname: "/(onboarding)/professional-details",
+            params: { role, ...data },
+        });
         } catch (error: unknown) {
             const errorMessage = error instanceof Error 
                 ? error.message 
                 : "Failed to save personal details. Please try again.";
             
-            Alert.alert("Error", errorMessage);
+            showToast.error(errorMessage, "Error");
         } finally {
             setIsLoading(false);
         }
@@ -292,8 +293,8 @@ export default function PersonalDetails() {
                         <Text className="text-white font-semibold text-base">Saving...</Text>
                     ) : (
                         <>
-                            <Text className="text-white font-semibold text-base">Continue</Text>
-                            <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
+                    <Text className="text-white font-semibold text-base">Continue</Text>
+                    <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
                         </>
                     )}
                 </Pressable>

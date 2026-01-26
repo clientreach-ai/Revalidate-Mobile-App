@@ -5,13 +5,13 @@ import {
     TextInput,
     Pressable,
     ScrollView,
-    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
+import { showToast } from "@/utils/toast";
 import "../global.css";
 
 export default function ResetPassword() {
@@ -65,7 +65,7 @@ export default function ResetPassword() {
 
     const handleResendOTP = async () => {
         if (!email) {
-            Alert.alert("Error", "Email not found. Please go back and try again.");
+            showToast.error("Email not found. Please go back and try again.", "Error");
             return;
         }
 
@@ -79,16 +79,13 @@ export default function ResetPassword() {
                 }
             );
 
-            Alert.alert(
-                "Code Sent",
-                "A new password reset code has been sent to your email."
-            );
+            showToast.success("A new password reset code has been sent to your email.", "Code Sent");
         } catch (error: unknown) {
             const errorMessage = error instanceof Error 
                 ? error.message 
                 : "Failed to resend code. Please try again.";
             
-            Alert.alert("Error", errorMessage);
+            showToast.error(errorMessage, "Error");
         } finally {
             setIsResending(false);
         }
@@ -98,27 +95,27 @@ export default function ResetPassword() {
         const otpString = otp.join("");
         
         if (otpString.length !== 6) {
-            Alert.alert("Invalid OTP", "Please enter all 6 digits");
+            showToast.error("Please enter all 6 digits", "Invalid OTP");
             return;
         }
 
         if (!password) {
-            Alert.alert("Error", "Please enter a new password");
+            showToast.error("Please enter a new password", "Error");
             return;
         }
 
         if (password.length < 8) {
-            Alert.alert("Error", "Password must be at least 8 characters long");
+            showToast.error("Password must be at least 8 characters long", "Error");
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert("Error", "Passwords do not match");
+            showToast.error("Passwords do not match", "Error");
             return;
         }
 
         if (!email) {
-            Alert.alert("Error", "Email not found. Please go back and try again.");
+            showToast.error("Email not found. Please go back and try again.", "Error");
             router.replace("/(auth)/forgot-password");
             return;
         }
@@ -135,22 +132,17 @@ export default function ResetPassword() {
                 }
             );
 
-            Alert.alert(
-                "Success",
-                "Password has been reset successfully. You can now login with your new password.",
-                [
-                    {
-                        text: "OK",
-                        onPress: () => router.replace("/(auth)/login"),
-                    },
-                ]
-            );
+            showToast.success("Password has been reset successfully. You can now login with your new password.", "Success");
+            // Navigate after a short delay to allow toast to be visible
+            setTimeout(() => {
+                router.replace("/(auth)/login");
+            }, 1500);
         } catch (error: unknown) {
             const errorMessage = error instanceof Error 
                 ? error.message 
                 : "Failed to reset password. Please try again.";
             
-            Alert.alert("Error", errorMessage);
+            showToast.error(errorMessage, "Error");
             // Clear OTP on error
             setOtp(["", "", "", "", "", ""]);
             inputRefs.current[0]?.focus();

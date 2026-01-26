@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -13,6 +13,7 @@ import {
 } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
+import { showToast } from "@/utils/toast";
 import "../global.css";
 
 // Plan selection component
@@ -65,12 +66,12 @@ export default function PlanChoose() {
             if (isNavigating) return;
             
             try {
-                setIsNavigating(true);
+            setIsNavigating(true);
 
                 // Get auth token
                 const token = await AsyncStorage.getItem('authToken');
                 if (!token) {
-                    Alert.alert("Error", "Please log in again");
+                    showToast.error("Please log in again", "Error");
                     router.replace("/(auth)/login");
                     return;
                 }
@@ -85,15 +86,15 @@ export default function PlanChoose() {
                 );
 
                 // Navigate to home/dashboard
-                router.replace("/(tabs)/home");
+                    router.replace("/(tabs)/home");
             } catch (error: unknown) {
                 const errorMessage = error instanceof Error 
                     ? error.message 
                     : "Failed to save subscription plan. Please try again.";
                 
-                Alert.alert("Error", errorMessage);
-                setIsNavigating(false);
-            }
+                showToast.error(errorMessage, "Error");
+                    setIsNavigating(false);
+                }
         },
         [router, isNavigating]
     );

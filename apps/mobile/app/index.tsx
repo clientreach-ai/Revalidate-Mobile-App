@@ -1,15 +1,18 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, Animated, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useThemeStore } from "@/features/theme/theme.store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiService, API_ENDPOINTS } from "@/services/api";
 import "./global.css";
 
 export default function SplashScreen() {
     const spinAnim = useRef(new Animated.Value(0)).current;
     const router = useRouter();
     const { isDark, toggleTheme } = useThemeStore();
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
     // Spin animation for loader
     useEffect(() => {
@@ -22,13 +25,82 @@ export default function SplashScreen() {
         ).start();
     }, []);
 
-    // Redirect to register screen after 2.5 seconds
+    // Check if user is already logged in
     useEffect(() => {
-        const timer = setTimeout(() => {
-            router.replace("/(auth)/register");
-        }, 2500);
+        const checkAuth = async () => {
+            try {
+                // Check for stored auth token
+                const token = await AsyncStorage.getItem('authToken');
+                
+                if (!token) {
+                    // No token, redirect to login
+                    setIsCheckingAuth(false);
+                    setTimeout(() => {
+                        router.replace("/(auth)/login");
+                    }, 1500);
+                    return;
+                }
 
-        return () => clearTimeout(timer);
+                // Check onboarding progress to determine where to redirect
+                try {
+                    const progress = await apiService.get<{
+                        success: boolean;
+                        data: {
+                            step1_role: boolean;
+                            step2_personal: boolean;
+                            step3_professional: boolean;
+                            step4_plan: boolean;
+                            completed: boolean;
+                            currentStep: number; // 0 = all done, 1-4 = step to complete
+                        };
+                    }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
+
+                    setIsCheckingAuth(false);
+                    
+                    if (progress?.data?.completed) {
+                        // User has completed all onboarding steps - navigate to dashboard
+                        setTimeout(() => {
+                            router.replace("/(tabs)/home");
+                        }, 1500);
+                    } else {
+                        // User hasn't completed onboarding - redirect to the appropriate step
+                        const step = progress?.data?.currentStep || 1;
+                        setTimeout(() => {
+                            if (step === 1) {
+                                router.replace("/(onboarding)/role-selection");
+                            } else if (step === 2) {
+                                router.replace("/(onboarding)/personal-details");
+                            } else if (step === 3) {
+                                router.replace("/(onboarding)/professional-details");
+                            } else if (step === 4) {
+                                router.replace("/(onboarding)/plan-choose");
+                            } else {
+                                // Default to role selection
+                                router.replace("/(onboarding)/role-selection");
+                            }
+                        }, 1500);
+                    }
+                } catch (error) {
+                    // Token is invalid or expired, clear it and redirect to login
+                    console.warn("Token validation failed:", error);
+                    await AsyncStorage.removeItem('authToken');
+                    await AsyncStorage.removeItem('userData');
+                    setIsCheckingAuth(false);
+                    setTimeout(() => {
+                        router.replace("/(auth)/login");
+                    }, 1500);
+                }
+            } catch (error) {
+                // Error checking auth, redirect to login
+                console.warn("Auth check error:", error);
+                setIsCheckingAuth(false);
+                setTimeout(() => {
+                    router.replace("/(auth)/login");
+                }, 1500);
+            }
+        };
+
+        checkAuth();
     }, [router]);
 
     const spin = spinAnim.interpolate({

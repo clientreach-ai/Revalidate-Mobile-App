@@ -5,13 +5,13 @@ import {
     TextInput,
     Pressable,
     ScrollView,
-    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
+import { showToast } from "@/utils/toast";
 import "../global.css";
 
 export default function VerifyOTP() {
@@ -63,12 +63,12 @@ export default function VerifyOTP() {
         const otpString = otp.join("");
         
         if (otpString.length !== 6) {
-            Alert.alert("Invalid OTP", "Please enter all 6 digits");
+            showToast.error("Please enter all 6 digits", "Invalid OTP");
             return;
         }
 
         if (!email) {
-            Alert.alert("Error", "Email not found. Please register again.");
+            showToast.error("Email not found. Please register again.", "Error");
             router.replace("/(auth)/register");
             return;
         }
@@ -84,22 +84,17 @@ export default function VerifyOTP() {
                 }
             );
 
-            Alert.alert(
-                "Success",
-                "Email verified successfully! Your account has been activated.",
-                [
-                    {
-                        text: "OK",
-                        onPress: () => router.replace("/(auth)/login"),
-                    },
-                ]
-            );
+            showToast.success("Email verified successfully! Your account has been activated.", "Success");
+            // Navigate after a short delay to allow toast to be visible
+            setTimeout(() => {
+                router.replace("/(auth)/login");
+            }, 1500);
         } catch (error: unknown) {
             const errorMessage = error instanceof Error 
                 ? error.message 
                 : "Invalid or expired OTP. Please try again.";
             
-            Alert.alert("Verification Failed", errorMessage);
+            showToast.error(errorMessage, "Verification Failed");
             // Clear OTP on error
             setOtp(["", "", "", "", "", ""]);
             inputRefs.current[0]?.focus();
@@ -110,7 +105,7 @@ export default function VerifyOTP() {
 
     const handleResend = async () => {
         if (!email) {
-            Alert.alert("Error", "Email not found. Please register again.");
+            showToast.error("Email not found. Please register again.", "Error");
             router.replace("/(auth)/register");
             return;
         }
@@ -125,7 +120,7 @@ export default function VerifyOTP() {
                 }
             );
 
-            Alert.alert("Success", "Verification code sent successfully. Please check your email.");
+            showToast.success("Verification code sent successfully. Please check your email.", "Success");
             // Clear OTP
             setOtp(["", "", "", "", "", ""]);
             inputRefs.current[0]?.focus();
@@ -134,7 +129,7 @@ export default function VerifyOTP() {
                 ? error.message 
                 : "Failed to resend verification code. Please try again.";
             
-            Alert.alert("Error", errorMessage);
+            showToast.error(errorMessage, "Error");
         } finally {
             setIsResending(false);
         }
