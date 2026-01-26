@@ -46,3 +46,14 @@ export const SERVER_CONFIG = {
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.CORS_ORIGIN || '*',
 };
+
+// Stripe Configuration
+export const STRIPE_CONFIG = {
+  secretKey: process.env.STRIPE_SECRET_KEY || '',
+  publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  // Premium plan pricing (in cents)
+  premiumPriceId: process.env.STRIPE_PREMIUM_PRICE_ID || '',
+  premiumPriceAmount: parseInt(process.env.STRIPE_PREMIUM_PRICE_AMOUNT || '999', 10), // Default: £9.99 = 999 pence
+  currency: process.env.STRIPE_CURRENCY || 'gbp',
+};

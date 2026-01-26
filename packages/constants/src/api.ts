@@ -38,5 +38,11 @@ export const API_ENDPOINTS = {
     UPLOAD: '/api/v1/documents/upload',
     LIST: '/api/v1/documents',
   },
+  PAYMENT: {
+    CREATE_INTENT: '/api/v1/payment/create-intent',
+    CONFIRM: '/api/v1/payment/confirm',
+    CREATE_SESSION: '/api/v1/payment/create-session',
+    STATUS: '/api/v1/payment/status',
+  },
   HEALTH: '/health',
 } as const;

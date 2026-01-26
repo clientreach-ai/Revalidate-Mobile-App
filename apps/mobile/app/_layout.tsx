@@ -4,8 +4,16 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text } from 'react-native';
 import { ThemeProvider } from '@/features/theme/ThemeProvider';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import Toast from 'react-native-toast-message';
 import "./global.css";
+
+// Stripe publishable key - must be set via environment variable
+const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
+
+if (!STRIPE_PUBLISHABLE_KEY) {
+  console.warn('⚠️  EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set. Stripe payments will not work.');
+}
 
 // Custom toast configuration
 const toastConfig = {
@@ -172,14 +180,16 @@ function StatusBarWrapper() {
 
 export default function RootLayout() {
     return (
-        <ThemeProvider>
-            <StatusBarWrapper />
-            <Stack
-                screenOptions={{
-                    headerShown: false,
-                }}
-            />
-            <Toast config={toastConfig} />
-        </ThemeProvider>
+        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+            <ThemeProvider>
+                <StatusBarWrapper />
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                    }}
+                />
+                <Toast config={toastConfig} />
+            </ThemeProvider>
+        </StripeProvider>
     );
 }
