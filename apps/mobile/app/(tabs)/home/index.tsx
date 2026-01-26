@@ -42,6 +42,7 @@ export default function DashboardScreen() {
   const [isPaused, setIsPaused] = useState(false);
   const [pausedAt, setPausedAt] = useState<Date | null>(null);
   const [totalPausedTime, setTotalPausedTime] = useState(0);
+  const [lastPausedTimer, setLastPausedTimer] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [stats, setStats] = useState({
@@ -65,16 +66,19 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     if (activeSession && activeSession.isActive) {
-      // Always update timer immediately
-      updateTimerFromSession();
-      
-      // Only run interval if not paused (to save resources)
-      if (!isPaused) {
-        timerIntervalRef.current = setInterval(() => {
-          updateTimerFromSession();
-        }, 1000);
+      // If paused, don't update timer - just show the last paused time
+      if (isPaused) {
+        if (lastPausedTimer) {
+          setTimer(lastPausedTimer);
+        }
+        // Clear interval when paused - timer should not update
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
       } else {
-        // When paused, update once per second to show paused time
+        // Not paused - update timer immediately and start interval
+        updateTimerFromSession();
         timerIntervalRef.current = setInterval(() => {
           updateTimerFromSession();
         }, 1000);
@@ -89,6 +93,7 @@ export default function DashboardScreen() {
         setIsPaused(false);
         setPausedAt(null);
         setTotalPausedTime(0);
+        setLastPausedTimer(null);
         // Clear stored pause state when session ends
         AsyncStorage.removeItem('workSessionPauseState').catch(console.error);
       }
@@ -99,7 +104,7 @@ export default function DashboardScreen() {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [activeSession, isPaused, totalPausedTime, pausedAt]);
+  }, [activeSession, isPaused, totalPausedTime, pausedAt, lastPausedTimer]);
 
   // Save pause state whenever it changes
   useEffect(() => {
@@ -109,18 +114,13 @@ export default function DashboardScreen() {
   }, [isPaused, pausedAt, totalPausedTime, activeSession?.id]);
 
   const updateTimerFromSession = () => {
-    if (!activeSession || !activeSession.isActive) return;
+    if (!activeSession || !activeSession.isActive || isPaused) return;
 
     const startTime = new Date(activeSession.startTime);
     const now = new Date();
     
-    // Calculate paused time: if currently paused, add time since pause started
-    let currentPausedTime = totalPausedTime;
-    if (isPaused && pausedAt) {
-      currentPausedTime += now.getTime() - pausedAt.getTime();
-    }
-    
-    const diffMs = now.getTime() - startTime.getTime() - currentPausedTime;
+    // Calculate elapsed time minus total paused time
+    const diffMs = now.getTime() - startTime.getTime() - totalPausedTime;
     
     const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
     const hours = Math.floor(totalSeconds / 3600);
@@ -150,30 +150,47 @@ export default function DashboardScreen() {
             const pauseState = JSON.parse(storedPauseState);
             // Only restore if it's for the same session
             if (pauseState.sessionId === response.data.id) {
-              setIsPaused(pauseState.isPaused);
+              setIsPaused(pauseState.isPaused || false);
               setTotalPausedTime(pauseState.totalPausedTime || 0);
               if (pauseState.isPaused && pauseState.pausedAt) {
                 setPausedAt(new Date(pauseState.pausedAt));
+                // Restore the timer value when paused
+                if (pauseState.lastPausedTimer) {
+                  setLastPausedTimer(pauseState.lastPausedTimer);
+                  setTimer(pauseState.lastPausedTimer);
+                }
               } else {
                 setPausedAt(null);
+                setLastPausedTimer(null);
+                // Calculate current timer if not paused
+                updateTimerFromSession();
               }
             } else {
               // Different session, reset pause state
               setIsPaused(false);
               setPausedAt(null);
               setTotalPausedTime(0);
+              setLastPausedTimer(null);
               await AsyncStorage.removeItem('workSessionPauseState');
+              // Calculate current timer for new session
+              updateTimerFromSession();
             }
           } else {
             setIsPaused(false);
             setPausedAt(null);
             setTotalPausedTime(0);
+            setLastPausedTimer(null);
+            // Calculate current timer
+            updateTimerFromSession();
           }
         } catch (error) {
           console.warn('Error loading pause state:', error);
           setIsPaused(false);
           setPausedAt(null);
           setTotalPausedTime(0);
+          setLastPausedTimer(null);
+          // Calculate current timer on error
+          updateTimerFromSession();
         }
       } else {
         setActiveSession(null);
@@ -201,6 +218,7 @@ export default function DashboardScreen() {
         isPaused,
         pausedAt: pausedAt?.toISOString() || null,
         totalPausedTime,
+        lastPausedTimer: isPaused ? timer : null, // Save current timer when paused
         lastUpdated: new Date().toISOString(),
       };
       await AsyncStorage.setItem('workSessionPauseState', JSON.stringify(pauseState));
@@ -237,8 +255,11 @@ export default function DashboardScreen() {
         setIsPaused(false);
         setPausedAt(null);
         setTotalPausedTime(0);
+        setLastPausedTimer(null);
         // Clear any old pause state when starting new session
         await AsyncStorage.removeItem('workSessionPauseState');
+        // Start timer immediately
+        updateTimerFromSession();
         showToast.success('Clinical session started', 'Success');
       }
     } catch (error: any) {
@@ -272,9 +293,18 @@ export default function DashboardScreen() {
   const handlePauseSession = async () => {
     if (!activeSession || isPaused) return;
     
+    // Save current timer value before pausing
+    setLastPausedTimer(timer);
     const now = new Date();
     setIsPaused(true);
     setPausedAt(now);
+    
+    // Stop the timer interval
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    
     showToast.info('Session paused', 'Paused');
     
     // Save pause state to AsyncStorage
@@ -288,9 +318,18 @@ export default function DashboardScreen() {
     const pauseStartTime = pausedAt || now;
     const pauseDuration = now.getTime() - pauseStartTime.getTime();
     
+    // Add the pause duration to total paused time
     setTotalPausedTime(prev => prev + pauseDuration);
     setIsPaused(false);
     setPausedAt(null);
+    setLastPausedTimer(null);
+    
+    // Restart the timer interval
+    updateTimerFromSession();
+    timerIntervalRef.current = setInterval(() => {
+      updateTimerFromSession();
+    }, 1000);
+    
     showToast.info('Session resumed', 'Resumed');
     
     // Save resume state to AsyncStorage
@@ -347,6 +386,11 @@ export default function DashboardScreen() {
                 setIsPaused(false);
                 setPausedAt(null);
                 setTotalPausedTime(0);
+                setLastPausedTimer(null);
+                // Clear pause state from storage
+                await AsyncStorage.removeItem('workSessionPauseState');
+                // Start timer immediately
+                updateTimerFromSession();
                 showToast.success('Session restarted', 'Success');
               }
             } catch (error: any) {
