@@ -7,8 +7,12 @@ import { logger } from './common/logger';
 const app = express();
 
 // Middleware
+// CORS configuration - allow all origins for mobile apps
+// When CORS_ORIGIN is "*", use a function to allow all origins (required when credentials: true)
 app.use(cors({
-  origin: SERVER_CONFIG.corsOrigin,
+  origin: SERVER_CONFIG.corsOrigin === '*' 
+    ? (_origin, callback) => callback(null, true) 
+    : SERVER_CONFIG.corsOrigin,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
