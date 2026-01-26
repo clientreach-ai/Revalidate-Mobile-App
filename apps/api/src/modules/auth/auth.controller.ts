@@ -245,6 +245,7 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response) =
     where: { id: parseInt(req.user.userId) },
     select: {
       id: true,
+      name: true,
       email: true,
       registration: true,
       due_date: true,
@@ -270,6 +271,7 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response) =
     success: true,
     data: {
       id: mappedUser.id,
+      name: userData.name || null,
       email: mappedUser.email,
       registrationNumber: mappedUser.registration_number,
       revalidationDate: mappedUser.revalidation_date,

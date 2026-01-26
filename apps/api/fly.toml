@@ -8,6 +8,8 @@ primary_region = 'iad'
 
 [build]
   dockerfile = 'Dockerfile'
+  build_context = '../..'
+  dockerfile_path = 'apps/api/Dockerfile'
 
 [env]
   NODE_ENV = 'production'

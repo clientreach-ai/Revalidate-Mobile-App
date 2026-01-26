@@ -3,13 +3,31 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { apiService, API_ENDPOINTS } from '@/services/api';
 import '../../global.css';
+
+interface UserData {
+  name: string | null;
+  email: string;
+  professionalRole: string | null;
+  registrationNumber: string | null;
+  revalidationDate: string | null;
+}
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
   const [timer, setTimer] = useState({ hours: 1, minutes: 45, seconds: 22 });
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [revalidationDays, setRevalidationDays] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load user data
+  useEffect(() => {
+    loadUserData();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -32,6 +50,88 @@ export default function DashboardScreen() {
 
     return () => clearInterval(interval);
   }, []);
+
+  const loadUserData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      const response = await apiService.get<{
+        success: boolean;
+        data: {
+          name: string | null;
+          email: string;
+          registrationNumber: string | null;
+          revalidationDate: string | null;
+          professionalRole: string | null;
+        };
+      }>(API_ENDPOINTS.USERS.ME, token);
+
+      if (response?.data) {
+        const userName = response.data.name || response.data.email.split('@')[0];
+
+        setUserData({
+          name: userName,
+          email: response.data.email,
+          professionalRole: response.data.professionalRole,
+          registrationNumber: response.data.registrationNumber,
+          revalidationDate: response.data.revalidationDate,
+        });
+
+        // Calculate days until revalidation
+        if (response.data.revalidationDate) {
+          const revalidationDate = new Date(response.data.revalidationDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          revalidationDate.setHours(0, 0, 0, 0);
+          const diffTime = revalidationDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          setRevalidationDays(diffDays);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getRolePrefix = (role: string | null): string => {
+    if (!role) return '';
+    
+    const roleMap: Record<string, string> = {
+      'doctor': 'Dr.',
+      'nurse': 'Nurse',
+      'pharmacist': 'Pharmacist',
+      'dentist': 'Dr.',
+      'other_healthcare': '',
+      'other': '',
+    };
+    
+    return roleMap[role] || '';
+  };
+
+  const getGreeting = (): string => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  const formatUserName = (): string => {
+    if (!userData) return 'User';
+    
+    const prefix = getRolePrefix(userData.professionalRole);
+    const name = userData.name || userData.email.split('@')[0];
+    
+    if (prefix) {
+      return `${prefix} ${name}`;
+    }
+    return name;
+  };
 
   const formatTime = (value: number) => value.toString().padStart(2, '0');
 
@@ -109,10 +209,10 @@ export default function DashboardScreen() {
               </View>
               <View>
                 <Text className="text-white/80 text-xs font-medium uppercase tracking-wider">
-                  Good Morning
+                  {getGreeting()}
                 </Text>
-                <Text className="text-white text-xl font-bold">
-                  Dr. Shahin Alam
+                <Text className="text-white text-xl font-bold" numberOfLines={1}>
+                  {isLoading ? 'Loading...' : formatUserName()}
                 </Text>
               </View>
             </View>
@@ -133,14 +233,23 @@ export default function DashboardScreen() {
           </View>
 
           {/* Revalidation Status */}
-          <View className="flex-row justify-between items-center">
-            <View className="bg-white/10 px-3 py-2 rounded-2xl items-center border border-white/20">
-              <Text className="text-[10px] text-white/80 font-semibold uppercase">
-                Revalidation
-              </Text>
-              <Text className="text-white font-bold">142 Days</Text>
+          {revalidationDays !== null && (
+            <View className="flex-row justify-between items-center">
+              <View className="bg-white/10 px-3 py-2 rounded-2xl items-center border border-white/20">
+                <Text className="text-[10px] text-white/80 font-semibold uppercase">
+                  Revalidation
+                </Text>
+                <Text className="text-white font-bold">
+                  {revalidationDays > 0 
+                    ? `${revalidationDays} ${revalidationDays === 1 ? 'Day' : 'Days'}`
+                    : revalidationDays === 0
+                    ? 'Due Today'
+                    : 'Overdue'
+                  }
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         {/* Main Content */}
