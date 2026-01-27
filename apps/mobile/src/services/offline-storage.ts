@@ -1,8 +1,25 @@
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
+
+// Conditionally load expo-sqlite on native; provide a lightweight web stub to
+// avoid bundler/wasm resolution errors when building for web.
+let SQLite: any;
+if (Platform.OS !== 'web') {
+  SQLite = require('expo-sqlite');
+} else {
+  // Minimal in-memory stub implementing the methods used by the app.
+  SQLite = {
+    openDatabaseAsync: async (_name: string) => ({
+      execAsync: async (_sql: string) => Promise.resolve(),
+      runAsync: async (_sql: string, _args?: any[]) => ({ lastInsertRowId: 1 }),
+      getAllAsync: async (_sql: string, _args?: any[]) => ([]),
+      getFirstAsync: async (_sql: string, _args?: any[]) => null,
+    }),
+  };
+}
 
 const DB_NAME = 'revalidation_offline.db';
 
-let db: SQLite.SQLiteDatabase | null = null;
+let db: any = null;
 
 export interface OfflineOperation {
   id?: number;

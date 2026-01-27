@@ -45,7 +45,19 @@ export default function ProfileScreen() {
 
   const loadLocalProfileImage = async () => {
     try {
-      const savedImage = await AsyncStorage.getItem('profile_image_uri');
+      const key = profile?.id ? `profile_image_uri_${profile.id}` : 'profile_image_uri';
+      let savedImage = await AsyncStorage.getItem(key);
+
+      // migrate legacy key to per-user key when possible
+      if (!savedImage && profile?.id) {
+        const legacy = await AsyncStorage.getItem('profile_image_uri');
+        if (legacy) {
+          savedImage = legacy;
+          await AsyncStorage.setItem(`profile_image_uri_${profile.id}`, legacy);
+          await AsyncStorage.removeItem('profile_image_uri');
+        }
+      }
+
       if (savedImage) setProfileImage(savedImage);
     } catch (e) {
       console.log('Failed to load local profile image', e);

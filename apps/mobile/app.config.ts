@@ -82,7 +82,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ],
   extra: {
     eas: {
-      projectId: (process.env as { EAS_PROJECT_ID?: string }).EAS_PROJECT_ID || '',
+      // EAS requires a static projectId for linking during builds. Fill with the
+      // project id reported by the EAS CLI so `eas build` can run non-interactively.
+      projectId: (process.env as { EAS_PROJECT_ID?: string }).EAS_PROJECT_ID || '356a49db-0d9f-4cd6-b573-ec3f9e318ce2',
     },
   },
   scheme: 'revalidation-tracker',

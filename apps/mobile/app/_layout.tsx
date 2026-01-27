@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import { ThemeProvider } from '@/features/theme/ThemeProvider';
 import { useThemeStore } from '@/features/theme/theme.store';
 import Toast from 'react-native-toast-message';
@@ -14,28 +14,31 @@ declare const ErrorUtils: {
     setGlobalHandler: (handler: (error: Error, isFatal?: boolean) => void) => void;
 };
 
-// Safe Stripe import - handles cases where native modules aren't available
+// Safe Stripe import - only load native Stripe on native platforms
 let StripeProvider: any;
 let isStripeAvailable = false;
 
 // Global flag to prevent repeated warnings
 declare global {
-    var __STRIPE_LAYOUT_WARNING_LOGGED__: boolean | undefined;
+  var __STRIPE_LAYOUT_WARNING_LOGGED__: boolean | undefined;
 }
 
-// Try to load Stripe - will fail gracefully if native modules aren't available
-try {
+if (Platform.OS !== 'web') {
+  try {
     const stripeModule = require("@stripe/stripe-react-native");
     if (stripeModule && stripeModule.StripeProvider) {
-        StripeProvider = stripeModule.StripeProvider;
-        isStripeAvailable = true;
+      StripeProvider = stripeModule.StripeProvider;
+      isStripeAvailable = true;
     } else {
-        throw new Error("Stripe module not properly loaded");
+      throw new Error("Stripe module not properly loaded");
     }
-} catch (error: any) {
-    // Suppress the error - it's expected in Expo Go
+  } catch (error: any) {
     // Provide a fallback component that just passes children through
     StripeProvider = ({ children, publishableKey }: any) => <>{children}</>;
+  }
+} else {
+  // Web fallback: no native Stripe available
+  StripeProvider = ({ children }: any) => <>{children}</>;
 }
 
 // Stripe publishable key - must be set via environment variable

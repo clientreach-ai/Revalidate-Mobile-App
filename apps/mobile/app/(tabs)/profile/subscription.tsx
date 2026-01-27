@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,21 +10,28 @@ import { showToast } from '@/utils/toast';
 import { setSubscriptionInfo } from '@/utils/subscription';
 import '../../global.css';
 
-// Safe Stripe import
+// Safe Stripe import - only load on native platforms
 let useStripe: any;
 let isStripeAvailable = false;
 
-try {
+if (Platform.OS !== 'web') {
+  try {
     const stripeModule = require("@stripe/stripe-react-native");
     if (stripeModule && stripeModule.useStripe) {
-        useStripe = stripeModule.useStripe;
-        isStripeAvailable = true;
+      useStripe = stripeModule.useStripe;
+      isStripeAvailable = true;
     }
-} catch (error: any) {
+  } catch (error: any) {
     useStripe = () => ({
-        initPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
-        presentPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
+      initPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
+      presentPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
     });
+  }
+} else {
+  useStripe = () => ({
+    initPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
+    presentPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
+  });
 }
 
 export default function SubscriptionScreen() {

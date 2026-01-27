@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -16,7 +16,7 @@ import { apiService, API_ENDPOINTS } from "@/services/api";
 import { showToast } from "@/utils/toast";
 import "../global.css";
 
-// Safe Stripe import - handles cases where native modules aren't available
+// Safe Stripe import - only load native Stripe on native platforms
 let useStripe: any;
 let isStripeAvailable = false;
 
@@ -25,33 +25,50 @@ declare global {
     var __STRIPE_WARNING_LOGGED__: boolean | undefined;
 }
 
-// Try to load Stripe - will fail gracefully if native modules aren't available
-try {
-    // Try to import Stripe - this will fail if native modules aren't available
-    const stripeModule = require("@stripe/stripe-react-native");
-    if (stripeModule && stripeModule.useStripe) {
-        useStripe = stripeModule.useStripe;
-        isStripeAvailable = true;
-    } else {
-        throw new Error("Stripe module not properly loaded");
+if (Platform.OS !== 'web') {
+    try {
+        // Try to import Stripe - this will fail if native modules aren't available
+        const stripeModule = require("@stripe/stripe-react-native");
+        if (stripeModule && stripeModule.useStripe) {
+            useStripe = stripeModule.useStripe;
+            isStripeAvailable = true;
+        } else {
+            throw new Error("Stripe module not properly loaded");
+        }
+    } catch (error: any) {
+        // Only log warning once to reduce console noise (using global to persist across hot reloads)
+        if (!global.__STRIPE_WARNING_LOGGED__) {
+            // Suppress the error message - it's expected in Expo Go
+            global.__STRIPE_WARNING_LOGGED__ = true;
+        }
+        // Provide fallback hook that returns error functions
+        useStripe = () => ({
+            initPaymentSheet: async () => ({ 
+                error: { 
+                    message: "Stripe is not available. Please build the app with native modules (development build).",
+                    code: "STRIPE_NOT_AVAILABLE"
+                } 
+            }),
+            presentPaymentSheet: async () => ({ 
+                error: { 
+                    message: "Stripe is not available. Please build the app with native modules (development build).",
+                    code: "STRIPE_NOT_AVAILABLE"
+                } 
+            }),
+        });
     }
-} catch (error: any) {
-    // Only log warning once to reduce console noise (using global to persist across hot reloads)
-    if (!global.__STRIPE_WARNING_LOGGED__) {
-        // Suppress the error message - it's expected in Expo Go
-        global.__STRIPE_WARNING_LOGGED__ = true;
-    }
-    // Provide fallback hook that returns error functions
+} else {
+    // Web fallback
     useStripe = () => ({
         initPaymentSheet: async () => ({ 
             error: { 
-                message: "Stripe is not available. Please build the app with native modules (development build).",
+                message: "Stripe is not available on web. Use Stripe.js for web payments.",
                 code: "STRIPE_NOT_AVAILABLE"
             } 
         }),
         presentPaymentSheet: async () => ({ 
             error: { 
-                message: "Stripe is not available. Please build the app with native modules (development build).",
+                message: "Stripe is not available on web. Use Stripe.js for web payments.",
                 code: "STRIPE_NOT_AVAILABLE"
             } 
         }),

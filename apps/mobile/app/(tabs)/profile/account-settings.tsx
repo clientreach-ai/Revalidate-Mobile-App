@@ -43,7 +43,19 @@ export default function AccountSettingsScreen() {
 
   const loadProfileImage = async () => {
     try {
-      const savedImage = await AsyncStorage.getItem('profile_image_uri');
+      const key = profile?.id ? `profile_image_uri_${profile.id}` : 'profile_image_uri';
+      let savedImage = await AsyncStorage.getItem(key);
+
+      // migrate legacy key to per-user key when possible
+      if (!savedImage && profile?.id) {
+        const legacy = await AsyncStorage.getItem('profile_image_uri');
+        if (legacy) {
+          savedImage = legacy;
+          await AsyncStorage.setItem(`profile_image_uri_${profile.id}`, legacy);
+          await AsyncStorage.removeItem('profile_image_uri');
+        }
+      }
+
       if (savedImage && !profile?.image) setProfileImage(savedImage);
     } catch (e) {
       console.log('Failed to load profile image', e);
@@ -100,7 +112,8 @@ export default function AccountSettingsScreen() {
       if (!result.canceled && result.assets[0]) {
         const uri = result.assets[0].uri;
         setProfileImage(uri);
-        await AsyncStorage.setItem('profile_image_uri', uri);
+        const key = profile?.id ? `profile_image_uri_${profile.id}` : 'profile_image_uri';
+        await AsyncStorage.setItem(key, uri);
 
         // Upload silently
         try {
