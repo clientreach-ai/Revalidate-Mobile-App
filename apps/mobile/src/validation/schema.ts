@@ -98,14 +98,16 @@ export const professionalRegistrationEnum = z.enum([
 
 export const onboardingProfessionalDetailsSchema = z.object({
   registrationNumber: registrationNumberSchema,
-  professionalRegistrations: z.array(professionalRegistrationEnum).min(1, 'At least one professional registration is required'),
+  // Accept backend-provided registration names (e.g. "GMC", "NMC") as strings
+  professionalRegistrations: z.array(z.string()).min(1, 'At least one professional registration is required'),
   registrationPin: z.string().optional(),
   revalidationDate: z.date({
     required_error: 'Revalidation date is required',
     invalid_type_error: 'Please select a valid date',
   }),
-  workSetting: workSettingEnum,
-  scope: scopeOfPracticeEnum,
+  // Accept backend-provided names for work setting and scope (display names)
+  workSetting: z.string().min(1, 'Work setting is required'),
+  scope: z.string().min(1, 'Scope of practice is required'),
   hourlyRate: z.number().min(0, 'Hourly rate must be 0 or greater').default(0),
   workHoursCompleted: z.number().min(0, 'Work hours must be 0 or greater').default(0),
   trainingHoursCompleted: z.number().min(0, 'Training hours must be 0 or greater').default(0),

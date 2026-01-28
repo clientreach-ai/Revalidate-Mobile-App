@@ -64,7 +64,7 @@ export default function ProfessionalDetails() {
 
     const { isDark } = useThemeStore();
     const [isLoading, setIsLoading] = useState(false);
-    const [isLoadingData, setIsLoadingData] = useState(true);
+    const [, setIsLoadingData] = useState(true);
     const [workSettingsOptions, setWorkSettingsOptions] = useState<Option[]>(() => config.workSettings as Option[]);
     // Do not use mocked defaults for scope; initialize empty and populate from API response only
     const [scopeOptions, setScopeOptions] = useState<Option[]>(() => []);
@@ -117,7 +117,7 @@ export default function ProfessionalDetails() {
                             revalidationDate: string | null;
                             workSetting?: string;
                             scope?: string;
-                            professionalRegistrations: string[];
+                            professionalRegistrations: string | string[];
                             registrationPin: string;
                             hourlyRate: number;
                             workHoursCompleted: number;
@@ -129,20 +129,27 @@ export default function ProfessionalDetails() {
                     };
                 }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token);
 
-                if (response?.data?.step3) {
+                    if (response?.data?.step3) {
                     const step3 = response.data.step3;
                     const revalidationDate = step3.revalidationDate 
                         ? new Date(step3.revalidationDate) 
                         : undefined;
 
+                    // coerce numeric/string values to proper types and normalize registrations
+                    const professionalRegistrations = Array.isArray(step3.professionalRegistrations)
+                        ? step3.professionalRegistrations
+                        : (typeof step3.professionalRegistrations === 'string' && step3.professionalRegistrations.length > 0)
+                            ? step3.professionalRegistrations.split(',').map((s: string) => s.trim())
+                            : [];
+
                     reset({
                         registrationNumber: step3.registrationNumber || "",
-                        professionalRegistrations: (step3.professionalRegistrations || []) as any,
+                        professionalRegistrations: professionalRegistrations as any,
                         registrationPin: step3.registrationPin || "",
-                        hourlyRate: step3.hourlyRate || 0,
-                        workHoursCompleted: step3.workHoursCompleted || 0,
-                        trainingHoursCompleted: step3.trainingHoursCompleted || 0,
-                        earningsCurrentYear: step3.earningsCurrentYear || 0,
+                        hourlyRate: Number(step3.hourlyRate) || 0,
+                        workHoursCompleted: Number(step3.workHoursCompleted) || 0,
+                        trainingHoursCompleted: Number(step3.trainingHoursCompleted) || 0,
+                        earningsCurrentYear: Number(step3.earningsCurrentYear) || 0,
                         workDescription: step3.workDescription || "",
                         notepad: step3.notepad || "",
                         revalidationDate: revalidationDate,
@@ -158,7 +165,7 @@ export default function ProfessionalDetails() {
                 }
                 // Fetch dynamic work settings from backend (if available)
                 try {
-                    // Use profile/work endpoint which returns [{id,name,status}]
+                    // Use profile/work endpoint which returns [{id,name,status}] and show names when status indicates enabled
                     const workResp = await apiService.get<any>('/api/v1/profile/work', token as string);
                     const items = Array.isArray(workResp) ? workResp : workResp?.data ?? [];
                     if (Array.isArray(items)) {
@@ -168,13 +175,13 @@ export default function ProfessionalDetails() {
                                 return String(s) === 'one' || String(s) === '1' || s === 1;
                             })
                             .map((ws: any) => {
-                                const rawValue = ws.id ?? ws.value ?? ws.key ?? ws.code ?? ws.name;
-                                const value = rawValue !== undefined && rawValue !== null ? String(rawValue) : '';
-                                const label = ws.name ?? ws.label ?? value;
-                                return { value, label };
+                                const name = (ws.name ?? ws.label ?? '').toString().trim();
+                                return { value: name, label: name };
                             });
-                        // Apply mapped list (preserve API order). If API returned an array, use it even if empty.
-                        setWorkSettingsOptions(mapped);
+
+                        // Deduplicate by `value` (name) to avoid repeated items
+                        const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
+                        setWorkSettingsOptions(unique as Option[]);
                     }
                 } catch (err) {
                     // ignore and keep defaults
@@ -184,21 +191,21 @@ export default function ProfessionalDetails() {
                 try {
                     const scopeResp = await apiService.get<any>('/api/v1/profile/scope', token as string);
                     const items = Array.isArray(scopeResp) ? scopeResp : scopeResp?.data ?? [];
-                    if (Array.isArray(items)) {
-                        const mapped = items
-                            .filter((s: any) => {
-                                const st = s.status ?? s.active ?? s.enabled ?? 'one';
-                                return String(st) === 'one' || String(st) === '1' || st === 1;
-                            })
-                            .map((s: any) => {
-                                const rawValue = s.id ?? s.value ?? s.key ?? s.code ?? s.name;
-                                const value = rawValue !== undefined && rawValue !== null ? String(rawValue) : '';
-                                const label = s.name ?? s.label ?? value;
-                                return { value, label };
-                            });
-                        // Apply mapped list exactly as returned (preserve order and labels).
-                        setScopeOptions(mapped);
-                    }
+                        if (Array.isArray(items)) {
+                            const mapped = items
+                                .filter((s: any) => {
+                                    const st = s.status ?? s.active ?? s.enabled ?? 'one';
+                                    return String(st) === 'one' || String(st) === '1' || st === 1;
+                                })
+                                .map((s: any) => {
+                                    const name = (s.name ?? s.label ?? '').toString().trim();
+                                    return { value: name, label: name };
+                                });
+
+                            // Deduplicate by `value` (name) to avoid repeated items
+                            const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
+                            setScopeOptions(unique);
+                        }
                 } catch (err) {
                     // ignore and keep defaults
                 }
@@ -207,19 +214,20 @@ export default function ProfessionalDetails() {
                 try {
                     const regResp = await apiService.get<any>('/api/v1/profile/registration', token as string);
                     const items = Array.isArray(regResp) ? regResp : regResp?.data ?? [];
-                    if (Array.isArray(items)) {
+                        if (Array.isArray(items)) {
                         const mapped = items
                             .filter((r: any) => {
                                 const st = r.status ?? r.active ?? r.enabled ?? 'one';
                                 return String(st) === 'one' || String(st) === '1' || st === 1;
                             })
                             .map((r: any) => {
-                                const rawValue = r.id ?? r.value ?? r.key ?? r.code ?? r.name;
-                                const value = rawValue !== undefined && rawValue !== null ? String(rawValue) : '';
-                                const label = r.name ?? r.label ?? value;
-                                return { value, label };
+                                const name = (r.name ?? r.label ?? '').toString().trim();
+                                return { value: name, label: name };
                             });
-                        setRegistrationOptions(mapped);
+
+                        // Deduplicate by `value` (name) to avoid duplicate keys/entries
+                        const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
+                        setRegistrationOptions(unique);
                     }
                 } catch (err) {
                     // ignore and keep defaults
@@ -238,7 +246,7 @@ export default function ProfessionalDetails() {
     const watchedDate = watch("revalidationDate");
     const watchedWorkSetting = watch("workSetting");
     const watchedScope = watch("scope");
-    const watchedProfessionalRegistrations = watch("professionalRegistrations") || [];
+    const watchedProfessionalRegistrations = (watch("professionalRegistrations") ?? []) as string[];
 
     const selectedWorkSetting = workSettingsOptions.find((w) => w.value === watchedWorkSetting)?.label ?? "Select work setting";
     const selectedScope = scopeOptions.find((s) => s.value === watchedScope)?.label ?? "Select scope of practice";
@@ -249,10 +257,62 @@ export default function ProfessionalDetails() {
     const toggleProfessionalRegistration = (value: string) => {
         const current = watchedProfessionalRegistrations;
         if (current.includes(value as any)) {
-            setValue("professionalRegistrations", current.filter((r) => r !== value) as any);
+            const updated = current.filter((r) => r !== value);
+            setValue("professionalRegistrations", updated as any);
+            // persist change
+            // sanitize and dedupe before saving
+            const clean = Array.from(new Set((updated || []).map((s) => (s || '').toString().trim()))).filter(Boolean);
+            saveStep3Partial({ professional_registrations: clean.join(',') });
         } else {
-            setValue("professionalRegistrations", [...current, value] as any);
+            const updated = [...current, value];
+            setValue("professionalRegistrations", updated as any);
+            // persist change
+            const clean = Array.from(new Set((updated || []).map((s) => (s || '').toString().trim()))).filter(Boolean);
+            saveStep3Partial({ professional_registrations: clean.join(',') });
         }
+    };
+
+    // Persist partial step3 data locally and to backend
+    const saveStep3Partial = async (partial: Record<string, any>) => {
+        try {
+            // merge with existing local cache
+            const raw = await AsyncStorage.getItem('onboarding.step3');
+            const existing = raw ? JSON.parse(raw) : {};
+            // sanitize professional_registrations if present
+            if (partial.professional_registrations && typeof partial.professional_registrations === 'string') {
+                const parts = partial.professional_registrations
+                    .split(',')
+                    .map((s: string) => s.trim())
+                    .filter(Boolean);
+                // dedupe
+                partial.professional_registrations = Array.from(new Set(parts)).join(',');
+            }
+
+            const merged = { ...existing, ...partial };
+            await AsyncStorage.setItem('onboarding.step3', JSON.stringify(merged));
+        } catch (e) {
+            // ignore local save failures
+        }
+
+        try {
+            const token = await AsyncStorage.getItem('authToken');
+            if (!token) return;
+            await apiService.post(API_ENDPOINTS.USERS.ONBOARDING.STEP_3, partial, token ?? undefined);
+        } catch (e) {
+            console.log('Failed to persist onboarding step3 partial', (e as any)?.message || e);
+        }
+    };
+
+    const handleWorkSettingSelect = async (value: string) => {
+        setValue('workSetting', value as any);
+        setShowWorkSettingModal(false);
+        await saveStep3Partial({ work_setting: value });
+    };
+
+    const handleScopeSelect = async (value: string) => {
+        setValue('scope', value as any);
+        setShowScopeModal(false);
+        await saveStep3Partial({ scope_of_practice: value });
     };
 
     const getSelectedRegistrationsLabel = () => {
@@ -283,6 +343,12 @@ export default function ProfessionalDetails() {
         const newDate = new Date(selectedYear, selectedMonth, day);
         setValue("revalidationDate", newDate);
         setShowDatePicker(false);
+        try {
+            // persist selected date to backend as YYYY-MM-DD
+            saveStep3Partial({ revalidation_date: formatDateForAPI(newDate) });
+        } catch (e) {
+            // ignore
+        }
     };
 
     const navigateMonth = (direction: "prev" | "next") => {
@@ -512,7 +578,14 @@ export default function ProfessionalDetails() {
                                             placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                                             value={value}
                                             onChangeText={onChange}
-                                            onBlur={onBlur}
+                                            onBlur={async () => {
+                                                onBlur();
+                                                try {
+                                                    await saveStep3Partial({ gmc_registration_number: value });
+                                                } catch (e) {
+                                                    /* ignore */
+                                                }
+                                            }}
                                             autoCapitalize="characters"
                                             autoCorrect={false}
                                         />
@@ -791,7 +864,12 @@ export default function ProfessionalDetails() {
                                             placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                                             value={value}
                                             onChangeText={onChange}
-                                            onBlur={onBlur}
+                                            onBlur={async () => {
+                                                onBlur();
+                                                try {
+                                                    await saveStep3Partial({ registration_reference_pin: value });
+                                                } catch (e) { /* ignore */ }
+                                            }}
                                             autoCapitalize="none"
                                             autoCorrect={false}
                                         />
@@ -871,12 +949,13 @@ export default function ProfessionalDetails() {
                                                     const num = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
                                                     onChange(isNaN(num) ? 0 : num);
                                                 }}
-                                                onBlur={() => {
+                                                onBlur={async () => {
                                                     onBlur();
                                                     // Ensure display value matches the numeric value
                                                     const num = parseFloat(displayValue);
                                                     if (!isNaN(num)) {
                                                         setDisplayValue(num.toString());
+                                                        try { await saveStep3Partial({ hourly_rate: num }); } catch (e) { /* ignore */ }
                                                     } else {
                                                         setDisplayValue("");
                                                     }
@@ -961,12 +1040,13 @@ export default function ProfessionalDetails() {
                                                     const num = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
                                                     onChange(isNaN(num) ? 0 : num);
                                                 }}
-                                                onBlur={() => {
+                                                onBlur={async () => {
                                                     onBlur();
                                                     // Ensure display value matches the numeric value
                                                     const num = parseFloat(displayValue);
                                                     if (!isNaN(num)) {
                                                         setDisplayValue(num.toString());
+                                                        try { await saveStep3Partial({ work_hours_completed_already: num }); } catch (e) { /* ignore */ }
                                                     } else {
                                                         setDisplayValue("");
                                                     }
@@ -1051,12 +1131,13 @@ export default function ProfessionalDetails() {
                                                     const num = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
                                                     onChange(isNaN(num) ? 0 : num);
                                                 }}
-                                                onBlur={() => {
+                                                onBlur={async () => {
                                                     onBlur();
                                                     // Ensure display value matches the numeric value
                                                     const num = parseFloat(displayValue);
                                                     if (!isNaN(num)) {
                                                         setDisplayValue(num.toString());
+                                                        try { await saveStep3Partial({ training_hours_completed_already: num }); } catch (e) { /* ignore */ }
                                                     } else {
                                                         setDisplayValue("");
                                                     }
@@ -1141,12 +1222,13 @@ export default function ProfessionalDetails() {
                                                     const num = formatted === '' || formatted === '.' ? 0 : parseFloat(formatted);
                                                     onChange(isNaN(num) ? 0 : num);
                                                 }}
-                                                onBlur={() => {
+                                                onBlur={async () => {
                                                     onBlur();
                                                     // Ensure display value matches the numeric value
                                                     const num = parseFloat(displayValue);
                                                     if (!isNaN(num)) {
                                                         setDisplayValue(num.toString());
+                                                        try { await saveStep3Partial({ earned_current_financial_year: num }); } catch (e) { /* ignore */ }
                                                     } else {
                                                         setDisplayValue("");
                                                     }
@@ -1198,7 +1280,10 @@ export default function ProfessionalDetails() {
                                             placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                                             value={value}
                                             onChangeText={onChange}
-                                            onBlur={onBlur}
+                                            onBlur={async () => {
+                                                onBlur();
+                                                try { await saveStep3Partial({ brief_description_of_work: value }); } catch (e) { /* ignore */ }
+                                            }}
                                             multiline
                                             numberOfLines={5}
                                             autoCorrect={false}
@@ -1243,7 +1328,10 @@ export default function ProfessionalDetails() {
                                             placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                                             value={value || ""}
                                             onChangeText={onChange}
-                                            onBlur={onBlur}
+                                            onBlur={async () => {
+                                                onBlur();
+                                                try { await saveStep3Partial({ notepad: value }); } catch (e) { /* ignore */ }
+                                            }}
                                             multiline
                                             numberOfLines={5}
                                             autoCorrect={false}
@@ -1312,13 +1400,10 @@ export default function ProfessionalDetails() {
                             Select Work Setting
                         </Text>
                         <ScrollView>
-                            {workSettingsOptions.map((setting) => (
+                            {workSettingsOptions.map((setting, idx) => (
                                 <TouchableOpacity
-                                    key={setting.value}
-                                    onPress={() => {
-                                        setValue("workSetting", setting.value as OnboardingProfessionalDetailsInput["workSetting"]);
-                                        setShowWorkSettingModal(false);
-                                    }}
+                                    key={`${setting.value}-${idx}`}
+                                    onPress={() => handleWorkSettingSelect(setting.value)}
                                     className={`py-4 px-4 rounded-xl mb-2 ${
                                         watchedWorkSetting === setting.value
                                             ? "bg-primary/10"
@@ -1377,13 +1462,10 @@ export default function ProfessionalDetails() {
                             Select Scope of Practice
                         </Text>
                         <ScrollView>
-                            {scopeOptions.map((item) => (
+                            {scopeOptions.map((item, idx) => (
                                 <TouchableOpacity
-                                    key={item.value}
-                                    onPress={() => {
-                                        setValue("scope", item.value as OnboardingProfessionalDetailsInput["scope"]);
-                                        setShowScopeModal(false);
-                                    }}
+                                    key={`${item.value}-${idx}`}
+                                    onPress={() => handleScopeSelect(item.value)}
                                     className={`py-4 px-4 rounded-xl mb-2 ${
                                         watchedScope === item.value
                                             ? "bg-primary/10"
@@ -1442,11 +1524,11 @@ export default function ProfessionalDetails() {
                             Select Professional Registration(s)
                         </Text>
                         <ScrollView>
-                            {registrationOptions.map((option) => {
+                            {registrationOptions.map((option, idx) => {
                                 const isSelected = watchedProfessionalRegistrations.includes(option.value as any);
                                 return (
                                     <TouchableOpacity
-                                        key={option.value}
+                                        key={`${option.value}-${idx}`}
                                         onPress={() => toggleProfessionalRegistration(option.value)}
                                         className={`py-4 px-4 rounded-xl mb-2 flex-row items-center justify-between ${
                                             isSelected

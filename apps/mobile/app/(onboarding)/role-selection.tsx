@@ -49,7 +49,7 @@ export default function RoleSelection() {
         defaultValues: {},
     });
 
-    const [availableRoles, setAvailableRoles] = useState<RoleItem[]>(() => DEFAULT_ROLES as unknown as RoleItem[]);
+    const [availableRoles, setAvailableRoles] = useState<RoleItem[]>(() => []);
 
     const watchedRole = watch("role");
 
@@ -94,8 +94,8 @@ export default function RoleSelection() {
             }
         }
 
-        // If no roles remain after filtering, fall back to defaults
-        return unique.length > 0 ? unique : (DEFAULT_ROLES as unknown as RoleItem[]);
+        // Return what we have (do not fallback to defaults)
+        return unique;
     };
 
     // Fetch roles from backend (protected or public) and update availableRoles
@@ -117,21 +117,8 @@ export default function RoleSelection() {
                 }
             }
 
-            // Fallback to public roles
-            try {
-                const publicResp = await apiService.get<{ roles: { name: string; status: string; type: string }[] }>(
-                    API_ENDPOINTS.PROFILE.ROLES
-                );
-                if (publicResp?.roles) {
-                    setAvailableRoles(mapBackendRoles(publicResp.roles));
-                    return;
-                }
-            } catch (err) {
-                console.log('Public roles fetch failed, using defaults', (err as any)?.message || err);
-            }
-
-            // If both fail, keep defaults
-            setAvailableRoles(DEFAULT_ROLES as unknown as RoleItem[]);
+                // If fetch fails or backend returns no roles, leave `availableRoles` empty (no fallback)
+                setAvailableRoles([]);
         } catch (err) {
             console.log('Failed to fetch roles', err);
         }
