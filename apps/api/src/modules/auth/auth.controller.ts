@@ -275,6 +275,7 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response) =
       subscriptionTier: mappedUser.subscription_tier,
       subscriptionStatus: mappedUser.subscription_status,
       trialEndsAt: mappedUser.trial_ends_at,
+      hourlyRate: mappedUser.hourly_rate,
       createdAt: mappedUser.created_at,
       updatedAt: mappedUser.updated_at,
     },

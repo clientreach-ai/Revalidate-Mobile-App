@@ -21,6 +21,7 @@ export const USER_COLUMN_MAPPING = {
   subscription_tier: 'subscription_tier',
   subscription_status: 'subscription_status',
   trial_ends_at: 'trial_ends_at',
+  hourly_rate: 'hourly_rate',
   created_at: 'created_at',
   updated_at: 'updated_at',
 } as const;
@@ -61,6 +62,7 @@ export function mapUserRow(dbRow: any): any {
     subscription_tier: dbRow.subscription_tier || 'free',
     subscription_status: dbRow.subscription_status || 'active',
     trial_ends_at: dbRow.trial_ends_at,
+    hourly_rate: dbRow.hourly_rate || 0,
     created_at: dbRow.created_at,
     updated_at: dbRow.updated_at,
   };
@@ -71,7 +73,7 @@ export function mapUserRow(dbRow: any): any {
  */
 export function mapUserToDb(userData: any): any {
   const mapped: any = {};
-  
+
   if (userData.registration_number !== undefined) {
     mapped.registration = userData.registration_number;
   }
@@ -96,6 +98,9 @@ export function mapUserToDb(userData: any): any {
   if (userData.trial_ends_at !== undefined) {
     mapped.trial_ends_at = userData.trial_ends_at;
   }
-  
+  if (userData.hourly_rate !== undefined) {
+    mapped.hourly_rate = userData.hourly_rate;
+  }
+
   return mapped;
 }

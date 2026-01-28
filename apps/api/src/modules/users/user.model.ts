@@ -14,6 +14,7 @@ export interface User {
   subscription_tier: 'free' | 'premium';
   subscription_status: 'active' | 'trial' | 'expired' | 'cancelled';
   trial_ends_at?: string;
+  hourly_rate?: number;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +25,7 @@ export interface UpdateUserProfile {
   professional_role?: 'doctor' | 'nurse' | 'pharmacist' | 'other' | 'other_healthcare';
   work_setting?: string;
   scope_of_practice?: string;
+  hourly_rate?: number;
 }
 
 /**

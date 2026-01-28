@@ -94,6 +94,9 @@ export async function updateUserProfile(
   if (dbUpdates.trial_ends_at !== undefined) {
     updateData.trial_ends_at = dbUpdates.trial_ends_at;
   }
+  if (dbUpdates.hourly_rate !== undefined) {
+    updateData.hourly_rate = dbUpdates.hourly_rate;
+  }
 
   if (Object.keys(updateData).length === 0) {
     throw new ApiError(400, 'No fields to update');

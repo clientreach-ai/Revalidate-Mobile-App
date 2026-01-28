@@ -12,6 +12,10 @@ export interface WorkHours {
   end_time?: string;
   duration_minutes?: number;
   work_description?: string;
+  location?: string;
+  shift_type?: string;
+  hourly_rate?: number;
+  total_earnings?: number;
   document_ids?: string; // JSON array of document IDs
   is_active: boolean;
   created_at: string;
@@ -23,6 +27,10 @@ export interface CreateWorkHours {
   end_time?: string;
   duration_minutes?: number;
   work_description?: string;
+  location?: string;
+  shift_type?: string;
+  hourly_rate?: number;
+  total_earnings?: number;
   document_ids?: number[];
 }
 
@@ -30,6 +38,10 @@ export interface UpdateWorkHours {
   end_time?: string;
   duration_minutes?: number;
   work_description?: string;
+  location?: string;
+  shift_type?: string;
+  hourly_rate?: number;
+  total_earnings?: number;
   document_ids?: number[];
 }
 
@@ -53,14 +65,19 @@ export async function createWorkHours(
   const [result] = await pool.execute(
     `INSERT INTO work_hours (
       user_id, start_time, end_time, duration_minutes, 
-      work_description, document_ids, is_active, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      work_description, location, shift_type, hourly_rate, total_earnings,
+      document_ids, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       userId,
       data.start_time,
       data.end_time || null,
       duration || null,
       data.work_description || null,
+      data.location || null,
+      data.shift_type || null,
+      data.hourly_rate || null,
+      data.total_earnings || null,
       data.document_ids ? JSON.stringify(data.document_ids) : null,
       !data.end_time, // Active if no end time
     ]
@@ -210,6 +227,22 @@ export async function updateWorkHours(
   if (updates.work_description !== undefined) {
     fields.push('work_description = ?');
     values.push(updates.work_description || null);
+  }
+  if (updates.location !== undefined) {
+    fields.push('location = ?');
+    values.push(updates.location || null);
+  }
+  if (updates.shift_type !== undefined) {
+    fields.push('shift_type = ?');
+    values.push(updates.shift_type || null);
+  }
+  if (updates.hourly_rate !== undefined) {
+    fields.push('hourly_rate = ?');
+    values.push(updates.hourly_rate || null);
+  }
+  if (updates.total_earnings !== undefined) {
+    fields.push('total_earnings = ?');
+    values.push(updates.total_earnings || null);
   }
   if (updates.document_ids !== undefined) {
     fields.push('document_ids = ?');
