@@ -9,7 +9,7 @@ export function validateRequest(schema: {
   query?: ZodSchema;
   params?: ZodSchema;
 }) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     try {
       if (schema.body) {
         req.body = schema.body.parse(req.body);

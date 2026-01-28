@@ -1,0 +1,10 @@
+{
+  "watch": ["src"],
+  "ext": "ts,tsx,js,json",
+  "ignore": ["dist", "node_modules", "uploads"],
+  "exec": "tsx src/server.ts",
+  "delay": "100",
+  "legacyWatch": true,
+  "restartable": "rs",
+  "verbose": true
+}

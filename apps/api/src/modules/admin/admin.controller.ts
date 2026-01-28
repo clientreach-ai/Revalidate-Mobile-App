@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { getMySQLPool } from '../../config/database';
 import { asyncHandler } from '../../common/middleware/async-handler';
 import { ApiError } from '../../common/middleware/error-handler';
-import { authenticateToken } from '../auth/auth.middleware';
+// auth middleware is available if needed in the future
 import { mapUserRow } from '../../config/database-mapping';
 
 /**
@@ -23,7 +23,7 @@ async function isAdmin(userId: string): Promise<boolean> {
  */
 export const requireAdmin = asyncHandler(async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: any
 ) => {
   if (!req.user) {
@@ -320,7 +320,7 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
  * Get dashboard statistics (admin only)
  * GET /api/v1/admin/stats
  */
-export const getDashboardStats = asyncHandler(async (req: Request, res: Response) => {
+export const getDashboardStats = asyncHandler(async (_req: Request, res: Response) => {
   const pool = getMySQLPool();
 
   // Total users

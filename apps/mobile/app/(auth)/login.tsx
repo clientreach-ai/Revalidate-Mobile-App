@@ -32,39 +32,9 @@ export default function Login() {
             try {
                 const token = await AsyncStorage.getItem('authToken');
                 if (token) {
-                    // Verify token is still valid and check onboarding progress
-                    try {
-                        const progress = await apiService.get<{
-                            success: boolean;
-                            data: {
-                                completed: boolean;
-                                currentStep: number;
-                            };
-                        }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
-
-                        // User is already logged in, redirect to appropriate screen
-                        if (progress?.data?.completed) {
-                            router.replace("/(tabs)/home");
-                        } else {
-                            const step = progress?.data?.currentStep || 1;
-                            if (step === 1) {
-                                router.replace("/(onboarding)/role-selection");
-                            } else if (step === 2) {
-                                router.replace("/(onboarding)/personal-details");
-                            } else if (step === 3) {
-                                router.replace("/(onboarding)/professional-details");
-                            } else if (step === 4) {
-                                router.replace("/(onboarding)/plan-choose");
-                            } else {
-                                router.replace("/(onboarding)/role-selection");
-                            }
-                        }
-                        return;
-                    } catch (error) {
-                        // Token invalid, clear it and continue to login screen
-                        await AsyncStorage.removeItem('authToken');
-                        await AsyncStorage.removeItem('userData');
-                    }
+                    // Always send logged-in users to onboarding
+                    router.replace("/(onboarding)/role-selection");
+                    return;
                 }
             } catch (error) {
                 console.warn("Auth check error:", error);
@@ -114,75 +84,27 @@ export default function Login() {
                 await AsyncStorage.setItem('authToken', token);
                 await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
                 
-                // Check onboarding progress to determine where to redirect
+                // After successful login always route user into onboarding
                 try {
-                    const progress = await apiService.get<{
-                        success: boolean;
-                        data: {
-                            step1_role: boolean;
-                            step2_personal: boolean;
-                            step3_professional: boolean;
-                            step4_plan: boolean;
-                            completed: boolean;
-                            currentStep: number; // 0 = all done, 1-4 = step to complete
-                        };
-                    }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
-                    
-                    if (progress?.data?.completed) {
-                        // User has completed all onboarding steps - navigate to dashboard
-                        router.replace("/(tabs)/home");
-                    } else {
-                        // User hasn't completed onboarding - redirect to the appropriate step
-                        const step = progress?.data?.currentStep || 1;
-                        if (step === 1) {
-                            router.replace("/(onboarding)/role-selection");
-                        } else if (step === 2) {
-                            router.replace("/(onboarding)/personal-details");
-                        } else if (step === 3) {
-                            router.replace("/(onboarding)/professional-details");
-                        } else if (step === 4) {
-                            router.replace("/(onboarding)/plan-choose");
-                        } else {
-                            // Default to role selection
-                            router.replace("/(onboarding)/role-selection");
-                        }
-                    }
-                } catch (progressError) {
-                    // If progress fetch fails, try to check basic profile data
+                    // Optionally set subscription info if available (non-blocking)
                     try {
-                        const userProfile = await apiService.get<{
-                            success: boolean;
-                            data: {
-                                registrationNumber?: string | null;
-                                revalidationDate?: string | null;
-                                subscriptionTier?: string | null;
-                                subscriptionStatus?: string | null;
-                            };
-                        }>(API_ENDPOINTS.USERS.ME, token);
-                        
-                        const hasBasicData = 
-                            userProfile?.data?.registrationNumber && 
-                            userProfile?.data?.revalidationDate;
-                        
-                        if (userProfile?.data?.subscriptionTier) {
+                        const profile = await apiService.get(API_ENDPOINTS.USERS.ME, token);
+                        if (profile?.data?.subscriptionTier) {
                             await setSubscriptionInfo({
-                                subscriptionTier: (userProfile.data.subscriptionTier || 'free') as 'free' | 'premium',
-                                subscriptionStatus: (userProfile.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
-                                isPremium: userProfile.data.subscriptionTier === 'premium',
-                                canUseOffline: userProfile.data.subscriptionTier === 'premium',
+                                subscriptionTier: (profile.data.subscriptionTier || 'free') as 'free' | 'premium',
+                                subscriptionStatus: (profile.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
+                                isPremium: profile.data.subscriptionTier === 'premium',
+                                canUseOffline: profile.data.subscriptionTier === 'premium',
                             });
                         }
-                        
-                        if (hasBasicData) {
-                            router.replace("/(tabs)/home");
-                        } else {
-                            router.replace("/(onboarding)/role-selection");
-                        }
-                    } catch (profileError) {
-                        // If both fail, redirect to onboarding start
-                        console.warn("Failed to fetch onboarding progress, redirecting to onboarding:", progressError);
-                        router.replace("/(onboarding)/role-selection");
+                    } catch (_) {
+                        // ignore profile fetch errors — still send to onboarding
                     }
+
+                    router.replace("/(onboarding)/role-selection");
+                } catch (err) {
+                    console.warn('Routing after login failed:', err);
+                    router.replace("/(onboarding)/role-selection");
                 }
             } else {
                 throw new Error("Invalid response from server");

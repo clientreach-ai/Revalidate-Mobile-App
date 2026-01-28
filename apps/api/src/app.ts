@@ -6,6 +6,9 @@ import { logger } from './common/logger';
 
 const app = express();
 
+// Startup trace for route mounting/debugging
+console.log('🔎 app.ts initialized');
+
 // Middleware
 // CORS configuration - allow all origins for mobile apps
 // When CORS_ORIGIN is "*", use a function to allow all origins (required when credentials: true)
@@ -24,7 +27,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logging
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   logger.debug(`${req.method} ${req.path}`);
   next();
 });
@@ -34,7 +37,7 @@ import path from 'path';
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ 
     status: 'ok', 
     message: 'Revalidation Tracker API is running',
@@ -44,10 +47,12 @@ app.get('/health', (req, res) => {
 
 // API routes
 import apiRoutes from './routes';
+console.log('🔎 mounting api routes');
 app.use(apiRoutes);
+console.log('🔎 api routes mounted');
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({ 
     message: 'Revalidation Tracker API',
     version: '1.0.0',

@@ -37,6 +37,8 @@ if (!MYSQL_CONFIG.user || !MYSQL_CONFIG.password || !MYSQL_CONFIG.database) {
 // JWT Configuration
 export const JWT_CONFIG = {
   secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+  // Optional public key (for RS256 tokens). Supports literal newlines encoded as \n in env.
+  publicKey: process.env.JWT_PUBLIC_KEY ? process.env.JWT_PUBLIC_KEY.replace(/\\n/g, '\n') : undefined,
   expiresIn: process.env.JWT_EXPIRES_IN || '7d',
 };
 

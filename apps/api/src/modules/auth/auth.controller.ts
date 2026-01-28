@@ -10,7 +10,7 @@ import {
   LoginRequest,
   AuthResponse,
   JwtPayload,
-  PasswordResetRequest,
+  // PasswordResetRequest, (removed - type not currently used)
   ChangePasswordRequest,
   VerifyOTPRequest,
   ResendOTPRequest,

@@ -21,9 +21,9 @@ export class ApiError extends Error {
  */
 export function errorHandler(
   err: Error | ApiError | ZodError,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) {
   // Zod validation errors
   if (err instanceof ZodError) {

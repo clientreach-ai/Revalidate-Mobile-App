@@ -20,7 +20,7 @@ import axios from 'axios';
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.diskStorage({
-    destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
       const uploadDir = path.join(process.cwd(), 'uploads', 'documents');
       // Create directory if it doesn't exist
       if (!fs.existsSync(uploadDir)) {
@@ -28,7 +28,7 @@ const upload = multer({
       }
       cb(null, uploadDir);
     },
-    filename: (req, file, cb) => {
+    filename: (_req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       const ext = path.extname(file.originalname);
       cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
@@ -37,7 +37,7 @@ const upload = multer({
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     // Allow PDF, images, and common document types
     const allowedMimes = [
       'application/pdf',

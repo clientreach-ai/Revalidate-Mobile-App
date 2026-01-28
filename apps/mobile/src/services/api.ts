@@ -22,8 +22,43 @@ class ApiService {
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
     this.timeout = API_CONFIG.TIMEOUT;
+
+    // If developer explicitly set API_BASE_URL, respect it and skip auto-detection.
+    const explicitApiBase = typeof process !== 'undefined' && (process as any).env && (process as any).env.API_BASE_URL;
+    if (!explicitApiBase) {
+      // Probe for a locally running backend and prefer it if reachable.
+      // Fire-and-forget: if detection finishes after app start, subsequent requests will use localhost/emulator host.
+      console.log('[ApiService] initial baseURL:', this.baseURL);
+      this.detectLocalBackend().catch(() => {});
+    }
   }
 
+  private async detectLocalBackend(): Promise<void> {
+    // Probe emulator hosts first so Android emulators prefer the host machine
+    const candidates = [
+      'http://10.0.2.2:3000', // Android emulator (AVD)
+      'http://10.0.3.2:3000', // Genymotion
+      'http://localhost:3000', // iOS simulator / expo web
+      'http://127.0.0.1:3000',
+    ];
+    const probeTimeout = 1000; // 1s
+
+    for (const base of candidates) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), probeTimeout);
+        const res = await fetch(`${base}/health`, { method: 'GET', signal: controller.signal });
+        clearTimeout(timer);
+        if (res && res.ok) {
+          this.baseURL = base;
+          console.log(`[ApiService] switched baseURL to ${base}`);
+          return;
+        }
+      } catch (e) {
+        // ignore and try next candidate
+      }
+    }
+  }
   private getOfflineCapability(): { canOffline: boolean; isFreeUser: boolean } {
     const { isPremium, canUseOffline } = useSubscriptionStore.getState();
     return {

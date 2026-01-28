@@ -4,7 +4,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "dev:nodemon": "nodemon --watch src --ext ts,tsx,js,json --exec \"tsx src/server.ts\"",
+    "build": "tsc --noEmitOnError false && tsc-alias",
     "start": "node dist/server.js",
     "lint": "eslint . --ext .ts",
     "type-check": "tsc --noEmit",
@@ -29,6 +30,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "module-alias": "^2.2.2",
     "@types/multer": "^2.0.0",
     "axios": "^1.6.2",
     "bcrypt": "^6.0.0",
@@ -43,16 +45,21 @@
     "stripe": "^14.7.0",
     "zod": "^3.22.4"
   },
+  "_moduleAliases": {
+    "@": "dist"
+  },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.5",
-    "@types/node": "^20.19.30",
+    "@types/node": "20.19.30",
     "@types/nodemailer": "^6.4.14",
     "prisma": "^5.19.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "nodemon": "^2.0.22",
+    "tsc-alias": "^1.8.0"
   },
   "private": true
 }

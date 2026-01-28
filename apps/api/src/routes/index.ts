@@ -11,6 +11,7 @@ import paymentRoutes from './payment.routes';
 import documentsRoutes from './documents.routes';
 import calendarRoutes from './calendar.routes';
 import notificationsRoutes from './notifications.routes';
+import profileRoutes from './profile.routes';
 // TODO: Add more routes as modules are implemented
 // import analyticsRoutes from './analytics.routes';
 // import subscriptionRoutes from './subscription.routes';
@@ -18,6 +19,8 @@ import notificationsRoutes from './notifications.routes';
 // import exportRoutes from './export.routes';
 
 const router = Router();
+
+console.log('🔎 routes/index.ts loaded');
 
 // API version prefix
 const API_VERSION = '/api/v1';
@@ -35,6 +38,8 @@ router.use(`${API_VERSION}/payment`, paymentRoutes);
 router.use(`${API_VERSION}/documents`, documentsRoutes);
 router.use(`${API_VERSION}/calendar`, calendarRoutes);
 router.use(`${API_VERSION}/notifications`, notificationsRoutes);
+router.use(`${API_VERSION}/profile`, profileRoutes);
+console.log(`🔎 mounted profile routes at ${API_VERSION}/profile`);
 // TODO: Mount additional routes as they're implemented
 // router.use(`${API_VERSION}/analytics`, analyticsRoutes);
 // router.use(`${API_VERSION}/subscription`, subscriptionRoutes);
@@ -42,7 +47,7 @@ router.use(`${API_VERSION}/notifications`, notificationsRoutes);
 // router.use(`${API_VERSION}/export`, exportRoutes);
 
 // API info endpoint
-router.get(`${API_VERSION}`, (req, res) => {
+router.get(`${API_VERSION}`, (_req, res) => {
   res.json({
     message: 'Revalidation Tracker API v1',
     version: '1.0.0',

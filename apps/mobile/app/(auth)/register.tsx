@@ -31,39 +31,9 @@ export default function Register() {
             try {
                 const token = await AsyncStorage.getItem('authToken');
                 if (token) {
-                    // Verify token is still valid and check onboarding progress
-                    try {
-                        const progress = await apiService.get<{
-                            success: boolean;
-                            data: {
-                                completed: boolean;
-                                currentStep: number;
-                            };
-                        }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
-
-                        // User is already logged in, redirect to appropriate screen
-                        if (progress?.data?.completed) {
-                            router.replace("/(tabs)/home");
-                        } else {
-                            const step = progress?.data?.currentStep || 1;
-                            if (step === 1) {
-                                router.replace("/(onboarding)/role-selection");
-                            } else if (step === 2) {
-                                router.replace("/(onboarding)/personal-details");
-                            } else if (step === 3) {
-                                router.replace("/(onboarding)/professional-details");
-                            } else if (step === 4) {
-                                router.replace("/(onboarding)/plan-choose");
-                            } else {
-                                router.replace("/(onboarding)/role-selection");
-                            }
-                        }
-                        return;
-                    } catch (error) {
-                        // Token invalid, clear it and continue to register screen
-                        await AsyncStorage.removeItem('authToken');
-                        await AsyncStorage.removeItem('userData');
-                    }
+                    // Always send logged-in users to onboarding
+                    router.replace("/(onboarding)/role-selection");
+                    return;
                 }
             } catch (error) {
                 console.warn("Auth check error:", error);

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from '@react-navigation/native';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Resolver, SubmitHandler } from "react-hook-form";
@@ -16,13 +17,21 @@ import { apiService, API_ENDPOINTS } from "@/services/api";
 import { showToast } from "@/utils/toast";
 import "../global.css";
 
-const roles = [
+const DEFAULT_ROLES = [
     { value: "doctor" as const, label: "Doctor / GP", icon: "healing", description: "General practitioners and medical doctors" },
     { value: "nurse" as const, label: "Nurse / Midwife", icon: "local-hospital", description: "Registered nurses and midwives" },
     { value: "pharmacist" as const, label: "Pharmacist", icon: "science", description: "Registered pharmacists" },
     { value: "dentist" as const, label: "Dentist", icon: "health-and-safety", description: "Dental practitioners" },
     { value: "other" as const, label: "Other Healthcare Professional", icon: "person", description: "Other regulated healthcare roles" },
 ] as const;
+
+type RoleItem = {
+    value: string;
+    label: string;
+    icon: string;
+    description: string;
+};
+
 
 export default function RoleSelection() {
     const router = useRouter();
@@ -41,18 +50,104 @@ export default function RoleSelection() {
         defaultValues: {},
     });
 
+    const [availableRoles, setAvailableRoles] = useState<RoleItem[]>(() => DEFAULT_ROLES as unknown as RoleItem[]);
+
     const watchedRole = watch("role");
 
-    // Load saved data on mount
+    // Helper to map backend roles -> frontend RoleItem
+    const mapBackendRoles = (roles: { name: string; status: string; type: string }[]) => {
+        // Only include roles with status === 'one' (exclude 'zero' or others)
+        const filtered = roles.filter(r => (r.status || '').toString() === 'one');
+
+        const mapped = filtered.map(r => {
+            const rawName = (r.name || '').trim();
+            const lower = rawName.toLowerCase();
+
+            // Derive frontend value from database name so DB edits are reflected live
+            // Keep canonical keys for common professions, otherwise slugify the DB name
+            let value: string;
+            if (lower.includes('doctor')) value = 'doctor';
+            else if (lower.includes('nurse')) value = 'nurse';
+            else if (lower.includes('pharmacist')) value = 'pharmacist';
+            else {
+                // Slugify unknown role names so they become distinct selectable items
+                value = rawName
+                    .toLowerCase()
+                    .replace(/\s+/g, '_')
+                    .replace(/[^a-z0-9_]/g, '');
+                if (!value) value = 'other';
+            }
+
+            // Use a friendly label: prefer the DB label if present, otherwise fall back to meta
+            const meta = getRoleMeta(value);
+            const label = rawName || meta.label;
+
+            return { value, label, icon: meta.icon, description: meta.description } as RoleItem;
+        });
+
+        // Remove duplicates by value while preserving order
+        const unique: RoleItem[] = [];
+        const seen = new Set<string>();
+        for (const item of mapped) {
+            if (!seen.has(item.value)) {
+                seen.add(item.value);
+                unique.push(item);
+            }
+        }
+
+        // If no roles remain after filtering, fall back to defaults
+        return unique.length > 0 ? unique : (DEFAULT_ROLES as unknown as RoleItem[]);
+    };
+
+    // Fetch roles from backend (protected or public) and update availableRoles
+    const fetchRolesFromBackend = async (token?: string | null) => {
+        try {
+            if (token) {
+                try {
+                    const rolesResp = await apiService.get<{
+                        success: boolean;
+                        data: { roles: { name: string; status: string; type: string }[] };
+                    }>(API_ENDPOINTS.USERS.ONBOARDING.ROLES, token);
+
+                    if (rolesResp?.data?.roles) {
+                        setAvailableRoles(mapBackendRoles(rolesResp.data.roles));
+                        return;
+                    }
+                } catch (e) {
+                    console.log('Protected roles fetch failed, will try public endpoint', (e as any)?.message || e);
+                }
+            }
+
+            // Fallback to public roles
+            try {
+                const publicResp = await apiService.get<{ roles: { name: string; status: string; type: string }[] }>(
+                    API_ENDPOINTS.PROFILE.ROLES
+                );
+                if (publicResp?.roles) {
+                    setAvailableRoles(mapBackendRoles(publicResp.roles));
+                    return;
+                }
+            } catch (err) {
+                console.log('Public roles fetch failed, using defaults', (err as any)?.message || err);
+            }
+
+            // If both fail, keep defaults
+            setAvailableRoles(DEFAULT_ROLES as unknown as RoleItem[]);
+        } catch (err) {
+            console.log('Failed to fetch roles', err);
+        }
+    };
+
+    // Load saved onboarding data and initial roles on mount
     useEffect(() => {
+        let mounted = true;
         const loadSavedData = async () => {
             try {
                 const token = await AsyncStorage.getItem('authToken');
-                if (!token) {
-                    setIsLoadingData(false);
-                    return;
-                }
+                // Initial roles load
+                await fetchRolesFromBackend(token);
 
+                // Load saved onboarding step data
                 const response = await apiService.get<{
                     success: boolean;
                     data: {
@@ -60,26 +155,59 @@ export default function RoleSelection() {
                     };
                 }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token);
 
-                if (response?.data?.step1?.role) {
-                    // Map backend role to frontend role
+                if (response?.data?.step1?.role && mounted) {
                     const backendRole = response.data.step1.role;
                     let frontendRole = backendRole;
-                    // Map 'other_healthcare' back to 'other' or 'dentist' if needed
-                    if (backendRole === 'other_healthcare') {
-                        frontendRole = 'other';
-                    }
+                    if (backendRole === 'other_healthcare') frontendRole = 'other';
                     reset({ role: frontendRole as any });
                 }
             } catch (error) {
-                // Silently fail - user might not have saved data yet
                 console.log('No saved role data found');
             } finally {
-                setIsLoadingData(false);
+                if (mounted) setIsLoadingData(false);
             }
         };
 
         loadSavedData();
+
+        return () => { mounted = false; };
     }, [reset]);
+
+    // Polling interval reference
+    const pollRef = useRef<number | null>(null);
+
+    // Re-fetch roles when the screen is focused
+    useFocusEffect(
+        React.useCallback(() => {
+            let isActive = true;
+            (async () => {
+                const token = await AsyncStorage.getItem('authToken');
+                if (isActive) await fetchRolesFromBackend(token);
+            })();
+
+            return () => { isActive = false; };
+        }, [])
+    );
+
+    // Start a periodic poll to keep roles in sync with backend
+    useEffect(() => {
+        const startPolling = async () => {
+            const token = await AsyncStorage.getItem('authToken');
+            // Poll every 30 seconds
+            pollRef.current = setInterval(async () => {
+                await fetchRolesFromBackend(token);
+            }, 30_000) as unknown as number;
+        };
+
+        startPolling();
+
+        return () => {
+            if (pollRef.current) {
+                clearInterval(pollRef.current as any);
+                pollRef.current = null;
+            }
+        };
+    }, []);
 
     // Map frontend role values to backend API values
     const mapRoleToBackend = (role: string): 'doctor' | 'nurse' | 'pharmacist' | 'other_healthcare' => {
@@ -89,6 +217,21 @@ export default function RoleSelection() {
         // Map 'dentist' and 'other' to 'other_healthcare'
         return 'other_healthcare';
     };
+
+    function getRoleMeta(value: string) {
+        switch (value) {
+            case 'doctor':
+                return { label: 'Doctor / GP', icon: 'healing', description: 'General practitioners and medical doctors' };
+            case 'nurse':
+                return { label: 'Nurse / Midwife', icon: 'local-hospital', description: 'Registered nurses and midwives' };
+            case 'pharmacist':
+                return { label: 'Pharmacist', icon: 'science', description: 'Registered pharmacists' };
+            case 'dentist':
+                return { label: 'Dentist', icon: 'health-and-safety', description: 'Dental practitioners' };
+            default:
+                return { label: 'Other Healthcare Professional', icon: 'person', description: 'Other regulated healthcare roles' };
+        }
+    }
 
     const onSubmit: SubmitHandler<OnboardingRoleInput> = async (data) => {
         try {
@@ -167,7 +310,7 @@ export default function RoleSelection() {
 
                     {/* Role Cards */}
                     <View className="gap-4 mb-6">
-                        {roles.map((role) => {
+                        {availableRoles.map((role) => {
                             const isSelected = watchedRole === role.value;
 
                             return (

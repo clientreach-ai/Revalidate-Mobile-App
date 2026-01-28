@@ -34,9 +34,6 @@ const updateProfileSchema = z.object({
   scope_of_practice: z.string().optional(),
 });
 
-/**
- * Format user response consistently
- */
 function formatUserResponse(user: any, name?: string | null, requirements?: any) {
   return {
     id: user.id,
@@ -57,10 +54,7 @@ function formatUserResponse(user: any, name?: string | null, requirements?: any)
   };
 }
 
-/**
- * Get user profile
- * GET /api/v1/users/profile
- */
+
 export const getProfile = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new ApiError(401, 'Authentication required');
@@ -84,10 +78,6 @@ export const getProfile = asyncHandler(async (req: Request, res: Response) => {
   });
 });
 
-/**
- * Update user profile
- * PUT /api/v1/users/profile
- */
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new ApiError(401, 'Authentication required');
@@ -109,10 +99,7 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   });
 });
 
-/**
- * Delete user account
- * DELETE /api/v1/users/profile
- */
+
 export const deleteAccount = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new ApiError(401, 'Authentication required');
@@ -126,21 +113,13 @@ export const deleteAccount = asyncHandler(async (req: Request, res: Response) =>
   });
 });
 
-/**
- * Registration schema - email and password only
- */
+
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
-/**
- * Register a new user
- * POST /api/v1/users/register
- * 
- * Creates a user account with email and password, then sends OTP to email for verification.
- * If email sending fails, user is still created but can request OTP again later.
- */
+
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const validated = registerSchema.parse(req.body);
 
@@ -186,12 +165,9 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(response);
 });
 
-/**
- * Onboarding Step 1: Choose Role
- * POST /api/v1/users/onboarding/step-1
- */
+
 const step1Schema = z.object({
-  professional_role: z.enum(['doctor', 'nurse', 'pharmacist', 'other_healthcare']),
+  professional_role: z.string(),
 });
 
 export const onboardingStep1 = asyncHandler(async (req: Request, res: Response) => {
@@ -199,8 +175,33 @@ export const onboardingStep1 = asyncHandler(async (req: Request, res: Response) 
     throw new ApiError(401, 'Authentication required');
   }
 
+  // Fetch allowed roles from database (only active roles)
+  const { prisma } = await import('../../lib/prisma');
+  const roles = await prisma.role_masters.findMany({
+    where: { status: 'one' },
+    select: { name: true, status: true, type: true },
+  });
+
+  const deriveRoleKey = (name: string) => {
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('doctor')) return 'doctor';
+    if (lower.includes('nurse')) return 'nurse';
+    if (lower.includes('pharmacist')) return 'pharmacist';
+    return 'other_healthcare';
+  };
+
+  const rolesWithKeys = roles.map(r => ({ ...r, key: deriveRoleKey(r.name) }));
+  const availableRoleKeys = Array.from(new Set(rolesWithKeys.map(r => r.key)));
+  const availableRoles = rolesWithKeys.map(r => ({ name: r.name, status: r.status, type: r.type, key: r.key }));
+
   const validated = step1Schema.parse(req.body) as OnboardingStep1Role;
-  await updateOnboardingStep1(req.user.userId, validated);
+
+  if (!availableRoleKeys.includes(validated.professional_role)) {
+    throw new ApiError(400, 'Invalid professional role');
+  }
+
+  // Store the frontend canonical key (e.g. 'doctor' or 'other_healthcare')
+  await updateOnboardingStep1(req.user.userId, { professional_role: validated.professional_role });
   const requirements = getRoleRequirements(validated.professional_role);
 
   res.json({
@@ -209,6 +210,35 @@ export const onboardingStep1 = asyncHandler(async (req: Request, res: Response) 
     data: {
       professionalRole: validated.professional_role,
       requirements,
+      availableRoles,
+    },
+  });
+});
+
+export const getOnboardingRoles = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const { prisma } = await import('../../lib/prisma');
+  const roles = await prisma.role_masters.findMany({
+    where: { status: 'one' },
+    select: { name: true, status: true, type: true },
+  });
+  const deriveRoleKey = (name: string) => {
+    const lower = (name || '').toLowerCase();
+    if (lower.includes('doctor')) return 'doctor';
+    if (lower.includes('nurse')) return 'nurse';
+    if (lower.includes('pharmacist')) return 'pharmacist';
+    return 'other_healthcare';
+  };
+
+  const availableRoles = roles.map(r => ({ name: r.name, status: r.status, type: r.type, key: deriveRoleKey(r.name) }));
+
+  res.json({
+    success: true,
+    data: {
+      roles: availableRoles,
     },
   });
 });

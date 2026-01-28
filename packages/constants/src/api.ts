@@ -2,8 +2,18 @@
  * API Configuration
  * Base URL for the Revalidation Tracker API
  */
+// Default to deployed backend. Allow override with `API_BASE_URL` env var
+// const DEFAULT_BASE_URL = 'https://revalidate-api.fly.dev';
+
+// Allow overriding the backend via `API_BASE_URL` env var (useful for local
+// dev or pointing to a deployed instance). Default to the Fly app URL.
+const resolvedBase =
+  typeof process !== 'undefined' && (process as any).env && (process as any).env.API_BASE_URL
+    ? (process as any).env.API_BASE_URL
+    : 'https://revalidate-api.fly.dev';
+
 export const API_CONFIG = {
-  BASE_URL: 'https://revalidate-api.fly.dev',
+  BASE_URL: resolvedBase,
   TIMEOUT: 30000, // 30 seconds
 } as const;
 
@@ -27,6 +37,7 @@ export const API_ENDPOINTS = {
       STEP_2: '/api/v1/users/onboarding/step-2',
       STEP_3: '/api/v1/users/onboarding/step-3',
       STEP_4: '/api/v1/users/onboarding/step-4',
+      ROLES: '/api/v1/users/onboarding/roles',
       PROGRESS: '/api/v1/users/onboarding/progress',
       DATA: '/api/v1/users/onboarding/data',
     },
@@ -83,4 +94,7 @@ export const API_ENDPOINTS = {
     DELETE: '/api/v1/appraisals',
   },
   HEALTH: '/health',
+  PROFILE: {
+    ROLES: '/api/v1/profile/roles',
+  },
 } as const;

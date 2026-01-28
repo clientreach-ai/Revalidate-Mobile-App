@@ -16,7 +16,8 @@ if (!STRIPE_CONFIG.secretKey) {
 // Initialize Stripe
 const stripe = STRIPE_CONFIG.secretKey 
   ? new Stripe(STRIPE_CONFIG.secretKey, {
-      apiVersion: '2024-12-18.acacia',
+      // Some Stripe types are pinned to known apiVersion string unions; cast to any
+      apiVersion: '2024-12-18.acacia' as any,
     })
   : null as any; // Type assertion for development - will fail at runtime if used without key
 
@@ -276,7 +277,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
             where: { id: parseInt(subUserId) },
             data: {
               subscription_tier: 'premium',
-              subscription_status: status,
+              subscription_status: status as any,
             },
           });
           logger.info(`User ${subUserId} subscription ${subscription.status} - subscription ${subscription.id}`);
@@ -291,7 +292,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
             where: { id: parseInt(deletedUserId) },
             data: {
               subscription_tier: 'free',
-              subscription_status: 'cancelled',
+              subscription_status: 'cancelled' as any,
             },
           });
           logger.info(`User ${deletedUserId} subscription cancelled - subscription ${deletedSubscription.id}`);
@@ -308,7 +309,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
               where: { id: parseInt(invoiceUserId) },
               data: {
                 subscription_tier: 'premium',
-                subscription_status: 'active',
+                subscription_status: 'active' as any,
               },
             });
             logger.info(`User ${invoiceUserId} subscription payment succeeded`);
@@ -325,7 +326,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
             await prisma.users.update({
               where: { id: parseInt(failedUserId) },
               data: {
-                subscription_status: 'expired',
+                subscription_status: 'expired' as any,
               },
             });
             logger.info(`User ${failedUserId} subscription payment failed`);

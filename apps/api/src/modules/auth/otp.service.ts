@@ -3,7 +3,6 @@
  */
 
 import { prisma } from '../../lib/prisma';
-import { ApiError } from '../../common/middleware/error-handler';
 
 /**
  * Generate a random 6-digit OTP

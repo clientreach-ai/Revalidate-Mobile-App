@@ -5,6 +5,7 @@ import {
   deleteAccount,
   register,
   onboardingStep1,
+  getOnboardingRoles,
   onboardingStep2,
   onboardingStep3,
   onboardingStep4,
@@ -28,6 +29,7 @@ router.delete('/profile', deleteAccount);
 // Onboarding routes (multi-step registration)
 router.get('/onboarding/progress', getOnboardingProgress);
 router.get('/onboarding/data', getOnboardingDataEndpoint);
+router.get('/onboarding/roles', getOnboardingRoles);
 router.post('/onboarding/step-1', onboardingStep1);
 router.post('/onboarding/step-2', onboardingStep2);
 router.post('/onboarding/step-3', onboardingStep3);

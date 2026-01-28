@@ -15,6 +15,8 @@ import {
   stripe,
 } from './stripe.service';
 import { STRIPE_CONFIG } from '../../config/env';
+import { prisma } from '../../lib/prisma';
+import Stripe from 'stripe';
 import { z } from 'zod';
 import { logger } from '../../common/logger';
 
@@ -107,7 +109,7 @@ export const confirmPaymentHandler = asyncHandler(async (req: Request, res: Resp
       where: { id: parseInt(req.user.userId) },
       data: {
         subscription_tier: 'premium',
-        subscription_status: status,
+        subscription_status: status as any,
       },
     });
 

@@ -26,8 +26,6 @@ interface TestResult {
 }
 
 let testResults: TestResult[] = [];
-let authToken: string | null = null;
-let testUserId: string | null = null;
 
 // Create axios instance
 const api: AxiosInstance = axios.create({

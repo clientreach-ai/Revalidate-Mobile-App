@@ -1,3 +1,6 @@
+// Ensure runtime path aliases resolve when compiled JS still contains `@/...` imports.
+// `module-alias/register` will read `_moduleAliases` from package.json and map `@` -> `dist/src`.
+import 'module-alias/register';
 import app from './app';
 import { connectMySQL } from './config/database';
 
