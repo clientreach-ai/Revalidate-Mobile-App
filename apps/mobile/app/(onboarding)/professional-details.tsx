@@ -1661,9 +1661,12 @@ export default function ProfessionalDetails() {
                             </Pressable>
                             {watchedDate && (
                                 <Pressable
-                                    onPress={() => {
+                                    onPress={async () => {
                                         setValue("revalidationDate", undefined as unknown as Date);
                                         setShowDatePicker(false);
+                                        try {
+                                            await saveStep3Partial({ revalidation_date: null });
+                                        } catch (e) { /* ignore */ }
                                     }}
                                     className={`flex-1 py-3 rounded-xl ${isDark ? "bg-slate-700" : "bg-gray-100"}`}
                                 >

@@ -11,6 +11,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
     onboardingRoleSchema,
     type OnboardingRoleInput,
+    type Role,
 } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
@@ -26,7 +27,7 @@ const DEFAULT_ROLES = [
 ] as const;
 
 type RoleItem = {
-    value: string;
+    value: Role;
     label: string;
     icon: string;
     description: string;
@@ -64,18 +65,13 @@ export default function RoleSelection() {
 
             // Derive frontend value from database name so DB edits are reflected live
             // Keep canonical keys for common professions, otherwise slugify the DB name
-            let value: string;
+            // Normalize backend-provided role names into the canonical frontend Role enum
+            let value: Role;
             if (lower.includes('doctor')) value = 'doctor';
             else if (lower.includes('nurse')) value = 'nurse';
             else if (lower.includes('pharmacist')) value = 'pharmacist';
-            else {
-                // Slugify unknown role names so they become distinct selectable items
-                value = rawName
-                    .toLowerCase()
-                    .replace(/\s+/g, '_')
-                    .replace(/[^a-z0-9_]/g, '');
-                if (!value) value = 'other';
-            }
+            else if (lower.includes('dentist')) value = 'dentist';
+            else value = 'other';
 
             // Use a friendly label: prefer the DB label if present, otherwise fall back to meta
             const meta = getRoleMeta(value);
