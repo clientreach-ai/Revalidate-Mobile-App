@@ -199,7 +199,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   const userData = users[0];
   if (userData.status === '0') {
-    throw new ApiError(403, 'Account is inactive. Please contact support.');
+    throw new ApiError(403, 'Account is blocked. Please contact support.');
   }
 
   if (!userData.password) {
