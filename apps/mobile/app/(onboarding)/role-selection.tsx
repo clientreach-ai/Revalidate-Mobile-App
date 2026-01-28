@@ -37,7 +37,6 @@ export default function RoleSelection() {
     const router = useRouter();
     const { isDark } = useThemeStore();
     const [isLoading, setIsLoading] = useState(false);
-    const [isLoadingData, setIsLoadingData] = useState(true);
 
     const {
         handleSubmit,
@@ -153,18 +152,22 @@ export default function RoleSelection() {
                     data: {
                         step1: { role: string | null };
                     };
-                }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token);
+                }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token ?? undefined);
 
                 if (response?.data?.step1?.role && mounted) {
                     const backendRole = response.data.step1.role;
                     let frontendRole = backendRole;
                     if (backendRole === 'other_healthcare') frontendRole = 'other';
                     reset({ role: frontendRole as any });
+                } else {
+                    // Fallback: if backend didn't return saved role, try local AsyncStorage
+                    const localRole = await AsyncStorage.getItem('onboardingRole');
+                    if (localRole && mounted) {
+                        reset({ role: localRole as any });
+                    }
                 }
             } catch (error) {
                 console.log('No saved role data found');
-            } finally {
-                if (mounted) setIsLoadingData(false);
             }
         };
 
@@ -188,6 +191,30 @@ export default function RoleSelection() {
             return () => { isActive = false; };
         }, [])
     );
+
+    // Persist role selection immediately when user taps a role card
+    const handleRoleSelect = async (roleValue: string) => {
+        try {
+            // update form state immediately for instant UI feedback
+            setValue("role", roleValue as any);
+
+            // save locally so selection persists even if backend isn't reachable
+            await AsyncStorage.setItem('onboardingRole', roleValue);
+
+            // attempt to save to backend if we have an auth token
+            const token = await AsyncStorage.getItem('authToken');
+            if (!token) return;
+
+            const backendRole = mapRoleToBackend(roleValue);
+            await apiService.post(
+                API_ENDPOINTS.USERS.ONBOARDING.STEP_1,
+                { professional_role: backendRole },
+                token ?? undefined
+            );
+        } catch (err) {
+            console.log('Failed to persist role selection', (err as any)?.message || err);
+        }
+    };
 
     // Start a periodic poll to keep roles in sync with backend
     useEffect(() => {
@@ -316,7 +343,7 @@ export default function RoleSelection() {
                             return (
                                 <Pressable
                                     key={role.value}
-                                    onPress={() => setValue("role", role.value)}
+                                    onPress={() => handleRoleSelect(role.value)}
                                     className={`w-full rounded-2xl p-5 flex-row items-center gap-4 ${
                                         isSelected
                                             ? "bg-primary/10"
