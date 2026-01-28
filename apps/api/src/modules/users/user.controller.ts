@@ -235,10 +235,85 @@ export const getOnboardingRoles = asyncHandler(async (req: Request, res: Respons
 
   const availableRoles = roles.map(r => ({ name: r.name, status: r.status, type: r.type, key: deriveRoleKey(r.name) }));
 
+  // Try to fetch work setting options from the database master table(s).
+  // The legacy DB sometimes stores work settings as integers referencing another table.
+  let workSettings: { id: string; name: string; status?: string }[] = [];
+  try {
+    // Preferred master table name
+    const rows: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, status FROM work_setting_masters WHERE status = 'one' ORDER BY id ASC`);
+    workSettings = rows.map(r => ({ id: String(r.id), name: r.name, status: r.status }));
+  } catch (err) {
+    try {
+      // Fallback table name
+      const rows2: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, status FROM work_settings WHERE status = 'one' ORDER BY id ASC`);
+      workSettings = rows2.map(r => ({ id: String(r.id), name: r.name, status: r.status }));
+    } catch (err2) {
+      // If neither table exists or query fails, try the `categories` table where work settings are stored
+      try {
+        // Try to find a parent category named like work_settings, then fetch its children
+        const parent: any[] = await prisma.$queryRawUnsafe(`SELECT id FROM categories WHERE LOWER(name) LIKE '%work setting%' OR LOWER(name) = 'work_settings' LIMIT 1`);
+        if (parent && parent.length > 0 && parent[0].id) {
+          const children: any[] = await prisma.$queryRawUnsafe(`SELECT id, name FROM categories WHERE parent_id = ${parent[0].id} ORDER BY id ASC`);
+          if (children && children.length > 0) {
+            workSettings = children.map((r: any) => ({ id: String(r.id), name: r.name }));
+          }
+        }
+
+        // If still empty, try to fetch common work-setting-like categories directly by name
+        if (workSettings.length === 0) {
+          const candidates = [
+            'Community setting (including district nursing and community psychiatric nursing)',
+            'Care home sector',
+            'Ambulance service',
+            'Consultancy',
+            'Cosmetic or aesthetic sector',
+            'Governing body or other leadership',
+            'GP practice or other primary care',
+            'Hospital or other secondary care',
+            'Inspectorate or regulator',
+            'Insurance or legal',
+            'Maternity unit or birth centre',
+            'Military',
+            'Occupational health',
+            'Police',
+            'Policy organisation',
+            'Prison',
+            'Private domestic setting',
+            'Public health organisation',
+            'School',
+            'Specialist or other tertiary care including hospice',
+            'Telephone or e-health advice',
+            'Trade union or professional body',
+            'University or other research facility',
+            'Voluntary or charity sector',
+            'Other',
+          ];
+          const placeholders = candidates.map(() => '?').join(',');
+          const rows3: any[] = await prisma.$queryRawUnsafe(`SELECT id, name FROM categories WHERE name IN (${placeholders}) ORDER BY id ASC`, ...candidates);
+          if (rows3 && rows3.length > 0) {
+            workSettings = rows3.map(r => ({ id: String(r.id), name: r.name }));
+          }
+        }
+      } catch (catErr) {
+        workSettings = [];
+      }
+    }
+  }
+
+  // If client requested only workSettings, return that to reduce payload
+  const only = (req.query.only || '') as string;
+  if (only === 'workSettings') {
+    return res.json({
+      success: true,
+      data: { workSettings },
+    });
+  }
+
   res.json({
     success: true,
     data: {
       roles: availableRoles,
+      workSettings,
     },
   });
 });
@@ -373,6 +448,70 @@ export const getOnboardingDataEndpoint = asyncHandler(async (req: Request, res: 
   }
 
   const data = await getOnboardingData(req.user.userId);
+
+  // Also include work settings master list so onboarding step 3 can render options
+  const { prisma } = await import('../../lib/prisma');
+  let workSettings: { id: string; name: string }[] = [];
+  try {
+    const rows: any[] = await prisma.$queryRawUnsafe(`SELECT id, name FROM work_setting_masters WHERE status = 'one' ORDER BY id ASC`);
+    workSettings = rows.map(r => ({ id: String(r.id), name: r.name }));
+  } catch (err) {
+    try {
+      const rows2: any[] = await prisma.$queryRawUnsafe(`SELECT id, name FROM work_settings WHERE status = 'one' ORDER BY id ASC`);
+      workSettings = rows2.map(r => ({ id: String(r.id), name: r.name }));
+    } catch (err2) {
+      try {
+        // Look in categories table for a parent category matching work setting, then fetch children
+        const parent: any[] = await prisma.$queryRawUnsafe(`SELECT id FROM categories WHERE LOWER(name) LIKE '%work setting%' OR LOWER(name) = 'work_settings' LIMIT 1`);
+        if (parent && parent.length > 0 && parent[0].id) {
+          const children: any[] = await prisma.$queryRawUnsafe(`SELECT id, name FROM categories WHERE parent_id = ${parent[0].id} ORDER BY id ASC`);
+          if (children && children.length > 0) {
+            workSettings = children.map((r: any) => ({ id: String(r.id), name: r.name }));
+          }
+        }
+
+        if (workSettings.length === 0) {
+          const candidates = [
+            'Community setting (including district nursing and community psychiatric nursing)',
+            'Care home sector',
+            'Ambulance service',
+            'Consultancy',
+            'Cosmetic or aesthetic sector',
+            'Governing body or other leadership',
+            'GP practice or other primary care',
+            'Hospital or other secondary care',
+            'Inspectorate or regulator',
+            'Insurance or legal',
+            'Maternity unit or birth centre',
+            'Military',
+            'Occupational health',
+            'Police',
+            'Policy organisation',
+            'Prison',
+            'Private domestic setting',
+            'Public health organisation',
+            'School',
+            'Specialist or other tertiary care including hospice',
+            'Telephone or e-health advice',
+            'Trade union or professional body',
+            'University or other research facility',
+            'Voluntary or charity sector',
+            'Other',
+          ];
+          const placeholders = candidates.map(() => '?').join(',');
+          const rows3: any[] = await prisma.$queryRawUnsafe(`SELECT id, name FROM categories WHERE name IN (${placeholders}) ORDER BY id ASC`, ...candidates);
+          if (rows3 && rows3.length > 0) {
+            workSettings = rows3.map(r => ({ id: String(r.id), name: r.name }));
+          }
+        }
+      } catch (catErr) {
+        workSettings = [];
+      }
+    }
+  }
+
+  // Attach workSettings to the response under step3 metadata
+  (data as any).workSettings = workSettings;
 
   res.json({
     success: true,

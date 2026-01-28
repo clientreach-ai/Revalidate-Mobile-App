@@ -123,6 +123,7 @@ export default function ProfessionalDetails() {
     const { isDark } = useThemeStore();
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingData, setIsLoadingData] = useState(true);
+    const [workSettingsOptions, setWorkSettingsOptions] = useState(() => config.workSettings);
     const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
     const [showScopeModal, setShowScopeModal] = useState(false);
     const [showProfessionalRegistrationsModal, setShowProfessionalRegistrationsModal] = useState(false);
@@ -211,6 +212,32 @@ export default function ProfessionalDetails() {
                         setSelectedYear(revalidationDate.getFullYear());
                     }
                 }
+                // Fetch dynamic work settings from backend (if available)
+                try {
+                    const token = await AsyncStorage.getItem('authToken');
+                    // Use profile/work endpoint which returns [{id,name,status}]
+                    const workResp = await apiService.get<any>('/api/v1/profile/work', token);
+                    const items = Array.isArray(workResp) ? workResp : workResp?.data ?? [];
+                    if (Array.isArray(items) && items.length > 0) {
+                        const mapped = items
+                            .filter((ws: any) => {
+                                // Backend uses "one"/"zero" strings for status; accept 1/"one"/"1"
+                                const s = ws.status ?? ws.active ?? ws.enabled ?? 'one';
+                                return String(s) === 'one' || String(s) === '1' || s === 1;
+                            })
+                            .map((ws: any) => {
+                                const rawValue = ws.id ?? ws.value ?? ws.key ?? ws.code ?? ws.name;
+                                const value = rawValue !== undefined && rawValue !== null ? String(rawValue) : '';
+                                const label = ws.name ?? ws.label ?? value;
+                                return { value, label };
+                            });
+                        if (mapped.length > 0) {
+                            setWorkSettingsOptions(mapped);
+                        }
+                    }
+                } catch (err) {
+                    // ignore and keep defaults
+                }
             } catch (error) {
                 // Silently fail - user might not have saved data yet
                 console.log('No saved professional details found');
@@ -227,7 +254,7 @@ export default function ProfessionalDetails() {
     const watchedScope = watch("scope");
     const watchedProfessionalRegistrations = watch("professionalRegistrations") || [];
 
-    const selectedWorkSetting = config.workSettings.find((w) => w.value === watchedWorkSetting)?.label ?? "Select work setting";
+    const selectedWorkSetting = workSettingsOptions.find((w) => w.value === watchedWorkSetting)?.label ?? "Select work setting";
     const selectedScope = config.scopeOfPractice.find((s) => s.value === watchedScope)?.label ?? "Select scope of practice";
 
     const professionalRegistrationsOptions = [
@@ -1305,7 +1332,7 @@ export default function ProfessionalDetails() {
                             Select Work Setting
                         </Text>
                         <ScrollView>
-                            {config.workSettings.map((setting) => (
+                            {workSettingsOptions.map((setting) => (
                                 <TouchableOpacity
                                     key={setting.value}
                                     onPress={() => {
