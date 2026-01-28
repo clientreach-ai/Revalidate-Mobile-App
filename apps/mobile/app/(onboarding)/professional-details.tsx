@@ -21,98 +21,40 @@ const roleConfig = {
         registrationLabel: "GMC Registration Number",
         registrationPlaceholder: "e.g. 12345678",
         registrationBody: "GMC",
-        workSettings: [
-            { value: "nhs-hospital", label: "NHS Hospital" },
-            { value: "nhs-community", label: "NHS Community" },
-            { value: "private-practice", label: "Private Practice" },
-            { value: "gp-surgery", label: "GP Surgery" },
-            { value: "other", label: "Other" },
-        ],
-        scopeOfPractice: [
-            { value: "full-time", label: "Full Time" },
-            { value: "part-time", label: "Part Time" },
-            { value: "locum", label: "Locum" },
-            { value: "consultant", label: "Consultant" },
-            { value: "specialist", label: "Specialist" },
-            { value: "gp", label: "General Practice" },
-        ],
+        workSettings: [],
+        scopeOfPractice: [],
     },
     nurse: {
         registrationLabel: "NMC Registration Number",
         registrationPlaceholder: "e.g. 12A3456B",
         registrationBody: "NMC",
-        workSettings: [
-            { value: "nhs-hospital", label: "NHS Hospital" },
-            { value: "nhs-community", label: "NHS Community" },
-            { value: "private-practice", label: "Private Practice" },
-            { value: "gp-surgery", label: "GP Surgery" },
-            { value: "other", label: "Other" },
-        ],
-        scopeOfPractice: [
-            { value: "full-time", label: "Full Time" },
-            { value: "part-time", label: "Part Time" },
-            { value: "bank", label: "Bank" },
-            { value: "agency", label: "Agency" },
-            { value: "specialist", label: "Specialist" },
-        ],
+        workSettings: [],
+        scopeOfPractice: [],
     },
     pharmacist: {
         registrationLabel: "GPhC Registration Number",
         registrationPlaceholder: "e.g. 1234567",
         registrationBody: "GPhC",
-        workSettings: [
-            { value: "pharmacy", label: "Community Pharmacy" },
-            { value: "nhs-hospital", label: "NHS Hospital" },
-            { value: "private-practice", label: "Private Practice" },
-            { value: "other", label: "Other" },
-        ],
-        scopeOfPractice: [
-            { value: "full-time", label: "Full Time" },
-            { value: "part-time", label: "Part Time" },
-            { value: "locum", label: "Locum" },
-            { value: "superintendent", label: "Superintendent" },
-        ],
+        workSettings: [],
+        scopeOfPractice: [],
     },
     dentist: {
         registrationLabel: "GDC Registration Number",
         registrationPlaceholder: "e.g. 123456",
         registrationBody: "GDC",
-        workSettings: [
-            { value: "dental-practice", label: "Dental Practice" },
-            { value: "nhs-hospital", label: "NHS Hospital" },
-            { value: "private-practice", label: "Private Practice" },
-            { value: "other", label: "Other" },
-        ],
-        scopeOfPractice: [
-            { value: "full-time", label: "Full Time" },
-            { value: "part-time", label: "Part Time" },
-            { value: "locum", label: "Locum" },
-            { value: "specialist", label: "Specialist" },
-        ],
+        workSettings: [],
+        scopeOfPractice: [],
     },
     other: {
         registrationLabel: "Registration Number",
         registrationPlaceholder: "Enter your registration number",
         registrationBody: "",
-        workSettings: [
-            { value: "nhs-hospital", label: "NHS Hospital" },
-            { value: "nhs-community", label: "NHS Community" },
-            { value: "private-practice", label: "Private Practice" },
-            { value: "gp-surgery", label: "GP Surgery" },
-            { value: "pharmacy", label: "Pharmacy" },
-            { value: "dental-practice", label: "Dental Practice" },
-            { value: "other", label: "Other" },
-        ],
-        scopeOfPractice: [
-            { value: "full-time", label: "Full Time" },
-            { value: "part-time", label: "Part Time" },
-            { value: "locum", label: "Locum" },
-            { value: "consultant", label: "Consultant" },
-            { value: "specialist", label: "Specialist" },
-            { value: "general", label: "General Practice" },
-        ],
+        workSettings: [],
+        scopeOfPractice: [],
     },
 };
+
+type Option = { value: string; label: string };
 
 export default function ProfessionalDetails() {
     const router = useRouter();
@@ -123,9 +65,9 @@ export default function ProfessionalDetails() {
     const { isDark } = useThemeStore();
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingData, setIsLoadingData] = useState(true);
-    const [workSettingsOptions, setWorkSettingsOptions] = useState(() => config.workSettings);
+    const [workSettingsOptions, setWorkSettingsOptions] = useState<Option[]>(() => config.workSettings as Option[]);
     // Do not use mocked defaults for scope; initialize empty and populate from API response only
-    const [scopeOptions, setScopeOptions] = useState<any[]>(() => []);
+    const [scopeOptions, setScopeOptions] = useState<Option[]>(() => []);
     const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
     const [showScopeModal, setShowScopeModal] = useState(false);
     const [showProfessionalRegistrationsModal, setShowProfessionalRegistrationsModal] = useState(false);
@@ -216,9 +158,8 @@ export default function ProfessionalDetails() {
                 }
                 // Fetch dynamic work settings from backend (if available)
                 try {
-                    const token = await AsyncStorage.getItem('authToken');
                     // Use profile/work endpoint which returns [{id,name,status}]
-                    const workResp = await apiService.get<any>('/api/v1/profile/work', token);
+                    const workResp = await apiService.get<any>('/api/v1/profile/work', token as string);
                     const items = Array.isArray(workResp) ? workResp : workResp?.data ?? [];
                     if (Array.isArray(items)) {
                         const mapped = items
@@ -241,8 +182,7 @@ export default function ProfessionalDetails() {
 
                 // Fetch dynamic scope-of-practice values from backend
                 try {
-                    const token = await AsyncStorage.getItem('authToken');
-                    const scopeResp = await apiService.get<any>('/api/v1/profile/scope', token);
+                    const scopeResp = await apiService.get<any>('/api/v1/profile/scope', token as string);
                     const items = Array.isArray(scopeResp) ? scopeResp : scopeResp?.data ?? [];
                     if (Array.isArray(items)) {
                         const mapped = items
@@ -258,6 +198,28 @@ export default function ProfessionalDetails() {
                             });
                         // Apply mapped list exactly as returned (preserve order and labels).
                         setScopeOptions(mapped);
+                    }
+                } catch (err) {
+                    // ignore and keep defaults
+                }
+
+                // Fetch registration list (for Professional Registrations) from backend
+                try {
+                    const regResp = await apiService.get<any>('/api/v1/profile/registration', token as string);
+                    const items = Array.isArray(regResp) ? regResp : regResp?.data ?? [];
+                    if (Array.isArray(items)) {
+                        const mapped = items
+                            .filter((r: any) => {
+                                const st = r.status ?? r.active ?? r.enabled ?? 'one';
+                                return String(st) === 'one' || String(st) === '1' || st === 1;
+                            })
+                            .map((r: any) => {
+                                const rawValue = r.id ?? r.value ?? r.key ?? r.code ?? r.name;
+                                const value = rawValue !== undefined && rawValue !== null ? String(rawValue) : '';
+                                const label = r.name ?? r.label ?? value;
+                                return { value, label };
+                            });
+                        setRegistrationOptions(mapped);
                     }
                 } catch (err) {
                     // ignore and keep defaults
@@ -281,14 +243,8 @@ export default function ProfessionalDetails() {
     const selectedWorkSetting = workSettingsOptions.find((w) => w.value === watchedWorkSetting)?.label ?? "Select work setting";
     const selectedScope = scopeOptions.find((s) => s.value === watchedScope)?.label ?? "Select scope of practice";
 
-    const professionalRegistrationsOptions = [
-        { value: "gmc", label: "GMC (General Medical Council)" },
-        { value: "nmc", label: "NMC (Nursing and Midwifery Council)" },
-        { value: "gphc", label: "GPhC (General Pharmaceutical Council)" },
-        { value: "gdc", label: "GDC (General Dental Council)" },
-        { value: "hcpcc", label: "HCPC (Health and Care Professions Council)" },
-        { value: "other", label: "Other" },
-    ];
+    // Loaded from API: registration types (e.g. Midwife, Registered Nurse)
+    const [registrationOptions, setRegistrationOptions] = useState<Option[]>([]);
 
     const toggleProfessionalRegistration = (value: string) => {
         const current = watchedProfessionalRegistrations;
@@ -302,7 +258,7 @@ export default function ProfessionalDetails() {
     const getSelectedRegistrationsLabel = () => {
         if (watchedProfessionalRegistrations.length === 0) return "Select Items";
         if (watchedProfessionalRegistrations.length === 1) {
-            return professionalRegistrationsOptions.find((opt) => opt.value === watchedProfessionalRegistrations[0])?.label || "Select Items";
+            return registrationOptions.find((opt) => opt.value === watchedProfessionalRegistrations[0])?.label || "Select Items";
         }
         return `${watchedProfessionalRegistrations.length} items selected`;
     };
@@ -1486,7 +1442,7 @@ export default function ProfessionalDetails() {
                             Select Professional Registration(s)
                         </Text>
                         <ScrollView>
-                            {professionalRegistrationsOptions.map((option) => {
+                            {registrationOptions.map((option) => {
                                 const isSelected = watchedProfessionalRegistrations.includes(option.value as any);
                                 return (
                                     <TouchableOpacity
