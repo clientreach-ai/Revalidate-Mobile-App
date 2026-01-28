@@ -88,7 +88,7 @@ export default function Login() {
                 try {
                     // Optionally set subscription info if available (non-blocking)
                     try {
-                        const profile = await apiService.get(API_ENDPOINTS.USERS.ME, token);
+                        const profile = await apiService.get<any>(API_ENDPOINTS.USERS.ME, token);
                         if (profile?.data?.subscriptionTier) {
                             await setSubscriptionInfo({
                                 subscriptionTier: (profile.data.subscriptionTier || 'free') as 'free' | 'premium',

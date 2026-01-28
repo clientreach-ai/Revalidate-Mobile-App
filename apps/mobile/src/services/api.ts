@@ -47,7 +47,7 @@ class ApiService {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), probeTimeout);
-        const res = await fetch(`${base}/health`, { method: 'GET', signal: controller.signal });
+        const res = await fetch(`${base}/health`, { method: 'GET', signal: controller.signal as any });
         clearTimeout(timer);
         if (res && res.ok) {
           this.baseURL = base;
@@ -174,7 +174,7 @@ class ApiService {
    */
   async get<T>(endpoint: string, token?: string): Promise<T> {
     const isOnlineMandatory = this.isOnlineOnly(endpoint);
-    const { canOffline, isFreeUser } = this.getOfflineCapability();
+    const { isFreeUser } = this.getOfflineCapability();
 
     if (isOnlineMandatory || isFreeUser) {
       // Force network for security/auth or Free plan

@@ -288,6 +288,7 @@ export default function CalendarScreen() {
                   endTime: '',
                   type: 'official',
                 });
+                setCurrentDate(selectedDate);
                 setFormErrors({});
                 setShowAddEventModal(true);
               }}
@@ -532,6 +533,7 @@ export default function CalendarScreen() {
                     endTime: '',
                     type: 'official',
                   });
+                  setCurrentDate(selectedDate);
                   setFormErrors({});
                   setShowAddEventModal(true);
                 }}
@@ -617,6 +619,7 @@ export default function CalendarScreen() {
             endTime: '',
             type: 'official',
           });
+          setCurrentDate(selectedDate);
           setFormErrors({});
           setShowAddEventModal(true);
         }}
@@ -731,7 +734,10 @@ export default function CalendarScreen() {
                       Date
                     </Text>
                     <Pressable
-                      onPress={() => setShowDatePicker(true)}
+                        onPress={() => {
+                          setCurrentDate(eventForm.date);
+                          setShowDatePicker(true);
+                        }}
                       className={`border rounded-2xl px-4 py-4 flex-row items-center justify-between ${isDark
                         ? "bg-slate-700 border-slate-600 active:bg-slate-600"
                         : "bg-white border-slate-200 active:bg-slate-50"
@@ -909,32 +915,69 @@ export default function CalendarScreen() {
             <Text className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
               Select Date
             </Text>
-            <ScrollView className="max-h-64">
-              {calendarDays.filter(day => day.isCurrentMonth).map((day, index) => (
-                <Pressable
-                  key={index}
-                  onPress={() => {
-                    setEventForm({ ...eventForm, date: day.date });
-                    setShowDatePicker(false);
-                  }}
-                  className={`py-3 px-4 rounded-xl mb-2 ${isSameDay(day.date, eventForm.date)
-                    ? 'bg-[#2B5F9E]'
-                    : (isDark ? 'bg-slate-700' : 'bg-slate-50')
-                    }`}
-                >
-                  <Text className={`font-medium ${isSameDay(day.date, eventForm.date)
-                    ? 'text-white'
-                    : (isDark ? 'text-white' : 'text-slate-800')
-                    }`}>
-                    {day.date.toLocaleDateString('en-GB', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long'
-                    })}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+            <View>
+              <View className="flex-row justify-between items-center mb-4 px-2">
+                <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                  {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                </Text>
+                <View className="flex-row gap-1">
+                  <Pressable onPress={() => navigateMonth('prev')} className="p-1 rounded-lg">
+                    <MaterialIcons name="chevron-left" size={20} color="#64748B" />
+                  </Pressable>
+                  <Pressable onPress={() => navigateMonth('next')} className="p-1 rounded-lg">
+                    <MaterialIcons name="chevron-right" size={20} color="#64748B" />
+                  </Pressable>
+                </View>
+              </View>
+
+              <View className="flex-row justify-between mb-2">
+                {dayNames.map((day) => (
+                  <View key={day} className="flex-1 items-center">
+                    <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                      {day}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              <ScrollView className="max-h-64">
+                <View className="flex-row flex-wrap">
+                  {calendarDays.map((day, index) => {
+                    const isSelected = isSameDay(day.date, eventForm.date);
+                    const isCurrentMonth = day.isCurrentMonth;
+                    return (
+                      <Pressable
+                        key={index}
+                        onPress={() => {
+                          setEventForm({ ...eventForm, date: day.date });
+                          setSelectedDate(day.date);
+                          setShowDatePicker(false);
+                        }}
+                        className="w-[14.28%] py-2 items-center justify-center"
+                      >
+                        <View className="relative items-center justify-center">
+                          {isSelected ? (
+                            <>
+                              <View className="w-8 h-8 rounded-full border-2 border-[#2B5F9E] items-center justify-center">
+                                <Text className="text-[#2B5F9E] font-bold text-sm">{day.date.getDate()}</Text>
+                              </View>
+                              <View className="absolute -bottom-1 w-1 h-1 bg-[#2B5F9E] rounded-full" />
+                            </>
+                          ) : (
+                            <Text className={`text-sm font-medium ${isCurrentMonth
+                              ? (isDark ? 'text-white' : 'text-slate-800')
+                              : (isDark ? 'text-gray-500' : 'text-slate-300')
+                              }`}>
+                              {day.date.getDate()}
+                            </Text>
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </View>
             <Pressable
               onPress={() => setShowDatePicker(false)}
               className={`mt-4 py-3 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-100"

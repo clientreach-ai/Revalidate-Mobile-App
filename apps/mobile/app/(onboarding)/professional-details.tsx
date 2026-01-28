@@ -612,8 +612,6 @@ export default function ProfessionalDetails() {
         }
     };
 
-    const onFormSubmit = handleSubmit(onSubmit);
-
     // Allow completing setup even if some fields fail zod validation by
     // persisting the current form values as a partial payload and
     // navigating to the next step. This keeps the strict schema for
@@ -1409,7 +1407,7 @@ export default function ProfessionalDetails() {
                                         ? "bg-slate-800/90 text-white border border-slate-700/50"
                                         : "bg-white text-gray-900 border border-gray-200 shadow-sm"
                                 }`}
-                                style={{ textAlignVertical: 'top' }}
+                                style={{ justifyContent: 'flex-start' }}
                             >
                                 {onboardingSummary ? (
                                     onboardingSummary.split('\n').map((line, idx) => (
