@@ -4,6 +4,8 @@ import {
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
+  inviteCalendarEvent,
+  copyCalendarEvent,
 } from '@/features/calendar/calendar.api';
 import { CalendarEvent, CreateCalendarEvent, UpdateCalendarEvent } from '@/features/calendar/calendar.types';
 import { showToast } from '@/utils/toast';
@@ -86,6 +88,31 @@ export function useCalendar() {
     }
   }, []);
 
+  const inviteAttendees = useCallback(async (eventId: string, attendees: Array<{ userId?: string; email?: string }>) => {
+    try {
+      const res = await inviteCalendarEvent(eventId, attendees);
+      showToast.success('Invites sent', 'Success');
+      return res.data;
+    } catch (error: any) {
+      console.error('Error inviting attendees:', error);
+      showToast.error(error.message || 'Failed to invite attendees', 'Error');
+      throw error;
+    }
+  }, []);
+
+  const copyEvent = useCallback(async (eventId: string, date: string) => {
+    try {
+      const res = await copyCalendarEvent(eventId, date);
+      setEvents(prev => [...prev, res.data]);
+      showToast.success('Event copied', 'Success');
+      return res.data;
+    } catch (error: any) {
+      console.error('Error copying event:', error);
+      showToast.error(error.message || 'Failed to copy event', 'Error');
+      throw error;
+    }
+  }, []);
+
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
@@ -98,5 +125,7 @@ export function useCalendar() {
     createEvent,
     updateEvent,
     deleteEvent: removeEvent,
+    inviteAttendees,
+    copyEvent,
   };
 }

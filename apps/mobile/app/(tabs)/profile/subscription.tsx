@@ -84,7 +84,7 @@ export default function SubscriptionScreen() {
         setIsPremium(isPremiumUser);
         setSubscriptionStatus(response.data.subscriptionStatus || 'free');
         setTrialEndsAt(response.data.trialEndsAt || null);
-        
+
         await setSubscriptionInfo({
           subscriptionTier: (response.data.subscriptionTier || 'free') as 'free' | 'premium',
           subscriptionStatus: (response.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
@@ -159,8 +159,8 @@ export default function SubscriptionScreen() {
         throw new Error("Failed to create payment intent");
       }
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : "Failed to start payment process. Please try again.";
       showToast.error(errorMessage, "Error");
       setIsProcessingPayment(false);
@@ -201,7 +201,7 @@ export default function SubscriptionScreen() {
           confirmPayload.paymentIntentId = paymentIntentId;
         }
       }
-      
+
       await apiService.post(
         API_ENDPOINTS.PAYMENT.CONFIRM,
         confirmPayload,
@@ -211,12 +211,12 @@ export default function SubscriptionScreen() {
       setClientSecret(null);
       setPaymentIntentId(null);
       showToast.success("Payment successful! Premium plan activated.", "Success");
-      
+
       // Reload subscription status
       await loadSubscriptionStatus();
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error 
-        ? error.message 
+      const errorMessage = error instanceof Error
+        ? error.message
         : "Payment processing failed. Please try again.";
       showToast.error(errorMessage, "Payment Error");
       setIsProcessingPayment(false);
@@ -256,8 +256,8 @@ export default function SubscriptionScreen() {
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
-      <ScrollView 
-        className="flex-1" 
+      <ScrollView
+        className="flex-1"
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -271,11 +271,10 @@ export default function SubscriptionScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between mb-8 px-6 pt-4">
-          <Pressable 
+          <Pressable
             onPress={() => router.back()}
-            className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${
-              isDark ? "bg-slate-800" : "bg-white"
-            }`}
+            className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
+              }`}
           >
             <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#1F2937"} />
           </Pressable>
@@ -287,10 +286,9 @@ export default function SubscriptionScreen() {
 
         {/* Current Plan Card */}
         <View className="px-6 mb-6">
-          <View 
-            className={`rounded-2xl p-6 shadow-lg border-2 ${
-              isDark ? "bg-slate-800" : "bg-white"
-            } ${isPremium ? 'border-[#D4AF37]' : (isDark ? 'border-slate-700' : 'border-slate-200')}`}
+          <View
+            className={`rounded-2xl p-6 shadow-lg border-2 ${isDark ? "bg-slate-800" : "bg-white"
+              } ${isPremium ? 'border-[#D4AF37]' : (isDark ? 'border-slate-700' : 'border-slate-200')}`}
             style={isPremium ? {
               backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
               shadowColor: '#D4AF37',
@@ -306,10 +304,9 @@ export default function SubscriptionScreen() {
                   Current Plan
                 </Text>
                 <View className="flex-row items-center gap-2">
-                  <Text 
-                    className={`text-2xl font-bold ${
-                      isPremium ? 'text-[#D4AF37]' : (isDark ? 'text-white' : 'text-slate-800')
-                    }`}
+                  <Text
+                    className={`text-2xl font-bold ${isPremium ? 'text-[#D4AF37]' : (isDark ? 'text-white' : 'text-slate-800')
+                      }`}
                     style={isPremium ? {
                       textShadowColor: 'rgba(212, 175, 55, 0.3)',
                       textShadowOffset: { width: 0, height: 1 },
@@ -319,7 +316,7 @@ export default function SubscriptionScreen() {
                     {isPremium ? 'Premium' : 'Free'}
                   </Text>
                   {isPremium && (
-                    <View 
+                    <View
                       className="px-2 py-0.5 rounded-full bg-[#FFD700]/20 border border-[#D4AF37]/50"
                       style={{
                         shadowColor: '#FFD700',
@@ -336,10 +333,9 @@ export default function SubscriptionScreen() {
                   )}
                 </View>
               </View>
-              <View 
-                className={`w-16 h-16 rounded-xl items-center justify-center ${
-                  isPremium ? 'bg-gradient-to-br from-[#FFD700] to-[#D4AF37]' : (isDark ? 'bg-slate-700' : 'bg-slate-100')
-                }`}
+              <View
+                className={`w-16 h-16 rounded-xl items-center justify-center ${isPremium ? 'bg-gradient-to-br from-[#FFD700] to-[#D4AF37]' : (isDark ? 'bg-slate-700' : 'bg-slate-100')
+                  }`}
                 style={isPremium ? {
                   backgroundColor: '#D4AF37',
                   shadowColor: '#D4AF37',
@@ -349,18 +345,17 @@ export default function SubscriptionScreen() {
                   elevation: 6,
                 } : {}}
               >
-                <MaterialIcons 
-                  name="workspace-premium" 
-                  size={32} 
-                  color={isPremium ? '#1F2937' : (isDark ? '#9CA3AF' : '#64748B')} 
+                <MaterialIcons
+                  name="workspace-premium"
+                  size={32}
+                  color={isPremium ? '#1F2937' : (isDark ? '#9CA3AF' : '#64748B')}
                 />
               </View>
             </View>
             {isPremium && trialEndsAt && subscriptionStatus === 'trial' && (
-              <View 
-                className={`rounded-xl p-3 border ${
-                  isDark ? "bg-amber-900/30 border-amber-700/50" : "bg-amber-50 border-amber-200"
-                }`}
+              <View
+                className={`rounded-xl p-3 border ${isDark ? "bg-amber-900/30 border-amber-700/50" : "bg-amber-50 border-amber-200"
+                  }`}
                 style={isPremium ? {
                   shadowColor: '#F59E0B',
                   shadowOffset: { width: 0, height: 2 },
@@ -369,18 +364,16 @@ export default function SubscriptionScreen() {
                   elevation: 4,
                 } : {}}
               >
-                <Text className={`text-sm font-medium ${
-                  isDark ? "text-amber-300" : "text-amber-700"
-                }`}>
+                <Text className={`text-sm font-medium ${isDark ? "text-amber-300" : "text-amber-700"
+                  }`}>
                   ⏰ Trial ends on: {formatDate(trialEndsAt)}
                 </Text>
               </View>
             )}
             {isPremium && subscriptionStatus === 'active' && (
-              <View 
-                className={`rounded-xl p-3 border ${
-                  isDark ? "bg-[#D4AF37]/20 border-[#D4AF37]/50" : "bg-[#FFD700]/10 border-[#D4AF37]/30"
-                }`}
+              <View
+                className={`rounded-xl p-3 border ${isDark ? "bg-[#D4AF37]/20 border-[#D4AF37]/50" : "bg-[#FFD700]/10 border-[#D4AF37]/30"
+                  }`}
                 style={{
                   shadowColor: '#D4AF37',
                   shadowOffset: { width: 0, height: 2 },
@@ -389,9 +382,8 @@ export default function SubscriptionScreen() {
                   elevation: 4,
                 }}
               >
-                <Text className={`text-sm font-semibold ${
-                  isDark ? "text-[#FFD700]" : "text-[#D4AF37]"
-                }`}>
+                <Text className={`text-sm font-semibold ${isDark ? "text-[#FFD700]" : "text-[#D4AF37]"
+                  }`}>
                   ✨ Active Premium Subscription
                 </Text>
               </View>
@@ -403,9 +395,8 @@ export default function SubscriptionScreen() {
         <View className="px-6" style={{ gap: 16 }}>
           {/* Free Plan */}
           {!isPremium && (
-            <View className={`rounded-2xl p-6 shadow-sm ${
-              isDark ? "bg-slate-800" : "bg-white"
-            }`}>
+            <View className={`rounded-2xl p-6 shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
+              }`}>
               <View className="flex-row items-center justify-between mb-4">
                 <View className="flex-1">
                   <Text className={`text-xl font-bold mb-1 ${isDark ? "text-white" : "text-slate-800"}`}>
@@ -417,9 +408,8 @@ export default function SubscriptionScreen() {
                     </Text>
                   </Text>
                 </View>
-                <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                  isDark ? "border-slate-600 bg-slate-700" : "border-slate-300 bg-white"
-                }`}>
+                <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${isDark ? "border-slate-600 bg-slate-700" : "border-slate-300 bg-white"
+                  }`}>
                   <MaterialIcons name="check" size={16} color="#2563EB" />
                 </View>
               </View>
@@ -442,10 +432,9 @@ export default function SubscriptionScreen() {
           )}
 
           {/* Premium Plan */}
-          <View 
-            className={`rounded-2xl p-6 shadow-lg border-2 ${
-              isDark ? "bg-slate-800" : "bg-white"
-            } ${isPremium ? 'border-[#D4AF37]' : (isDark ? 'border-[#D4AF37]/60' : 'border-[#D4AF37]')}`}
+          <View
+            className={`rounded-2xl p-6 shadow-lg border-2 ${isDark ? "bg-slate-800" : "bg-white"
+              } ${isPremium ? 'border-[#D4AF37]' : (isDark ? 'border-[#D4AF37]/60' : 'border-[#D4AF37]')}`}
             style={!isPremium ? {
               shadowColor: '#D4AF37',
               shadowOffset: { width: 0, height: 4 },
@@ -457,12 +446,11 @@ export default function SubscriptionScreen() {
             <View className="flex-row items-center justify-between mb-4">
               <View className="flex-1">
                 <View className="flex-row items-center gap-2 mb-1">
-                  <Text 
-                    className={`text-xl font-bold ${
-                      isPremium 
+                  <Text
+                    className={`text-xl font-bold ${isPremium
                         ? (isDark ? "text-[#FFD700]" : "text-[#D4AF37]")
                         : (isDark ? "text-white" : "text-slate-800")
-                    }`}
+                      }`}
                     style={!isPremium ? {
                       textShadowColor: 'rgba(212, 175, 55, 0.3)',
                       textShadowOffset: { width: 0, height: 1 },
@@ -472,7 +460,7 @@ export default function SubscriptionScreen() {
                     Premium Plan
                   </Text>
                   {!isPremium && (
-                    <View 
+                    <View
                       className="bg-[#FFD700]/20 px-2 py-0.5 rounded-full border border-[#D4AF37]/50"
                       style={{
                         shadowColor: '#D4AF37',
@@ -486,12 +474,11 @@ export default function SubscriptionScreen() {
                     </View>
                   )}
                 </View>
-                <Text 
-                  className={`text-3xl font-bold ${
-                    isPremium 
+                <Text
+                  className={`text-3xl font-bold ${isPremium
                       ? (isDark ? "text-[#FFD700]" : "text-[#D4AF37]")
                       : (isDark ? "text-white" : "text-slate-800")
-                  }`}
+                    }`}
                   style={!isPremium ? {
                     textShadowColor: 'rgba(212, 175, 55, 0.2)',
                     textShadowOffset: { width: 0, height: 1 },
@@ -503,12 +490,11 @@ export default function SubscriptionScreen() {
                   </Text>
                 </Text>
               </View>
-              <View 
-                className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                  isPremium 
-                    ? 'bg-[#D4AF37] border-[#D4AF37]' 
+              <View
+                className={`w-6 h-6 rounded-full border-2 items-center justify-center ${isPremium
+                    ? 'bg-[#D4AF37] border-[#D4AF37]'
                     : (isDark ? 'border-[#D4AF37]/60 bg-[#D4AF37]/20' : 'border-[#D4AF37] bg-[#FFD700]/20')
-                }`}
+                  }`}
                 style={!isPremium ? {
                   shadowColor: '#D4AF37',
                   shadowOffset: { width: 0, height: 2 },
@@ -532,10 +518,10 @@ export default function SubscriptionScreen() {
                 'Premium Support',
               ].map((feature, index) => (
                 <View key={index} className="flex-row items-center gap-2">
-                  <MaterialIcons 
-                    name="check-circle" 
-                    size={20} 
-                    color={isPremium ? "#D4AF37" : "#D4AF37"} 
+                  <MaterialIcons
+                    name="check-circle"
+                    size={20}
+                    color={isPremium ? "#D4AF37" : "#D4AF37"}
                   />
                   <Text className={`text-sm ${isDark ? "text-gray-300" : "text-slate-600"}`}>
                     {feature}
@@ -545,12 +531,11 @@ export default function SubscriptionScreen() {
             </View>
             {!isPremium && (
               <>
-                <Pressable 
+                <Pressable
                   onPress={clientSecret ? handlePayment : handleUpgrade}
                   disabled={isProcessingPayment || !isStripeAvailable}
-                  className={`rounded-xl p-4 items-center mt-2 flex-row justify-center ${
-                    isProcessingPayment || !isStripeAvailable ? "bg-[#D4AF37]/50" : "bg-[#D4AF37]"
-                  }`}
+                  className={`rounded-xl p-4 items-center mt-2 flex-row justify-center ${isProcessingPayment || !isStripeAvailable ? "bg-[#D4AF37]/50" : "bg-[#D4AF37]"
+                    }`}
                   style={!isProcessingPayment && isStripeAvailable ? {
                     shadowColor: '#D4AF37',
                     shadowOffset: { width: 0, height: 4 },
@@ -564,30 +549,50 @@ export default function SubscriptionScreen() {
                   ) : clientSecret ? (
                     <>
                       <MaterialIcons name="lock" size={20} color="white" />
-                      <Text className="text-white font-semibold text-base ml-2">Pay & Upgrade</Text>
+                      <Text className="text-white font-semibold text-base ml-2">Pay & Upgrade Monthly</Text>
                     </>
                   ) : (
                     <>
                       <MaterialIcons name="workspace-premium" size={20} color="white" />
-                      <Text className="text-white font-semibold text-base ml-2">Upgrade to Premium</Text>
+                      <Text className="text-white font-semibold text-base ml-2">Upgrade Monthly (£9.99)</Text>
                     </>
                   )}
                 </Pressable>
+
+                {/* Yearly Upgrade Button */}
+                <Pressable
+                  onPress={() => {
+                    // TODO: Handle yearly upgrade specifics if different flow
+                    handleUpgrade();
+                  }}
+                  disabled={isProcessingPayment || !isStripeAvailable}
+                  className={`rounded-xl p-4 items-center mt-3 flex-row justify-center border-2 ${isProcessingPayment || !isStripeAvailable
+                      ? "border-[#D4AF37]/30 bg-transparent"
+                      : "border-[#D4AF37] bg-[#D4AF37]/10"
+                    }`}
+                >
+                  <View className="items-center">
+                    <Text className={`font-bold text-base ${isDark ? "text-[#D4AF37]" : "text-[#D4AF37]"}`}>
+                      Upgrade Yearly (£99.99)
+                    </Text>
+                    <Text className={`text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                      Save ~17% (2 months free)
+                    </Text>
+                  </View>
+                </Pressable>
+
                 {!isStripeAvailable && (
-                  <View className={`mt-3 rounded-xl p-3 ${
-                    isDark ? "bg-amber-900/20 border border-amber-800" : "bg-amber-50 border border-amber-200"
-                  }`}>
+                  <View className={`mt-3 rounded-xl p-3 ${isDark ? "bg-amber-900/20 border border-amber-800" : "bg-amber-50 border border-amber-200"
+                    }`}>
                     <View className="flex-row items-start gap-2">
                       <MaterialIcons name="info" size={20} color="#F59E0B" />
                       <View className="flex-1">
-                        <Text className={`text-sm font-medium mb-1 ${
-                          isDark ? "text-amber-300" : "text-amber-800"
-                        }`}>
+                        <Text className={`text-sm font-medium mb-1 ${isDark ? "text-amber-300" : "text-amber-800"
+                          }`}>
                           Development Build Required
                         </Text>
-                        <Text className={`text-xs ${
-                          isDark ? "text-amber-400" : "text-amber-700"
-                        }`}>
+                        <Text className={`text-xs ${isDark ? "text-amber-400" : "text-amber-700"
+                          }`}>
                           Stripe payments require a development build. Free plan works in Expo Go.
                         </Text>
                       </View>
@@ -600,16 +605,14 @@ export default function SubscriptionScreen() {
 
           {/* Manage Subscription */}
           {isPremium && (
-            <View className={`rounded-2xl p-6 shadow-sm ${
-              isDark ? "bg-slate-800" : "bg-white"
-            }`}>
+            <View className={`rounded-2xl p-6 shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
+              }`}>
               <Text className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
                 Manage Subscription
               </Text>
               <View className="gap-3">
-                <Pressable className={`flex-row items-center justify-between p-4 rounded-xl ${
-                  isDark ? "bg-slate-700" : "bg-slate-50"
-                }`}>
+                <Pressable className={`flex-row items-center justify-between p-4 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-50"
+                  }`}>
                   <View className="flex-row items-center gap-3">
                     <MaterialIcons name="credit-card" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
                     <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
@@ -618,9 +621,8 @@ export default function SubscriptionScreen() {
                   </View>
                   <MaterialIcons name="chevron-right" size={20} color={isDark ? "#64748B" : "#94A3B8"} />
                 </Pressable>
-                <Pressable className={`flex-row items-center justify-between p-4 rounded-xl ${
-                  isDark ? "bg-slate-700" : "bg-slate-50"
-                }`}>
+                <Pressable className={`flex-row items-center justify-between p-4 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-50"
+                  }`}>
                   <View className="flex-row items-center gap-3">
                     <MaterialIcons name="receipt" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
                     <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
@@ -629,7 +631,7 @@ export default function SubscriptionScreen() {
                   </View>
                   <MaterialIcons name="chevron-right" size={20} color={isDark ? "#64748B" : "#94A3B8"} />
                 </Pressable>
-                <Pressable 
+                <Pressable
                   onPress={async () => {
                     // TODO: Implement cancel subscription API call
                     showToast.info("Cancel subscription feature coming soon", "Info");

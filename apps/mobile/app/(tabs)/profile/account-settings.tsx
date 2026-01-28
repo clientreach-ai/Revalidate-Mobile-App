@@ -184,7 +184,7 @@ export default function AccountSettingsScreen() {
   };
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
+    <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-slate-50"}`} edges={['top']}>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 100 }}
@@ -220,7 +220,7 @@ export default function AccountSettingsScreen() {
             {/* Profile Picture Section */}
             <View className="items-center my-8">
               <View className="relative">
-                <View className={`w-32 h-32 rounded-full border-4 overflow-hidden shadow-sm ${isDark ? "border-slate-800" : "border-white"
+                <View className={`w-32 h-32 rounded-full border-4 overflow-hidden shadow-sm ${isDark ? "border-slate-800" : "border-slate-200"
                   }`}>
                   {profileImage ? (
                     <Image source={{ uri: profileImage }} className="w-full h-full" />
@@ -232,7 +232,7 @@ export default function AccountSettingsScreen() {
                 </View>
                 <Pressable
                   onPress={handleImagePick}
-                  className={`absolute bottom-1 right-1 bg-[#2B5E9C] p-2 rounded-full border-2 shadow-lg ${isDark ? "border-slate-800" : "border-white"
+                  className={`absolute bottom-1 right-1 bg-[#2B5E9C] p-2 rounded-full border-2 shadow-lg ${isDark ? "border-slate-800" : "border-slate-200"
                     }`}
                 >
                   <MaterialIcons name="camera-alt" size={16} color="#FFFFFF" />

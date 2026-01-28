@@ -46,7 +46,7 @@ export default function SplashScreen() {
                 setIsCheckingAuth(false);
                 requestAnimationFrame(() => {
                     setTimeout(() => {
-                        router.replace("/(onboarding)/role-selection");
+                        router.replace("/(onboarding)");
                     }, 1500);
                 });
             } catch (error) {
@@ -79,9 +79,8 @@ export default function SplashScreen() {
 
             {/* Dark mode toggle button */}
             <Pressable
-                className={`absolute top-4 right-4 p-2 rounded-full shadow-lg ${
-                    isDark ? "bg-slate-800/80" : "bg-white/80"
-                }`}
+                className={`absolute top-4 right-4 p-2 rounded-full shadow-lg ${isDark ? "bg-slate-800/80" : "bg-white/80"
+                    }`}
                 onPress={toggleTheme}
             >
                 <MaterialIcons

@@ -69,3 +69,24 @@ export async function deleteCalendarEvent(eventId: string): Promise<{ success: b
 
   return apiService.delete<{ success: boolean; message: string }>(`${API_ENDPOINTS.CALENDAR.DELETE_EVENT}/${eventId}`, token);
 }
+
+export async function inviteCalendarEvent(eventId: string, attendees: Array<{ userId?: string; email?: string }>) {
+  const token = await AsyncStorage.getItem('authToken');
+  if (!token) throw new Error('No authentication token found');
+
+  return apiService.post<{ success: boolean; data: any }>(`${API_ENDPOINTS.CALENDAR.EVENTS}/${eventId}/invite`, { attendees }, token);
+}
+
+export async function respondToInvite(eventId: string, attendeeId: string, status: 'accepted' | 'declined') {
+  const token = await AsyncStorage.getItem('authToken');
+  if (!token) throw new Error('No authentication token found');
+
+  return apiService.post<{ success: boolean; data: any }>(`${API_ENDPOINTS.CALENDAR.EVENTS}/${eventId}/respond`, { attendeeId, status }, token);
+}
+
+export async function copyCalendarEvent(eventId: string, date: string) {
+  const token = await AsyncStorage.getItem('authToken');
+  if (!token) throw new Error('No authentication token found');
+
+  return apiService.post<{ success: boolean; data: any }>(`${API_ENDPOINTS.CALENDAR.EVENTS}/${eventId}/copy`, { date }, token);
+}

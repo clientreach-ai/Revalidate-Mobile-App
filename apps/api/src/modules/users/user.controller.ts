@@ -518,3 +518,46 @@ export const getOnboardingDataEndpoint = asyncHandler(async (req: Request, res: 
     data,
   });
 });
+
+/**
+ * Search users for live autocomplete
+ * GET /api/v1/users/search?q=&limit=&offset=
+ */
+export const searchUsers = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+  try {
+    const q = (req.query.q || '').toString().trim();
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+    // Avoid expensive queries for very short queries
+    if (!q || q.length < 2) {
+      return res.json({ success: true, data: [], pagination: { total: 0, limit, offset } });
+    }
+
+    const { prisma } = await import('../../lib/prisma');
+
+    // Use raw SQL with LOWER(...) LIKE for case-insensitive matching to avoid
+    // Prisma `mode` compatibility issues across client versions.
+    const raw = await prisma.$queryRaw`
+      SELECT id, name, email
+      FROM users
+      WHERE (LOWER(name) LIKE CONCAT('%', LOWER(${q}), '%') OR LOWER(email) LIKE CONCAT('%', LOWER(${q}), '%'))
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    // $queryRaw returns any[]; normalize to expected shape
+    const users = Array.isArray(raw) ? raw.map((r: any) => ({ id: String(r.id), name: r.name, email: r.email })) : [];
+
+    res.json({ success: true, data: users, pagination: { total: users.length, limit, offset } });
+  } catch (err) {
+    console.error('Error in searchUsers:', err);
+    // Provide helpful message in development, generic in production
+    if (process.env.NODE_ENV === 'development') {
+      throw err; // let global handler show stack in dev
+    }
+    throw new ApiError(500, 'Internal server error');
+  }
+});

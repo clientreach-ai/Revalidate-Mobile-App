@@ -43,34 +43,34 @@ if (Platform.OS !== 'web') {
         }
         // Provide fallback hook that returns error functions
         useStripe = () => ({
-            initPaymentSheet: async () => ({ 
-                error: { 
+            initPaymentSheet: async () => ({
+                error: {
                     message: "Stripe is not available. Please build the app with native modules (development build).",
                     code: "STRIPE_NOT_AVAILABLE"
-                } 
+                }
             }),
-            presentPaymentSheet: async () => ({ 
-                error: { 
+            presentPaymentSheet: async () => ({
+                error: {
                     message: "Stripe is not available. Please build the app with native modules (development build).",
                     code: "STRIPE_NOT_AVAILABLE"
-                } 
+                }
             }),
         });
     }
 } else {
     // Web fallback
     useStripe = () => ({
-        initPaymentSheet: async () => ({ 
-            error: { 
+        initPaymentSheet: async () => ({
+            error: {
                 message: "Stripe is not available on web. Use Stripe.js for web payments.",
                 code: "STRIPE_NOT_AVAILABLE"
-            } 
+            }
         }),
-        presentPaymentSheet: async () => ({ 
-            error: { 
+        presentPaymentSheet: async () => ({
+            error: {
                 message: "Stripe is not available on web. Use Stripe.js for web payments.",
                 code: "STRIPE_NOT_AVAILABLE"
-            } 
+            }
         }),
     });
 }
@@ -107,7 +107,7 @@ export default function PlanChoose() {
     const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-    
+
     const stripe = useStripe();
     const initPaymentSheet = stripe?.initPaymentSheet || (async () => ({ error: { message: "Stripe not available" } }));
     const presentPaymentSheet = stripe?.presentPaymentSheet || (async () => ({ error: { message: "Stripe not available" } }));
@@ -172,7 +172,7 @@ export default function PlanChoose() {
 
                 if (response?.data?.step4?.subscriptionTier) {
                     reset({
-                        selectedPlan: response.data.step4.subscriptionTier as "free" | "premium",
+                        selectedPlan: response.data.step4.subscriptionTier as "free" | "premium" | "premium_yearly",
                         trialSelected: false,
                     });
                 }
@@ -188,7 +188,7 @@ export default function PlanChoose() {
     const onSubmit: SubmitHandler<OnboardingPlanInput> = useCallback(
         async (data) => {
             if (isNavigating) return;
-            
+
             try {
                 setIsNavigating(true);
 
@@ -214,12 +214,15 @@ export default function PlanChoose() {
                 }
 
                 // If premium plan, create subscription setup and show payment sheet
-                if (data.selectedPlan === "premium") {
+                if (data.selectedPlan === "premium" || data.selectedPlan === "premium_yearly") {
                     if (!isStripeAvailable) {
                         showToast.error("Stripe payment is not available. Please build the app with native modules enabled.", "Payment Unavailable");
                         setIsNavigating(false);
                         return;
                     }
+
+                    // For yearly plan, we pass 'yearly' interval to the backend
+                    const interval = data.selectedPlan === "premium_yearly" ? "year" : "month";
 
                     const paymentResponse = await apiService.post<{
                         success: boolean;
@@ -231,7 +234,7 @@ export default function PlanChoose() {
                         };
                     }>(
                         API_ENDPOINTS.PAYMENT.CREATE_INTENT,
-                        {},
+                        { interval }, // Pass interval to backend
                         token
                     );
 
@@ -246,10 +249,10 @@ export default function PlanChoose() {
                     }
                 }
             } catch (error: unknown) {
-                const errorMessage = error instanceof Error 
-                    ? error.message 
+                const errorMessage = error instanceof Error
+                    ? error.message
                     : "Failed to process plan selection. Please try again.";
-                
+
                 showToast.error(errorMessage, "Error");
                 setIsNavigating(false);
             }
@@ -294,7 +297,7 @@ export default function PlanChoose() {
                     confirmPayload.paymentIntentId = paymentIntentId;
                 }
             }
-            
+
             await apiService.post(
                 API_ENDPOINTS.PAYMENT.CONFIRM,
                 confirmPayload,
@@ -302,10 +305,14 @@ export default function PlanChoose() {
             );
 
             // Save subscription plan
+            // Note: Backend handles interval in payment intent, frontend just confirms 'premium' status
+            // But we can save the specific tier if we want detailed analytics
+            const tier = watchedPlan === "premium_yearly" ? "premium_yearly" : "premium";
+
             await apiService.post(
                 API_ENDPOINTS.USERS.ONBOARDING.STEP_4,
                 {
-                    subscription_tier: "premium",
+                    subscription_tier: tier,
                 },
                 token
             );
@@ -315,8 +322,8 @@ export default function PlanChoose() {
             showToast.success("Payment successful! Premium plan activated.", "Success");
             router.replace("/(tabs)/home");
         } catch (error: unknown) {
-            const errorMessage = error instanceof Error 
-                ? error.message 
+            const errorMessage = error instanceof Error
+                ? error.message
                 : "Payment processing failed. Please try again.";
             showToast.error(errorMessage, "Payment Error");
             setIsProcessingPayment(false);
@@ -325,7 +332,7 @@ export default function PlanChoose() {
 
     const onFormSubmit = handleSubmit(onSubmit);
 
-    const handleSelectPlan = useCallback((plan: "free" | "premium") => {
+    const handleSelectPlan = useCallback((plan: "free" | "premium" | "premium_yearly") => {
         setValue("selectedPlan", plan);
         if (plan === "free") {
             setValue("trialSelected", false);
@@ -379,16 +386,16 @@ export default function PlanChoose() {
                                 borderRadius: 16,
                                 borderWidth: 2,
                                 padding: 24,
-                                backgroundColor: watchedPlan === "free" 
-                                    ? "rgba(30, 90, 243, 0.1)" 
-                                    : isDark 
-                                    ? "rgba(30, 41, 59, 0.9)" 
-                                    : "#ffffff",
-                                borderColor: watchedPlan === "free" 
-                                    ? "#1E5AF3" 
-                                    : isDark 
-                                    ? "rgba(51, 65, 85, 0.5)" 
-                                    : "#e5e7eb",
+                                backgroundColor: watchedPlan === "free"
+                                    ? "rgba(30, 90, 243, 0.1)"
+                                    : isDark
+                                        ? "rgba(30, 41, 59, 0.9)"
+                                        : "#ffffff",
+                                borderColor: watchedPlan === "free"
+                                    ? "#1E5AF3"
+                                    : isDark
+                                        ? "rgba(51, 65, 85, 0.5)"
+                                        : "#e5e7eb",
                                 shadowColor: isDark ? "#000" : "#000",
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: isDark ? 0.1 : 0.05,
@@ -399,37 +406,34 @@ export default function PlanChoose() {
                             <View className="flex-row items-center justify-between mb-4">
                                 <View className="flex-1">
                                     <Text
-                                        className={`text-2xl font-bold mb-1 ${
-                                            watchedPlan === "free"
-                                                ? "text-primary"
-                                                : isDark
+                                        className={`text-2xl font-bold mb-1 ${watchedPlan === "free"
+                                            ? "text-primary"
+                                            : isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
-                                        }`}
+                                            }`}
                                     >
                                         Free Plan
                                     </Text>
                                     <Text
-                                        className={`text-3xl font-bold ${
-                                            watchedPlan === "free"
-                                                ? "text-primary"
-                                                : isDark
+                                        className={`text-3xl font-bold ${watchedPlan === "free"
+                                            ? "text-primary"
+                                            : isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
-                                        }`}
+                                            }`}
                                     >
                                         £0
                                         <Text className="text-lg font-normal">/month</Text>
                                     </Text>
                                 </View>
                                 <View
-                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                        watchedPlan === "free"
-                                            ? "bg-primary border-primary"
-                                            : isDark
+                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${watchedPlan === "free"
+                                        ? "bg-primary border-primary"
+                                        : isDark
                                             ? "border-slate-600 bg-slate-800"
                                             : "border-gray-300 bg-white"
-                                    }`}
+                                        }`}
                                 >
                                     {watchedPlan === "free" && (
                                         <MaterialIcons name="check" size={16} color="white" />
@@ -445,9 +449,8 @@ export default function PlanChoose() {
                                             color={watchedPlan === "free" ? "#1E5AF3" : isDark ? "#9CA3AF" : "#6B7280"}
                                         />
                                         <Text
-                                            className={`flex-1 text-sm ${
-                                                isDark ? "text-gray-300" : "text-gray-700"
-                                            }`}
+                                            className={`flex-1 text-sm ${isDark ? "text-gray-300" : "text-gray-700"
+                                                }`}
                                         >
                                             {feature}
                                         </Text>
@@ -469,16 +472,16 @@ export default function PlanChoose() {
                                 borderWidth: 2,
                                 padding: 24,
                                 position: 'relative',
-                                backgroundColor: watchedPlan === "premium" 
-                                    ? "rgba(30, 90, 243, 0.1)" 
-                                    : isDark 
-                                    ? "rgba(30, 41, 59, 0.9)" 
-                                    : "#ffffff",
-                                borderColor: watchedPlan === "premium" 
-                                    ? "#1E5AF3" 
-                                    : isDark 
-                                    ? "rgba(51, 65, 85, 0.5)" 
-                                    : "#e5e7eb",
+                                backgroundColor: watchedPlan === "premium"
+                                    ? "rgba(30, 90, 243, 0.1)"
+                                    : isDark
+                                        ? "rgba(30, 41, 59, 0.9)"
+                                        : "#ffffff",
+                                borderColor: watchedPlan === "premium"
+                                    ? "#1E5AF3"
+                                    : isDark
+                                        ? "rgba(51, 65, 85, 0.5)"
+                                        : "#e5e7eb",
                                 shadowColor: isDark ? "#000" : "#000",
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: isDark ? 0.1 : 0.05,
@@ -494,45 +497,41 @@ export default function PlanChoose() {
                             <View className="flex-row items-center justify-between mb-4">
                                 <View className="flex-1">
                                     <Text
-                                        className={`text-2xl font-bold mb-1 ${
-                                            watchedPlan === "premium"
-                                                ? "text-primary"
-                                                : isDark
+                                        className={`text-2xl font-bold mb-1 ${watchedPlan === "premium"
+                                            ? "text-primary"
+                                            : isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
-                                        }`}
+                                            }`}
                                     >
                                         Premium Plan
                                     </Text>
                                     <View className="flex-row items-baseline gap-1">
                                         <Text
-                                            className={`text-3xl font-bold ${
-                                                watchedPlan === "premium"
-                                                    ? "text-primary"
-                                                    : isDark
+                                            className={`text-3xl font-bold ${watchedPlan === "premium"
+                                                ? "text-primary"
+                                                : isDark
                                                     ? "text-white"
                                                     : "text-gray-900"
-                                            }`}
+                                                }`}
                                         >
                                             £9.99
                                         </Text>
                                         <Text
-                                            className={`text-lg ${
-                                                isDark ? "text-gray-400" : "text-gray-500"
-                                            }`}
+                                            className={`text-lg ${isDark ? "text-gray-400" : "text-gray-500"
+                                                }`}
                                         >
                                             /month
                                         </Text>
                                     </View>
                                 </View>
                                 <View
-                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                                        watchedPlan === "premium"
-                                            ? "bg-primary border-primary"
-                                            : isDark
+                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${watchedPlan === "premium"
+                                        ? "bg-primary border-primary"
+                                        : isDark
                                             ? "border-slate-600 bg-slate-800"
                                             : "border-gray-300 bg-white"
-                                    }`}
+                                        }`}
                                 >
                                     {watchedPlan === "premium" && (
                                         <MaterialIcons name="check" size={16} color="white" />
@@ -548,9 +547,109 @@ export default function PlanChoose() {
                                             color={watchedPlan === "premium" ? "#1E5AF3" : isDark ? "#9CA3AF" : "#6B7280"}
                                         />
                                         <Text
-                                            className={`flex-1 text-sm ${
-                                                isDark ? "text-gray-300" : "text-gray-700"
+                                            className={`flex-1 text-sm ${isDark ? "text-gray-300" : "text-gray-700"
+                                                }`}
+                                        >
+                                            {feature}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        </TouchableOpacity>
+
+                        {/* Premium Yearly Plan */}
+                        <TouchableOpacity
+                            onPress={(e) => {
+                                e?.preventDefault?.();
+                                handleSelectPlan("premium_yearly");
+                            }}
+                            activeOpacity={0.8}
+                            style={{
+                                width: '100%',
+                                borderRadius: 16,
+                                borderWidth: 2,
+                                padding: 24,
+                                position: 'relative',
+                                backgroundColor: watchedPlan === "premium_yearly"
+                                    ? "rgba(212, 175, 55, 0.1)"
+                                    : isDark
+                                        ? "rgba(30, 41, 59, 0.9)"
+                                        : "#ffffff",
+                                borderColor: watchedPlan === "premium_yearly"
+                                    ? "#D4AF37"
+                                    : isDark
+                                        ? "rgba(51, 65, 85, 0.5)"
+                                        : "#e5e7eb",
+                                shadowColor: isDark ? "#000" : "#000",
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: isDark ? 0.1 : 0.05,
+                                shadowRadius: 4,
+                                elevation: 2,
+                            }}
+                        >
+                            {/* Best Value Badge */}
+                            <View className="absolute -top-3 right-6 bg-[#D4AF37] px-3 py-1 rounded-full">
+                                <Text className="text-white text-xs font-bold">BEST VALUE</Text>
+                            </View>
+
+                            <View className="flex-row items-center justify-between mb-4">
+                                <View className="flex-1">
+                                    <Text
+                                        className={`text-2xl font-bold mb-1 ${watchedPlan === "premium_yearly"
+                                            ? "text-[#D4AF37]"
+                                            : isDark
+                                                ? "text-white"
+                                                : "text-gray-900"
                                             }`}
+                                    >
+                                        Yearly Plan
+                                    </Text>
+                                    <View className="flex-row items-baseline gap-1">
+                                        <Text
+                                            className={`text-3xl font-bold ${watchedPlan === "premium_yearly"
+                                                ? "text-[#D4AF37]"
+                                                : isDark
+                                                    ? "text-white"
+                                                    : "text-gray-900"
+                                                }`}
+                                        >
+                                            £99.99
+                                        </Text>
+                                        <Text
+                                            className={`text-lg ${isDark ? "text-gray-400" : "text-gray-500"
+                                                }`}
+                                        >
+                                            /year
+                                        </Text>
+                                    </View>
+                                    <Text className="text-xs text-green-600 font-medium mt-1">
+                                        Save ~17% (2 months free)
+                                    </Text>
+                                </View>
+                                <View
+                                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${watchedPlan === "premium_yearly"
+                                        ? "bg-[#D4AF37] border-[#D4AF37]"
+                                        : isDark
+                                            ? "border-slate-600 bg-slate-800"
+                                            : "border-gray-300 bg-white"
+                                        }`}
+                                >
+                                    {watchedPlan === "premium_yearly" && (
+                                        <MaterialIcons name="check" size={16} color="white" />
+                                    )}
+                                </View>
+                            </View>
+                            <View className="gap-2">
+                                {premiumFeatures.map((feature, index) => (
+                                    <View key={index} className="flex-row items-start gap-2">
+                                        <MaterialIcons
+                                            name="check-circle"
+                                            size={20}
+                                            color={watchedPlan === "premium_yearly" ? "#D4AF37" : isDark ? "#9CA3AF" : "#6B7280"}
+                                        />
+                                        <Text
+                                            className={`flex-1 text-sm ${isDark ? "text-gray-300" : "text-gray-700"
+                                                }`}
                                         >
                                             {feature}
                                         </Text>
@@ -560,15 +659,14 @@ export default function PlanChoose() {
                         </TouchableOpacity>
 
                         {/* Free Trial Option */}
-                        {watchedPlan === "premium" && (
+                        {(watchedPlan === "premium" || watchedPlan === "premium_yearly") && (
                             <View
-                                className={`rounded-2xl p-4 border ${
-                                    watchedTrial
-                                        ? "bg-primary/10 border-primary"
-                                        : isDark
+                                className={`rounded-2xl p-4 border ${watchedTrial
+                                    ? "bg-primary/10 border-primary"
+                                    : isDark
                                         ? "bg-slate-800/50 border-slate-700/50"
                                         : "bg-gray-50 border-gray-200"
-                                }`}
+                                    }`}
                             >
                                 <TouchableOpacity
                                     onPress={() => setValue("trialSelected", !watchedTrial)}
@@ -576,13 +674,12 @@ export default function PlanChoose() {
                                     className="flex-row items-center gap-3"
                                 >
                                     <View
-                                        className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                                            watchedTrial
-                                                ? "bg-primary border-primary"
-                                                : isDark
+                                        className={`w-5 h-5 rounded border-2 flex items-center justify-center ${watchedTrial
+                                            ? "bg-primary border-primary"
+                                            : isDark
                                                 ? "border-slate-600 bg-slate-800"
                                                 : "border-gray-300 bg-white"
-                                        }`}
+                                            }`}
                                     >
                                         {watchedTrial && (
                                             <MaterialIcons name="check" size={14} color="white" />
@@ -590,16 +687,14 @@ export default function PlanChoose() {
                                     </View>
                                     <View className="flex-1">
                                         <Text
-                                            className={`font-semibold ${
-                                                isDark ? "text-white" : "text-gray-900"
-                                            }`}
+                                            className={`font-semibold ${isDark ? "text-white" : "text-gray-900"
+                                                }`}
                                         >
                                             Start 28-Day Free Trial
                                         </Text>
                                         <Text
-                                            className={`text-sm mt-1 ${
-                                                isDark ? "text-gray-400" : "text-gray-500"
-                                            }`}
+                                            className={`text-sm mt-1 ${isDark ? "text-gray-400" : "text-gray-500"
+                                                }`}
                                         >
                                             Try all premium features free for 28 days. Cancel anytime.
                                         </Text>
@@ -613,15 +708,14 @@ export default function PlanChoose() {
 
             {/* Continue/Payment Button */}
             <View className={`px-6 pb-8 pt-4 border-t ${isDark ? "border-slate-700/50" : "border-gray-200"}`}>
-                {watchedPlan === "premium" && clientSecret ? (
+                {(watchedPlan === "premium" || watchedPlan === "premium_yearly") && clientSecret ? (
                     <TouchableOpacity
                         onPress={handlePayment}
                         disabled={isProcessingPayment || isNavigating}
-                        className={`w-full py-4 rounded-2xl flex-row items-center justify-center ${
-                            isProcessingPayment || isNavigating
-                                ? "bg-primary/50"
-                                : "bg-primary"
-                        }`}
+                        className={`w-full py-4 rounded-2xl flex-row items-center justify-center ${isProcessingPayment || isNavigating
+                            ? "bg-primary/50"
+                            : "bg-primary"
+                            }`}
                         style={{
                             shadowColor: "#1E5AF3",
                             shadowOffset: { width: 0, height: 8 },
@@ -642,34 +736,32 @@ export default function PlanChoose() {
                 ) : (
                     <TouchableOpacity
                         onPress={onFormSubmit}
-                    activeOpacity={0.8}
-                    disabled={isNavigating}
-                    className={`w-full bg-primary py-4 rounded-2xl flex-row items-center justify-center ${
-                        isNavigating ? "opacity-50" : "active:opacity-90"
-                    }`}
-                    style={{
-                        shadowColor: "#1E5AF3",
-                        shadowOffset: { width: 0, height: 8 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 12,
-                        elevation: 8,
-                    }}
-                >
-                    <Text className="text-white font-semibold text-base">
-                        {watchedPlan === "premium" && watchedTrial
-                            ? "Start Free Trial"
-                            : watchedPlan === "premium"
-                            ? "Subscribe to Premium"
-                            : "Continue with Free Plan"}
-                    </Text>
-                    <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
-                </TouchableOpacity>
+                        activeOpacity={0.8}
+                        disabled={isNavigating}
+                        className={`w-full bg-primary py-4 rounded-2xl flex-row items-center justify-center ${isNavigating ? "opacity-50" : "active:opacity-90"
+                            }`}
+                        style={{
+                            shadowColor: "#1E5AF3",
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 12,
+                            elevation: 8,
+                        }}
+                    >
+                        <Text className="text-white font-semibold text-base">
+                            {watchedPlan === "premium" && watchedTrial
+                                ? "Start Free Trial"
+                                : watchedPlan === "premium"
+                                    ? "Subscribe to Premium"
+                                    : "Continue with Free Plan"}
+                        </Text>
+                        <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
+                    </TouchableOpacity>
                 )}
                 {watchedPlan === "free" && (
                     <Text
-                        className={`text-center text-xs mt-3 ${
-                            isDark ? "text-gray-400" : "text-gray-500"
-                        }`}
+                        className={`text-center text-xs mt-3 ${isDark ? "text-gray-400" : "text-gray-500"
+                            }`}
                     >
                         You can upgrade to Premium anytime from settings
                     </Text>

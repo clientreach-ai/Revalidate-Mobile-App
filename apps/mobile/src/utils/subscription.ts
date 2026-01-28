@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface SubscriptionInfo {
-  subscriptionTier: 'free' | 'premium';
+  subscriptionTier: 'free' | 'premium' | 'premium_yearly';
   subscriptionStatus: 'active' | 'trial' | 'expired' | 'cancelled';
   isPremium: boolean;
   canUseOffline: boolean;
@@ -16,7 +16,7 @@ let cacheTimestamp: number = 0;
 export async function getSubscriptionInfo(): Promise<SubscriptionInfo | null> {
   try {
     const now = Date.now();
-    
+
     if (cachedSubscription && (now - cacheTimestamp) < CACHE_DURATION) {
       return cachedSubscription;
     }
@@ -62,5 +62,5 @@ export async function clearSubscriptionCache(): Promise<void> {
 }
 
 export function canUseOfflineMode(subscriptionTier: string | null | undefined): boolean {
-  return subscriptionTier === 'premium';
+  return subscriptionTier === 'premium' || subscriptionTier === 'premium_yearly';
 }

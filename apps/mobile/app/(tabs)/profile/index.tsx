@@ -174,6 +174,15 @@ export default function ProfileScreen() {
       iconColor: '#64748B',
       onPress: () => handleMenuPress('2'),
     },
+    ...(isPremium ? [{
+      id: 'export',
+      title: 'Export Data',
+      subtitle: 'Download PDF Report',
+      icon: 'file-download' as keyof typeof MaterialIcons.glyphMap,
+      iconBgColor: 'bg-blue-50',
+      iconColor: '#3B82F6',
+      onPress: () => router.push('/export'),
+    }] : []),
     {
       id: '3',
       title: 'Subscription',
@@ -202,11 +211,11 @@ export default function ProfileScreen() {
     },
   ];
 
-  const backgroundColor = isDark ? 'bg-background-dark' : 'bg-background-light';
+  const backgroundColor = isDark ? 'bg-background-dark' : 'bg-slate-50';
   const headerBgColor = isDark ? 'bg-slate-800' : 'bg-white';
-  const borderColor = isDark ? 'border-slate-800' : 'border-white';
+  const borderColor = isDark ? 'border-slate-800' : 'border-slate-200';
   const textColor = isDark ? 'text-white' : 'text-slate-800';
-  const secondaryTextColor = isDark ? 'text-gray-400' : 'text-gray-600';
+  const secondaryTextColor = isDark ? 'text-gray-400' : 'text-slate-600';
 
   return (
     <SafeAreaView className={`flex-1 ${backgroundColor}`} edges={['top']}>
@@ -248,7 +257,7 @@ export default function ProfileScreen() {
                   {profileImage ? (
                     <Image source={{ uri: profileImage }} className="w-full h-full" />
                   ) : (
-                    <View className={`w-full h-full items-center justify-center ${isPremium ? 'bg-gradient-to-br from-[#FFD700] to-[#D4AF37]' : 'bg-teal-200'}`}>
+                    <View className={`w-full h-full items-center justify-center ${isPremium ? 'bg-premium-400' : 'bg-teal-200'}`}>
                       <MaterialIcons name="person" size={64} color={isPremium ? '#1F2937' : '#14B8A6'} />
                     </View>
                   )}
@@ -273,7 +282,7 @@ export default function ProfileScreen() {
 
               {isPremium && (
                 <View className="mt-3 flex-row items-center space-x-2">
-                  <View className="px-3 py-1 rounded-full bg-gradient-to-br from-[#FFD700] to-[#D4AF37]">
+                  <View className="px-3 py-1 rounded-full bg-premium-400">
                     <Text className="text-sm font-semibold text-[#1F2937]">⭐ Premium</Text>
                   </View>
                 </View>
@@ -283,32 +292,32 @@ export default function ProfileScreen() {
             {/* NMC Revalidation Due Card */}
             {profile?.revalidationDate && (
               <View className="px-6 mb-8">
-                <View className={`${isPremium ? 'bg-gradient-to-br from-[#FFD700] to-[#D4AF37]' : 'bg-[#2563EB]'} p-5 rounded-2xl text-white shadow-xl`}>
+                <View className={`${isPremium ? 'bg-premium-400' : 'bg-primary-600'} p-5 rounded-2xl shadow-xl`}>
                   <View className="flex-row justify-between items-start mb-4">
                     <View>
-                      <Text className="text-blue-100 text-sm opacity-80 mb-1">
+                      <Text className={`${isPremium ? 'text-amber-900' : 'text-blue-100'} text-sm opacity-80 mb-1`}>
                         NMC Revalidation Due
                       </Text>
-                      <Text className="text-xl font-bold text-white">
+                      <Text className={`text-xl font-bold ${isPremium ? 'text-[#1F2937]' : 'text-white'}`}>
                         {formatDate(profile.revalidationDate)}
                       </Text>
                     </View>
-                    <View className="bg-white/20 p-2 rounded-lg">
-                      <MaterialIcons name="event-repeat" size={24} color="#FFFFFF" />
+                    <View className={`${isPremium ? 'bg-black/10' : 'bg-white/20'} p-2 rounded-lg`}>
+                      <MaterialIcons name="event-repeat" size={24} color={isPremium ? '#1F2937' : '#FFFFFF'} />
                     </View>
                   </View>
 
                   {/* Progress Bar */}
-                  <View className="w-full bg-white/20 rounded-full h-2 mb-3">
+                  <View className={`w-full ${isPremium ? 'bg-black/10' : 'bg-white/20'} rounded-full h-2 mb-3`}>
                     <View
-                      className="bg-white h-2 rounded-full"
+                      className={`${isPremium ? 'bg-[#1F2937]' : 'bg-white'} h-2 rounded-full`}
                       style={{ width: `${progressPercentage}%` }}
                     />
                   </View>
 
                   {daysLeft !== null && (
-                    <View className="bg-white/20 self-start px-2 py-1 rounded">
-                      <Text className="text-xs text-white font-medium">
+                    <View className={`${isPremium ? 'bg-black/10' : 'bg-white/20'} self-start px-2 py-1 rounded`}>
+                      <Text className={`text-xs font-medium ${isPremium ? 'text-[#1F2937]' : 'text-white'}`}>
                         {daysLeft > 0 ? `${daysLeft} Days Left` : daysLeft === 0 ? 'Due Today' : `${Math.abs(daysLeft)} Days Overdue`}
                       </Text>
                     </View>
@@ -322,8 +331,8 @@ export default function ProfileScreen() {
               {menuItems.map((item) => {
                 const itemBgColor = item.isDestructive ? 'bg-red-50' : headerBgColor;
                 const itemTextColor = item.isDestructive ? 'text-red-600' : textColor;
-                const subtitleColor = isDark ? 'text-gray-400' : 'text-slate-400';
-                const chevronColor = item.isDestructive ? '#DC2626' : (isDark ? '#64748B' : '#94A3B8');
+                const subtitleColor = isDark ? 'text-gray-400' : 'text-slate-500';
+                const chevronColor = item.isDestructive ? '#DC2626' : (isDark ? '#64748B' : '#CBD5E1');
 
                 return (
                   <Pressable

@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface SubscriptionInfo {
-    subscriptionTier: 'free' | 'premium';
+    subscriptionTier: 'free' | 'premium' | 'premium_yearly';
     subscriptionStatus: 'active' | 'trial' | 'expired' | 'cancelled';
     isPremium: boolean;
     canUseOffline: boolean;
@@ -11,7 +11,7 @@ export interface SubscriptionInfo {
 
 interface SubscriptionState extends SubscriptionInfo {
     setSubscriptionInfo: (info: SubscriptionInfo) => void;
-    setTier: (tier: 'free' | 'premium') => void;
+    setTier: (tier: 'free' | 'premium' | 'premium_yearly') => void;
     reset: () => void;
 }
 
@@ -31,8 +31,8 @@ export const useSubscriptionStore = create<SubscriptionState>()(
                 set((state) => ({
                     ...state,
                     subscriptionTier: tier,
-                    isPremium: tier === 'premium',
-                    canUseOffline: tier === 'premium',
+                    isPremium: tier === 'premium' || tier === 'premium_yearly',
+                    canUseOffline: tier === 'premium' || tier === 'premium_yearly',
                 })),
             reset: () => set(initialState),
         }),

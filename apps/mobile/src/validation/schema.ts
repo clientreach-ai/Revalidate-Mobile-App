@@ -120,7 +120,7 @@ export type OnboardingProfessionalDetailsInput = z.infer<
 >;
 
 export const onboardingPlanSchema = z.object({
-  selectedPlan: z.enum(['free', 'premium']),
+  selectedPlan: z.enum(['free', 'premium', 'premium_yearly']),
   trialSelected: z.boolean().default(false),
 });
 export type OnboardingPlanInput = z.infer<typeof onboardingPlanSchema>;

@@ -16,6 +16,13 @@ export interface CalendarEvent {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  attendees?: {
+    id: string;
+    userId: string | null;
+    name: string | null;
+    email: string | null;
+    status: string | null;
+  }[];
 }
 
 export interface CreateCalendarEvent {
@@ -148,6 +155,11 @@ export async function getCalendarEventById(
       id: BigInt(eventId),
       user_id: BigInt(userId),
     },
+    include: {
+      attendees: {
+        include: { users: { select: { id: true, name: true, email: true } } },
+      },
+    },
   });
 
   if (!event) {
@@ -169,6 +181,13 @@ export async function getCalendarEventById(
     status: event.status,
     createdAt: event.created_at,
     updatedAt: event.updated_at,
+    attendees: event.attendees?.map(a => ({
+      id: a.id.toString(),
+      userId: a.user_id ? a.user_id.toString() : null,
+      name: a.users ? a.users.name : null,
+      email: a.attendee_email ?? (a.users ? a.users.email : null),
+      status: a.status ?? null,
+    })) || [],
   };
 }
 
@@ -383,6 +402,40 @@ export async function inviteAttendees(
   }
 
   return created;
+}
+
+/**
+ * Respond to an invite (accept/decline) by updating the attendee status.
+ * Only the invited user (matched by user_id or attendee_email) may update their status.
+ */
+export async function respondToInvite(
+  eventId: string,
+  userId: string,
+  attendeeId: string,
+  status: 'accepted' | 'declined'
+): Promise<any> {
+  const attendee = await prisma.user_calendar_attendees.findFirst({ where: { id: BigInt(attendeeId), event_id: BigInt(eventId) } });
+  if (!attendee) {
+    throw new ApiError(404, 'Invite not found');
+  }
+
+  // Allow only the invited user to respond
+  const userIdNum = BigInt(userId);
+  const isOwnerMatch = attendee.user_id && attendee.user_id === userIdNum;
+
+  if (!isOwnerMatch) {
+    // If not linked to a user, allow match by email
+    if (!attendee.attendee_email) {
+      throw new ApiError(403, 'Not authorized to respond to this invite');
+    }
+    const user = await prisma.users.findFirst({ where: { id: userIdNum } });
+    if (!user || String(user.email).toLowerCase() !== String(attendee.attendee_email).toLowerCase()) {
+      throw new ApiError(403, 'Not authorized to respond to this invite');
+    }
+  }
+
+  const updated = await prisma.user_calendar_attendees.update({ where: { id: BigInt(attendeeId) }, data: { status } });
+  return { id: updated.id.toString(), userId: updated.user_id ? updated.user_id.toString() : null, email: updated.attendee_email, status: updated.status };
 }
 
 /**

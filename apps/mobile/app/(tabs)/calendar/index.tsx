@@ -1,9 +1,12 @@
 import { View, Text, ScrollView, Pressable, Modal, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getProfile } from '@/features/profile/profile.api';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useCalendar } from '@/hooks/useCalendar';
+import { searchUsers } from '@/features/users/users.api';
+import { getCalendarEventById, respondToInvite as apiRespondToInvite } from '@/features/calendar/calendar.api';
 import { CreateCalendarEvent, UpdateCalendarEvent } from '@/features/calendar/calendar.types';
 import '../../global.css';
 import { useRouter } from 'expo-router';
@@ -14,7 +17,11 @@ export default function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
-  const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent } = useCalendar();
+  const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, inviteAttendees } = useCalendar();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [showInvitesModal, setShowInvitesModal] = useState(false);
+  const [inviteRows, setInviteRows] = useState<Array<any>>([]);
+  const [isLoadingInvites, setIsLoadingInvites] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
@@ -34,6 +41,10 @@ export default function CalendarScreen() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<any>>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Array<{ id: string; name?: string; email?: string }>>([]);
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -144,6 +155,62 @@ export default function CalendarScreen() {
     }
   }, []); // Only run once on mount
 
+  // Load current user's profile to find invites addressed to them
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await getProfile();
+        if (!mounted) return;
+        const email = res?.data?.email ?? null;
+        if (email) setUserEmail(String(email));
+      } catch (e) {
+        // ignore profile fetch errors silently
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // When invites modal opens, fetch full event details for matching invites to obtain attendee records
+  useEffect(() => {
+    if (!showInvitesModal) return;
+    if (!userEmail) return;
+
+    let mounted = true;
+    (async () => {
+      setIsLoadingInvites(true);
+      try {
+        const matches = events.filter(e => e.invite && String(e.invite).toLowerCase().includes(userEmail.toLowerCase()));
+        const rows: any[] = [];
+        for (const m of matches) {
+          try {
+            const res = await getCalendarEventById(String(m.id));
+            const ev = res.data;
+            // find attendee record for this user
+            const attendee = (ev.attendees || []).find((a: any) => {
+              if (!a) return false;
+              if (a.userId && userEmail) {
+                // if attendee is linked to a user, compare by email
+                return String(a.email || '').toLowerCase() === String(userEmail).toLowerCase();
+              }
+              return String(a.email || '').toLowerCase() === String(userEmail).toLowerCase();
+            });
+            rows.push({ event: ev, attendee });
+          } catch (e) {
+            console.warn('Failed to load invite event detail', m.id, e);
+          }
+        }
+        if (mounted) setInviteRows(rows);
+      } catch (e) {
+        console.error('Failed to load invites', e);
+      } finally {
+        if (mounted) setIsLoadingInvites(false);
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, [showInvitesModal, userEmail, events]);
+
   const calendarDays = getDaysInMonth(currentDate);
 
   const validateForm = () => {
@@ -219,7 +286,15 @@ export default function CalendarScreen() {
             endTime: eventForm.endTime || undefined,
             location: eventForm.location || undefined,
           };
-          await createEvent(createData);
+          const created = await createEvent(createData);
+          if (selectedUsers && selectedUsers.length > 0) {
+            try {
+              const attendees = selectedUsers.map(u => ({ userId: u.id }));
+              await inviteAttendees(created.id, attendees);
+            } catch (e) {
+              console.error('Failed to send invites:', e);
+            }
+          }
         }
 
         setIsSubmitting(false);
@@ -240,6 +315,34 @@ export default function CalendarScreen() {
       }
     }
   };
+
+  // Debounced live search for users
+  useEffect(() => {
+    if (!searchQuery || searchQuery.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await searchUsers(searchQuery, 10, 0);
+        if (!cancelled) setSearchResults(res.data || []);
+      } catch (e) {
+        console.error('User search failed', e);
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   const formatTime = (hour: number, minute: number) => {
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
@@ -307,6 +410,19 @@ export default function CalendarScreen() {
               <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white items-center justify-center">
                 <Text className="text-white text-[8px] font-bold" style={{ lineHeight: 10 }}>2</Text>
               </View>
+            </Pressable>
+            <Pressable
+              onPress={() => setShowInvitesModal(true)}
+              className={`relative w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                }`}
+            >
+              <MaterialIcons name="mail" size={20} color="#2B5F9E" />
+              {/* Invites Badge */}
+              {userEmail && events.filter(e => e.invite && String(e.invite).toLowerCase().includes(userEmail.toLowerCase())).length > 0 && (
+                <View className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white items-center justify-center">
+                  <Text className="text-white text-[8px] font-bold" style={{ lineHeight: 10 }}>{events.filter(e => e.invite && String(e.invite).toLowerCase().includes(userEmail.toLowerCase())).length}</Text>
+                </View>
+              )}
             </Pressable>
           </View>
         </View>
@@ -459,8 +575,9 @@ export default function CalendarScreen() {
             </View>
           ) : filteredEvents.length > 0 ? (
             filteredEvents.map((event) => (
-              <View
+              <Pressable
                 key={event.id}
+                onPress={() => router.push({ pathname: '/(tabs)/calendar/[id]', params: { id: String(event.id) } })}
                 className={`p-4 rounded-2xl border shadow-sm flex-row items-start ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
                   }`}
                 style={{ gap: 16 }}
@@ -512,7 +629,7 @@ export default function CalendarScreen() {
                     </Text>
                   </View>
                 </View>
-              </View>
+              </Pressable>
             ))
           ) : (
             <View className={`p-8 rounded-2xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
@@ -605,6 +722,95 @@ export default function CalendarScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Invites Modal */}
+      <Modal
+        visible={showInvitesModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowInvitesModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className={`rounded-t-3xl max-h-[70%] ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            <SafeAreaView edges={['bottom']} className="px-6 py-4">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Invites</Text>
+                <Pressable onPress={() => setShowInvitesModal(false)}>
+                  <MaterialIcons name="close" size={22} color={isDark ? '#9CA3AF' : '#64748B'} />
+                </Pressable>
+              </View>
+
+              <ScrollView style={{ maxHeight: 320 }} nestedScrollEnabled>
+                {isLoadingInvites ? (
+                  <View className="p-4">
+                    <Text className={`${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Loading invites...</Text>
+                  </View>
+                ) : inviteRows.length > 0 ? (
+                  inviteRows.map(({ event: ev, attendee }: any) => (
+                    <View key={ev.id} className={`p-4 rounded-xl mb-2 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
+                      <View>
+                        <Text className={`font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{ev.title}</Text>
+                        <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>{ev.date} {ev.startTime ? `• ${ev.startTime}` : ''}</Text>
+                      </View>
+                      <View className="flex-row mt-3" style={{ gap: 8 }}>
+                        <Pressable
+                          onPress={async () => {
+                            if (!attendee) return;
+                            try {
+                              await apiRespondToInvite(String(ev.id), String(attendee.id), 'accepted');
+                              // refresh events and update rows
+                              await refresh();
+                              setInviteRows(prev => prev.map(r => r.event.id === ev.id ? { ...r, attendee: { ...r.attendee, status: 'accepted' } } : r));
+                            } catch (e) {
+                              console.error('Accept invite failed', e);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-lg bg-[#2B5F9E]"
+                        >
+                          <Text className="text-white">Accept</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={async () => {
+                            if (!attendee) return;
+                            try {
+                              await apiRespondToInvite(String(ev.id), String(attendee.id), 'declined');
+                              await refresh();
+                              setInviteRows(prev => prev.map(r => r.event.id === ev.id ? { ...r, attendee: { ...r.attendee, status: 'declined' } } : r));
+                            } catch (e) {
+                              console.error('Decline invite failed', e);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-lg bg-gray-200"
+                        >
+                          <Text className="text-slate-800">Decline</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            setShowInvitesModal(false);
+                            router.push({ pathname: '/(tabs)/calendar/[id]', params: { id: String(ev.id) } });
+                          }}
+                          className="px-4 py-2 rounded-lg border"
+                        >
+                          <Text className={`${isDark ? 'text-white' : 'text-slate-800'}`}>View</Text>
+                        </Pressable>
+                        {attendee && attendee.status && (
+                          <View className="ml-auto justify-center">
+                            <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Status: {attendee.status}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  ))
+                ) : (
+                  <View className="p-4">
+                    <Text className={`${isDark ? 'text-gray-300' : 'text-slate-700'}`}>No invites at the moment</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </SafeAreaView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Floating Action Button */}
       <Pressable
@@ -860,6 +1066,48 @@ export default function CalendarScreen() {
                           Personal
                         </Text>
                       </Pressable>
+                    </View>
+
+                    {/* Invite users (optional) - live search */}
+                    <View>
+                      <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>Invite Users (optional)</Text>
+                      <TextInput
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        placeholder="Search users by name or email"
+                        placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
+                        className={`border rounded-2xl px-4 py-3 text-base ${isDark ? "bg-slate-700 text-white border-slate-600" : "bg-white text-slate-800 border-slate-200"}`}
+                      />
+
+                      {selectedUsers.length > 0 && (
+                        <View className="flex-row flex-wrap mt-3" style={{ gap: 8 }}>
+                          {selectedUsers.map((u) => (
+                            <Pressable key={u.id} onPress={() => setSelectedUsers(prev => prev.filter(x => x.id !== u.id))} className="px-3 py-1 rounded-full bg-slate-200">
+                              <Text className="text-sm">{u.name || u.email}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      )}
+
+                      {searchQuery.length >= 2 && (
+                        <View className="mt-2 max-h-40">
+                          {isSearching ? (
+                            <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>Searching...</Text>
+                          ) : (
+                            searchResults.slice(0, 6).map((u) => (
+                              <Pressable key={u.id} onPress={() => {
+                                const exists = selectedUsers.some(s => s.id === String(u.id));
+                                if (exists) setSelectedUsers(prev => prev.filter(s => s.id !== String(u.id)));
+                                else setSelectedUsers(prev => [...prev, { id: String(u.id), name: u.name, email: u.email }]);
+                                setSearchQuery('');
+                                setSearchResults([]);
+                              }} className={`p-3 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-white'} mb-1 border`}>
+                                <Text className={isDark ? 'text-white' : 'text-slate-800'}>{u.name} {u.email ? `· ${u.email}` : ''}</Text>
+                              </Pressable>
+                            ))
+                          )}
+                        </View>
+                      )}
                     </View>
                   </View>
                 </View>

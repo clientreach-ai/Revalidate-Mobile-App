@@ -4,6 +4,7 @@ import {
   updateProfile,
   deleteAccount,
   register,
+  searchUsers,
   onboardingStep1,
   getOnboardingRoles,
   onboardingStep2,
@@ -23,6 +24,7 @@ router.post('/register', registrationRateLimiter, register);
 // All other routes require authentication
 router.use(authenticateToken);
 router.get('/profile', getProfile);
+router.get('/search', searchUsers);
 router.put('/profile', updateProfile);
 router.delete('/profile', deleteAccount);
 

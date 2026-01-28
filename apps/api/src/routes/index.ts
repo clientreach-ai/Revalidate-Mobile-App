@@ -13,11 +13,7 @@ import calendarRoutes from './calendar.routes';
 import notificationsRoutes from './notifications.routes';
 import profileRoutes from './profile.routes';
 import slidersRoutes from './sliders.routes';
-// TODO: Add more routes as modules are implemented
-// import analyticsRoutes from './analytics.routes';
-// import subscriptionRoutes from './subscription.routes';
-// import syncRoutes from './sync.routes';
-// import exportRoutes from './export.routes';
+import exportRoutes from './export.routes';
 
 const router = Router();
 
@@ -41,13 +37,9 @@ router.use(`${API_VERSION}/calendar`, calendarRoutes);
 router.use(`${API_VERSION}/notifications`, notificationsRoutes);
 router.use(`${API_VERSION}/profile`, profileRoutes);
 router.use(`${API_VERSION}/sliders`, slidersRoutes);
+router.use(`${API_VERSION}/export`, exportRoutes);
 console.log(`🔎 mounted sliders routes at ${API_VERSION}/sliders`);
-console.log(`🔎 mounted profile routes at ${API_VERSION}/profile`);
-// TODO: Mount additional routes as they're implemented
-// router.use(`${API_VERSION}/analytics`, analyticsRoutes);
-// router.use(`${API_VERSION}/subscription`, subscriptionRoutes);
-// router.use(`${API_VERSION}/sync`, syncRoutes);
-// router.use(`${API_VERSION}/export`, exportRoutes);
+console.log(`🔎 mounted export routes at ${API_VERSION}/export`);
 
 // API info endpoint
 router.get(`${API_VERSION}`, (_req, res) => {

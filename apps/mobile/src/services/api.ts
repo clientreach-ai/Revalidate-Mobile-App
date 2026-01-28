@@ -21,19 +21,28 @@ class ApiService {
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
-    this.timeout = API_CONFIG.TIMEOUT;
+    // Faster timeout for better UX (10 seconds instead of 30)
+    this.timeout = 10000;
 
-    // If developer explicitly set API_BASE_URL, respect it and skip auto-detection.
-    const explicitApiBase = typeof process !== 'undefined' && (process as any).env && (process as any).env.API_BASE_URL;
-    if (!explicitApiBase) {
-      // Probe for a locally running backend and prefer it if reachable.
-      // Fire-and-forget: if detection finishes after app start, subsequent requests will use localhost/emulator host.
+    // Skip local backend detection if already pointing to production
+    const isProductionUrl = this.baseURL.includes('fly.dev') ||
+      this.baseURL.includes('herokuapp.com') ||
+      this.baseURL.includes('.app') ||
+      this.baseURL.includes('.io');
+
+    if (!isProductionUrl) {
+      // Only probe for local backend during development
       console.log('[ApiService] initial baseURL:', this.baseURL);
-      this.detectLocalBackend().catch(() => {});
+      this.detectLocalBackend().catch(() => { });
+    } else {
+      console.log('[ApiService] using production baseURL:', this.baseURL);
     }
   }
 
   private async detectLocalBackend(): Promise<void> {
+    // Skip if not in development mode
+    if (__DEV__ !== true) return;
+
     // Probe emulator hosts first so Android emulators prefer the host machine
     const candidates = [
       'http://10.0.2.2:3000', // Android emulator (AVD)
@@ -41,7 +50,7 @@ class ApiService {
       'http://localhost:3000', // iOS simulator / expo web
       'http://127.0.0.1:3000',
     ];
-    const probeTimeout = 1000; // 1s
+    const probeTimeout = 500; // 500ms - quick probe
 
     for (const base of candidates) {
       try {
@@ -343,6 +352,30 @@ class ApiService {
       return response.json() as Promise<T>;
     } catch (error: any) {
       return this.handleOfflineWrite('DELETE', endpoint, undefined, token, error);
+    }
+  }
+
+  async postBlob(endpoint: string, data: unknown, token?: string): Promise<Blob> {
+    try {
+      const response = await fetch(this.getUrl(endpoint), {
+        method: 'POST',
+        headers: this.getHeaders(token),
+        body: JSON.stringify(data),
+        signal: this.createTimeoutSignal(this.timeout) as any,
+      });
+
+      if (!response.ok) {
+        const errorMessage = await this.parseErrorResponse(response);
+        throw new ServerError(errorMessage, response.status);
+      }
+      return await response.blob();
+    } catch (error: any) {
+      if (error instanceof ServerError) throw error;
+      const isConnected = await checkNetworkStatus();
+      if (!isConnected) {
+        throw new Error('INTERNET_REQUIRED: This feature requires an internet connection.');
+      }
+      throw error;
     }
   }
 

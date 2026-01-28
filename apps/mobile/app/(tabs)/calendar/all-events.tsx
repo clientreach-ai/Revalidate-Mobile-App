@@ -2,9 +2,10 @@ import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, M
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useCalendar } from '@/hooks/useCalendar';
+import { searchUsers } from '@/features/users/users.api';
 import { CreateCalendarEvent } from '@/features/calendar/calendar.types';
 import '../../global.css';
 
@@ -13,7 +14,7 @@ type EventType = 'all' | 'official' | 'personal';
 export default function AllEventsScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
-  const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent } = useCalendar();
+  const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, inviteAttendees } = useCalendar();
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
 
   // Modal State
@@ -33,6 +34,40 @@ export default function AllEventsScreen() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<any>>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Array<{ id: string; name?: string; email?: string }>>([]);
+
+  // Debounced live search
+  useEffect(() => {
+    if (!searchQuery || searchQuery.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await searchUsers(searchQuery, 10, 0);
+        if (!cancelled) {
+          setSearchResults(res.data || []);
+        }
+      } catch (e) {
+        console.error('User search failed', e);
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   // Helper for date picker
   const getDaysInMonthForPicker = () => {
@@ -122,7 +157,16 @@ export default function AllEventsScreen() {
         if (editingEventId) {
           await updateEvent(editingEventId, data);
         } else {
-          await createEvent(data);
+          const created = await createEvent(data);
+          // If users selected, invite them after event creation
+          if (selectedUsers && selectedUsers.length > 0) {
+            try {
+              const attendees = selectedUsers.map(u => ({ userId: u.id }));
+              await inviteAttendees(created.id, attendees);
+            } catch (e) {
+              console.error('Failed to send invites:', e);
+            }
+          }
         }
 
         setShowAddEventModal(false);
@@ -164,9 +208,6 @@ export default function AllEventsScreen() {
               color={isDark ? "#FFFFFF" : "#1E293B"}
             />
           </Pressable>
-          <Text className={`text-xl font-bold ${headerTextColor}`}>
-            All Events
-          </Text>
         </View>
         <Pressable
           onPress={() => {
@@ -244,8 +285,9 @@ export default function AllEventsScreen() {
         ) : filteredEvents.length > 0 ? (
           <View style={{ gap: 16 }}>
             {filteredEvents.map((event) => (
-              <View
+              <Pressable
                 key={event.id}
+                onPress={() => router.push({ pathname: '/(tabs)/calendar/[id]', params: { id: String(event.id) } })}
                 className={`p-4 rounded-2xl border shadow-sm ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
                   }`}
                 style={{ gap: 16 }}
@@ -316,7 +358,7 @@ export default function AllEventsScreen() {
                     )}
                   </View>
                 </View>
-              </View>
+              </Pressable>
             ))}
           </View>
         ) : (
@@ -414,6 +456,50 @@ export default function AllEventsScreen() {
                       multiline
                       className={`border rounded-2xl px-4 py-4 text-base min-h-[100px] ${isDark ? "bg-slate-700 text-white border-slate-600" : "bg-white text-slate-800 border-slate-200"}`}
                     />
+                  </View>
+
+                  {/* Invite users (optional) - live search */}
+                  <View>
+                    <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>Invite Users (optional)</Text>
+                    <TextInput
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      placeholder="Search users by name or email"
+                      placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
+                      className={`border rounded-2xl px-4 py-3 text-base ${isDark ? "bg-slate-700 text-white border-slate-600" : "bg-white text-slate-800 border-slate-200"}`}
+                    />
+
+                    {/* Selected chips */}
+                    {selectedUsers.length > 0 && (
+                      <View className="flex-row flex-wrap mt-3" style={{ gap: 8 }}>
+                        {selectedUsers.map((u) => (
+                          <Pressable key={u.id} onPress={() => setSelectedUsers(prev => prev.filter(x => x.id !== u.id))} className="px-3 py-1 rounded-full bg-slate-200">
+                            <Text className="text-sm">{u.name || u.email}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* Search results */}
+                    {searchQuery.length >= 2 && (
+                      <View className="mt-2 max-h-40">
+                        {isSearching ? (
+                          <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>Searching...</Text>
+                        ) : (
+                          searchResults.slice(0, 6).map((u) => (
+                            <Pressable key={u.id} onPress={() => {
+                              const exists = selectedUsers.some(s => s.id === String(u.id));
+                              if (exists) setSelectedUsers(prev => prev.filter(s => s.id !== String(u.id)));
+                              else setSelectedUsers(prev => [...prev, { id: String(u.id), name: u.name, email: u.email }]);
+                              setSearchQuery('');
+                              setSearchResults([]);
+                            }} className={`p-3 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-white'} mb-1 border`}> 
+                              <Text className={isDark ? 'text-white' : 'text-slate-800'}>{u.name} {u.email ? `· ${u.email}` : ''}</Text>
+                            </Pressable>
+                          ))
+                        )}
+                      </View>
+                    )}
                   </View>
 
                   <Pressable

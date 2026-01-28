@@ -10,6 +10,7 @@ import {
   CreateCalendarEvent,
   UpdateCalendarEvent,
   inviteAttendees,
+  respondToInvite,
   copyCalendarEvent,
 } from './calendar.model';
 import { z } from 'zod';
@@ -103,6 +104,13 @@ function formatEventResponse(event: any) {
     invite: event.invite || '',
     createdAt: formatDateTime(event.createdAt),
     updatedAt: formatDateTime(event.updatedAt),
+    attendees: event.attendees ? event.attendees.map((a: any) => ({
+      id: a.id,
+      userId: a.userId || null,
+      name: a.name || null,
+      email: a.email || null,
+      status: a.status || null,
+    })) : [],
   };
 }
 
@@ -243,6 +251,30 @@ export const invite = asyncHandler(async (req: Request, res: Response) => {
     res.json({ success: true, data: created });
   } catch (err) {
     console.error('Error in calendar.invite:', err);
+    throw err;
+  }
+});
+
+/**
+ * Respond to an invite (accept/decline)
+ * POST /api/v1/calendar/events/:id/respond
+ */
+export const respond = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const schema = z.object({
+    attendeeId: z.string().min(1),
+    status: z.enum(['accepted', 'declined']),
+  });
+
+  try {
+    const { attendeeId, status } = schema.parse(req.body);
+    const updated = await respondToInvite(req.params.id, req.user.userId, attendeeId, status as 'accepted' | 'declined');
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    console.error('Error in calendar.respond:', err);
     throw err;
   }
 });

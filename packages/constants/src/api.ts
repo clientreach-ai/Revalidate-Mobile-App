@@ -27,8 +27,11 @@ export const API_ENDPOINTS = {
     RESET_PASSWORD: '/api/v1/auth/reset-password',
     VERIFY_OTP: '/api/v1/auth/verify-email',
     RESEND_OTP: '/api/v1/auth/resend-otp',
+    CHANGE_PASSWORD: '/api/v1/auth/change-password',
   },
   USERS: {
+    // Search users (query param `q` expected)
+    SEARCH: '/api/v1/users/search',
     PROFILE: '/api/v1/users/profile',
     UPDATE_PROFILE: '/api/v1/users/profile',
     ME: '/api/v1/auth/me',
@@ -48,6 +51,8 @@ export const API_ENDPOINTS = {
     GET_BY_ID: '/api/v1/calendar/events',
     UPDATE_EVENT: '/api/v1/calendar/events',
     DELETE_EVENT: '/api/v1/calendar/events',
+    INVITE: '/api/v1/calendar/events',
+    COPY: '/api/v1/calendar/events',
   },
   DOCUMENTS: {
     UPLOAD: '/api/v1/documents/upload',
@@ -96,5 +101,9 @@ export const API_ENDPOINTS = {
   HEALTH: '/health',
   PROFILE: {
     ROLES: '/api/v1/profile/roles',
+  },
+  EXPORT: {
+    PREVIEW: '/api/v1/export/preview',
+    PORTFOLIO: '/api/v1/export/portfolio',
   },
 } as const;

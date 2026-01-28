@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Platform, Text } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -12,85 +12,70 @@ export default function TabsLayout() {
   const { isPremium } = usePremium();
 
   const activeColor = isPremium ? '#D4AF37' : '#2B5F9E';
+  const inactiveColor = isDark ? '#6B7280' : '#94A3B8';
 
-  // Calculate consistent spacing for both platforms
-  const bottomPadding = Platform.OS === 'ios'
-    ? Math.max(insets.bottom, 8) + 4  // iOS: safe area + 4px
-    : 8;  // Android: fixed 8px
-
+  // Premium height adjustments
   const tabBarHeight = Platform.OS === 'ios'
-    ? 70 + bottomPadding  // iOS: 70px content + bottom padding
-    : 70 + bottomPadding;  // Android: same for consistency
+    ? 75 + insets.bottom
+    : 85;
+
+  const TabIcon = ({ name, focused, color }: { name: keyof typeof MaterialIcons.glyphMap; focused: boolean; color: string }) => (
+    <View className="items-center justify-center pt-2">
+      <View
+        className={`items-center justify-center w-12 h-12 rounded-2xl ${focused ? (isPremium ? 'bg-premium-100/50' : 'bg-primary-50/50') : ''}`}
+        style={focused && Platform.OS === 'ios' ? { shadowColor: color, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 } : {}}
+      >
+        <MaterialIcons
+          name={name}
+          size={focused ? 42 : 38}
+          color={color}
+        />
+      </View>
+      {focused && (
+        <View
+          className="w-1.5 h-1.5 rounded-full absolute -bottom-3"
+          style={{ backgroundColor: color }}
+        />
+      )}
+    </View>
+  );
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: activeColor,
-        tabBarInactiveTintColor: isDark ? '#6B7280' : '#9CA3AF',
+        tabBarInactiveTintColor: inactiveColor,
         tabBarStyle: {
-          backgroundColor: Platform.OS === 'ios'
-            ? (isDark ? 'rgba(11, 18, 32, 0.8)' : 'rgba(255, 255, 255, 0.8)')
-            : (isDark ? '#0B1220' : '#FFFFFF'),
-          borderTopWidth: isPremium ? 2 : 1,
-          borderTopColor: isPremium
-            ? (isDark ? '#D4AF37' : '#D4AF37')
-            : (isDark ? '#1F2937' : '#E5E7EB'),
+          backgroundColor: isDark ? '#0B1220' : '#FFFFFF',
+          borderTopWidth: 0,
           height: tabBarHeight,
-          paddingBottom: bottomPadding,
-          paddingTop: 10,
-          paddingHorizontal: 0,
-          width: '100%',
-          elevation: isPremium ? 8 : 0,
-          shadowOpacity: isPremium ? 0.3 : 0,
-          shadowColor: isPremium ? '#D4AF37' : undefined,
-          shadowOffset: isPremium ? { width: 0, height: -2 } : undefined,
-          shadowRadius: isPremium ? 4 : undefined,
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
+          paddingTop: 0,
+          borderTopLeftRadius: 32,
+          borderTopRightRadius: 32,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -10 },
+          shadowOpacity: isDark ? 0.3 : 0.08,
+          shadowRadius: 20,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
-          marginTop: 4,
-          marginBottom: 0,
-          textAlign: 'center',
+          display: 'none', // We'll handle labels inside custom components if needed, or hide for cleaner look
         },
-        tabBarIconStyle: {
-          marginTop: 0,
-          marginBottom: 0,
-        },
-        tabBarItemStyle: {
-          paddingVertical: 8,
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          minWidth: 0,
-          maxWidth: '100%',
-        },
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
       }}
     >
       <Tabs.Screen
         name="home/index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ focused }) => (
-            <MaterialIcons
-              name="home"
-              size={28}
-              color={focused ? activeColor : '#9CA3AF'}
-            />
-          ),
-          tabBarLabel: ({ focused }) => (
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: focused ? '700' : '500',
-                color: focused ? activeColor : '#9CA3AF',
-                marginTop: 4,
-              }}
-            >
-              Home
-            </Text>
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="home" focused={focused} color={color} />
           ),
         }}
       />
@@ -99,24 +84,8 @@ export default function TabsLayout() {
         name="calendar/index"
         options={{
           title: 'Calendar',
-          tabBarIcon: ({ focused }) => (
-            <MaterialIcons
-              name="calendar-month"
-              size={28}
-              color={focused ? activeColor : '#9CA3AF'}
-            />
-          ),
-          tabBarLabel: ({ focused }) => (
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: focused ? '700' : '500',
-                color: focused ? activeColor : '#9CA3AF',
-                marginTop: 4,
-              }}
-            >
-              Calendar
-            </Text>
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="calendar-month" focused={focused} color={color} />
           ),
         }}
       />
@@ -125,24 +94,8 @@ export default function TabsLayout() {
         name="gallery/index"
         options={{
           title: 'Gallery',
-          tabBarIcon: ({ focused }) => (
-            <MaterialIcons
-              name="photo-library"
-              size={28}
-              color={focused ? activeColor : '#9CA3AF'}
-            />
-          ),
-          tabBarLabel: ({ focused }) => (
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: focused ? '700' : '500',
-                color: focused ? activeColor : '#9CA3AF',
-                marginTop: 4,
-              }}
-            >
-              Gallery
-            </Text>
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="photo-library" focused={focused} color={color} />
           ),
         }}
       />
@@ -151,24 +104,8 @@ export default function TabsLayout() {
         name="profile/index"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ focused }) => (
-            <MaterialIcons
-              name="person"
-              size={28}
-              color={focused ? activeColor : '#9CA3AF'}
-            />
-          ),
-          tabBarLabel: ({ focused }) => (
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: focused ? '700' : '500',
-                color: focused ? activeColor : '#9CA3AF',
-                marginTop: 4,
-              }}
-            >
-              Profile
-            </Text>
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="person" focused={focused} color={color} />
           ),
         }}
       />
@@ -184,8 +121,15 @@ export default function TabsLayout() {
       <Tabs.Screen name="profile/all-stats" options={{ href: null }} />
       <Tabs.Screen name="profile/subscription" options={{ href: null }} />
       <Tabs.Screen name="profile/settings" options={{ href: null }} />
+      <Tabs.Screen name="profile/change-password" options={{ href: null }} />
+      <Tabs.Screen name="profile/delete-account" options={{ href: null }} />
+      <Tabs.Screen name="profile/about" options={{ href: null }} />
+      <Tabs.Screen name="profile/terms" options={{ href: null }} />
+      <Tabs.Screen name="profile/privacy" options={{ href: null }} />
+      <Tabs.Screen name="profile/faq" options={{ href: null }} />
       <Tabs.Screen name="notifications/index" options={{ href: null }} />
       <Tabs.Screen name="calendar/all-events" options={{ href: null }} />
+      <Tabs.Screen name="calendar/[id]" options={{ href: null }} />
       <Tabs.Screen name="gallery/general" options={{ href: null }} />
       <Tabs.Screen name="appraisal/index" options={{ href: null }} />
     </Tabs>

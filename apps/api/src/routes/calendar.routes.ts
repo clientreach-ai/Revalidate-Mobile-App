@@ -7,6 +7,7 @@ import {
   remove,
   invite,
   copy,
+  respond,
 } from '../modules/calendar/calendar.controller';
 import { authenticateToken } from '../modules/auth/auth.middleware';
 
@@ -22,5 +23,6 @@ router.put('/events/:id', update);
 router.delete('/events/:id', remove);
 router.post('/events/:id/invite', invite);
 router.post('/events/:id/copy', copy);
+router.post('/events/:id/respond', respond);
 
 export default router;

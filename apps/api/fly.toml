@@ -7,9 +7,9 @@ app = 'revalidate-api'
 primary_region = 'iad'
 
 [build]
-  dockerfile = 'Dockerfile'
-  build_context = '../..'
-  dockerfile_path = 'apps/api/Dockerfile'
+  # Use repo root as build context so Dockerfile can COPY monorepo files
+  context = '../..'
+  dockerfile = 'apps/api/Dockerfile'
 
 [env]
   NODE_ENV = 'production'

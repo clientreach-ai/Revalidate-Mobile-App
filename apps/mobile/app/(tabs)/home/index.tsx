@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { API_CONFIG } from '@revalidation-tracker/constants';
@@ -35,6 +35,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
+  const isMounted = useRef(true); // Track mount status to prevent state updates on unmounted component
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [timer, setTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -106,7 +107,9 @@ export default function DashboardScreen() {
   };
 
   useEffect(() => {
+    isMounted.current = true;
     return () => {
+      isMounted.current = false;
       if (autoScrollIntervalRef.current) clearInterval(autoScrollIntervalRef.current);
       if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
     };
@@ -136,12 +139,25 @@ export default function DashboardScreen() {
   }, [viewportWidth, slides.length]);
 
   useEffect(() => {
-    loadUserData();
-    loadActiveSession();
-    loadDashboardStats();
-    loadNotificationsCount();
-    loadRecentActivities();
-    loadSlides();
+    const loadAllData = async () => {
+      // Load user data first as it might be needed for other calls (though mostly independent)
+      await loadUserData(); // Keep this first to set early user state if needed, or bundle it if completely independent.
+
+      // Parallelize independent data fetches
+      await Promise.all([
+        loadActiveSession(),
+        loadDashboardStats(),
+        loadNotificationsCount(),
+        loadRecentActivities(),
+        loadSlides()
+      ]);
+
+
+
+      if (isMounted.current) setIsLoading(false);
+    };
+
+    loadAllData();
   }, []);
 
   // Removed useFocusEffect to prevent auto-starting timer when switching tabs
@@ -224,6 +240,7 @@ export default function DashboardScreen() {
       }>(API_ENDPOINTS.WORK_HOURS.ACTIVE, token);
 
       if (response?.data && response.data.isActive) {
+        if (!isMounted.current) return;
         setActiveSession(response.data);
 
         // Load persisted pause state from AsyncStorage
@@ -285,10 +302,12 @@ export default function DashboardScreen() {
       }
     } catch (error) {
       console.error('Error loading active session:', error);
-      setActiveSession(null);
-      setIsPaused(false);
-      setPausedAt(null);
-      setTotalPausedTime(0);
+      if (isMounted.current) {
+        setActiveSession(null);
+        setIsPaused(false);
+        setPausedAt(null);
+        setTotalPausedTime(0);
+      }
     }
   };
 
@@ -506,14 +525,16 @@ export default function DashboardScreen() {
         const data = response.data;
         const userName = data.name || data.email?.split('@')[0] || 'User';
 
-        setUserData({
-          name: userName,
-          email: data.email,
-          professionalRole: data.professionalRole,
-          registrationNumber: data.registrationNumber,
-          revalidationDate: data.revalidationDate,
-          image: data.image || null,
-        });
+        if (isMounted.current) {
+          setUserData({
+            name: userName,
+            email: data.email,
+            professionalRole: data.professionalRole,
+            registrationNumber: data.registrationNumber,
+            revalidationDate: data.revalidationDate,
+            image: data.image || null,
+          });
+        }
 
         if (data.subscriptionTier) {
           await setSubscriptionInfo({
@@ -548,7 +569,7 @@ export default function DashboardScreen() {
               revalidationDate.setHours(0, 0, 0, 0);
               const diffTime = revalidationDate.getTime() - today.getTime();
               const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-              setRevalidationDays(diffDays);
+              if (isMounted.current) setRevalidationDays(diffDays);
             }
           } catch (error) {
             console.error('Error parsing revalidation date:', error);
@@ -559,7 +580,7 @@ export default function DashboardScreen() {
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
-      setIsLoading(false);
+      // Loading state is now managed by the parent Promise.all
     }
   };
 
@@ -639,21 +660,25 @@ export default function DashboardScreen() {
         console.warn('Reflections endpoint not available:', error);
       }
 
-      setStats({
-        totalHours: Math.round(totalHours),
-        totalEarnings: Math.round(totalEarnings),
-        cpdHours: Math.round(cpdHours),
-        reflectionsCount,
-      });
+      if (isMounted.current) {
+        setStats({
+          totalHours: Math.round(totalHours),
+          totalEarnings: Math.round(totalEarnings),
+          cpdHours: Math.round(cpdHours),
+          reflectionsCount,
+        });
+      }
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
       // Set default values on error
-      setStats({
-        totalHours: 0,
-        totalEarnings: 0,
-        cpdHours: 0,
-        reflectionsCount: 0,
-      });
+      if (isMounted.current) {
+        setStats({
+          totalHours: 0,
+          totalEarnings: 0,
+          cpdHours: 0,
+          reflectionsCount: 0,
+        });
+      }
     }
   };
 
@@ -671,11 +696,11 @@ export default function DashboardScreen() {
         const unread = response.data.filter(n =>
           n.status === '0' || n.isRead === false
         ).length;
-        setUnreadNotifications(unread);
+        if (isMounted.current) setUnreadNotifications(unread);
       }
     } catch (error) {
       console.warn('Error loading notifications count:', error);
-      setUnreadNotifications(0);
+      if (isMounted.current) setUnreadNotifications(0);
     }
   };
 
@@ -717,12 +742,12 @@ export default function DashboardScreen() {
         raw: it,
       }));
 
-      setRecentActivities(mapped);
+      if (isMounted.current) setRecentActivities(mapped);
     } catch (error) {
       console.warn('Error loading recent activities:', error);
-      setRecentActivities([]);
+      if (isMounted.current) setRecentActivities([]);
     } finally {
-      setIsLoadingActivities(false);
+      if (isMounted.current) setIsLoadingActivities(false);
     }
   };
 
@@ -747,7 +772,7 @@ export default function DashboardScreen() {
         }))
         .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
 
-      setSlides(slides);
+      if (isMounted.current) setSlides(slides);
 
       // Load persisted cache and then ensure images are cached locally.
       (async () => {
@@ -1228,157 +1253,157 @@ export default function DashboardScreen() {
                   if (w && w !== viewportWidth) setViewportWidth(w);
                 }}
               >
-              {slides.length === 0 ? (
-                <View className="p-6 items-center">
-                  <Text className={`text-sm ${isDark ? "text-gray-400" : "text-slate-500"}`}>
-                    No announcements
-                  </Text>
-                </View>
-              ) : (
-                <>
-                <Animated.ScrollView
-                  ref={r => { scrollRef.current = r as any; }}
-                  horizontal
-                  pagingEnabled
-                  scrollEventThrottle={16}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ padding: 8 }}
-                  onScrollBeginDrag={() => {
-                    // Pause auto-scroll when user interacts
-                    if (autoScrollIntervalRef.current) {
-                      clearInterval(autoScrollIntervalRef.current);
-                      autoScrollIntervalRef.current = null;
-                    }
-                    if (resumeTimeoutRef.current) {
-                      clearTimeout(resumeTimeoutRef.current);
-                      resumeTimeoutRef.current = null;
-                    }
-                  }}
-                  onTouchStart={() => {
-                    if (autoScrollIntervalRef.current) {
-                      clearInterval(autoScrollIntervalRef.current);
-                      autoScrollIntervalRef.current = null;
-                    }
-                    if (resumeTimeoutRef.current) {
-                      clearTimeout(resumeTimeoutRef.current);
-                      resumeTimeoutRef.current = null;
-                    }
-                  }}
-                  onScrollEndDrag={() => {
-                    // resume after 4 seconds of idle
-                    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
-                    resumeTimeoutRef.current = setTimeout(() => {
-                      startAutoScroll();
-                    }, 4000) as any;
-                  }}
-                  onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-                    const x = e.nativeEvent.contentOffset.x || 0;
-                    if (viewportWidth) {
-                      const idx = Math.round(x / viewportWidth);
-                      setCurrentSlideIndex(idx);
-                    }
-                    // resume auto-scroll after interaction
-                    if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
-                    resumeTimeoutRef.current = setTimeout(() => startAutoScroll(), 4000) as any;
-                  }}
-                  onScroll={Animated.event(
-                    [
-                      {
-                        nativeEvent: {
-                          contentOffset: { x: animatedX },
-                        },
-                      },
-                    ],
-                    { useNativeDriver: false }
-                  )}
-                >
-                  {slides.map((s, idx) => {
-                    const base = API_CONFIG.BASE_URL.replace(/\/$/, '');
-                    // Normalize server-provided image_url: if it's relative (starts with '/'), prefix with API base
-                    const normalizedImageUrl = s.image_url
-                      ? (/^https?:\/\//i.test(s.image_url)
-                          ? s.image_url
-                          : `${base}${s.image_url.startsWith('/') ? '' : '/'}${s.image_url}`)
-                      : null;
+                {slides.length === 0 ? (
+                  <View className="p-6 items-center">
+                    <Text className={`text-sm ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+                      No announcements
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Animated.ScrollView
+                      ref={r => { scrollRef.current = r as any; }}
+                      horizontal
+                      pagingEnabled
+                      scrollEventThrottle={16}
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ padding: 8 }}
+                      onScrollBeginDrag={() => {
+                        // Pause auto-scroll when user interacts
+                        if (autoScrollIntervalRef.current) {
+                          clearInterval(autoScrollIntervalRef.current);
+                          autoScrollIntervalRef.current = null;
+                        }
+                        if (resumeTimeoutRef.current) {
+                          clearTimeout(resumeTimeoutRef.current);
+                          resumeTimeoutRef.current = null;
+                        }
+                      }}
+                      onTouchStart={() => {
+                        if (autoScrollIntervalRef.current) {
+                          clearInterval(autoScrollIntervalRef.current);
+                          autoScrollIntervalRef.current = null;
+                        }
+                        if (resumeTimeoutRef.current) {
+                          clearTimeout(resumeTimeoutRef.current);
+                          resumeTimeoutRef.current = null;
+                        }
+                      }}
+                      onScrollEndDrag={() => {
+                        // resume after 4 seconds of idle
+                        if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+                        resumeTimeoutRef.current = setTimeout(() => {
+                          startAutoScroll();
+                        }, 4000) as any;
+                      }}
+                      onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                        const x = e.nativeEvent.contentOffset.x || 0;
+                        if (viewportWidth) {
+                          const idx = Math.round(x / viewportWidth);
+                          setCurrentSlideIndex(idx);
+                        }
+                        // resume auto-scroll after interaction
+                        if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+                        resumeTimeoutRef.current = setTimeout(() => startAutoScroll(), 4000) as any;
+                      }}
+                      onScroll={Animated.event(
+                        [
+                          {
+                            nativeEvent: {
+                              contentOffset: { x: animatedX },
+                            },
+                          },
+                        ],
+                        { useNativeDriver: false }
+                      )}
+                    >
+                      {slides.map((s, idx) => {
+                        const base = API_CONFIG.BASE_URL.replace(/\/$/, '');
+                        // Normalize server-provided image_url: if it's relative (starts with '/'), prefix with API base
+                        const normalizedImageUrl = s.image_url
+                          ? (/^https?:\/\//i.test(s.image_url)
+                            ? s.image_url
+                            : `${base}${s.image_url.startsWith('/') ? '' : '/'}${s.image_url}`)
+                          : null;
 
-                    const candidates = [
-                      normalizedImageUrl ?? `${base}/uploads/${s.image}`,
-                      `${base}/uploads/sliders/${s.image}`,
-                    ];
+                        const candidates = [
+                          normalizedImageUrl ?? `${base}/uploads/${s.image}`,
+                          `${base}/uploads/sliders/${s.image}`,
+                        ];
 
-                    const currentUri = slideImageMap[s.id] ?? candidates[0];
+                        const currentUri = slideImageMap[s.id] ?? candidates[0];
 
-                    const containerStyle: any = { width: viewportWidth || 320, marginRight: 0, alignItems: 'center' };
-                    const imgStyle: any = { width: (viewportWidth ? viewportWidth - 16 : 320), height: 160, borderRadius: 16 };
+                        const containerStyle: any = { width: viewportWidth || 320, marginRight: 0, alignItems: 'center' };
+                        const imgStyle: any = { width: (viewportWidth ? viewportWidth - 16 : 320), height: 160, borderRadius: 16 };
 
-                    return (
-                      <Pressable key={s.id} style={containerStyle} onPress={() => { /* future: handle slide tap */ }}>
-                        {currentUri ? (
-                          (() => {
-                            const w = viewportWidth || Dimensions.get('window').width;
-                            const inputRange = [Math.max(0, idx - 1) * w, idx * w, (idx + 1) * w];
-                            const scale = animatedX.interpolate({
-                              inputRange,
-                              outputRange: [0.95, 1, 0.95],
-                              extrapolate: 'clamp',
-                            });
-                            const opacity = animatedX.interpolate({
-                              inputRange,
-                              outputRange: [0.7, 1, 0.7],
-                              extrapolate: 'clamp',
-                            });
+                        return (
+                          <Pressable key={s.id} style={containerStyle} onPress={() => { /* future: handle slide tap */ }}>
+                            {currentUri ? (
+                              (() => {
+                                const w = viewportWidth || Dimensions.get('window').width;
+                                const inputRange = [Math.max(0, idx - 1) * w, idx * w, (idx + 1) * w];
+                                const scale = animatedX.interpolate({
+                                  inputRange,
+                                  outputRange: [0.95, 1, 0.95],
+                                  extrapolate: 'clamp',
+                                });
+                                const opacity = animatedX.interpolate({
+                                  inputRange,
+                                  outputRange: [0.7, 1, 0.7],
+                                  extrapolate: 'clamp',
+                                });
 
-                            return (
-                              <Animated.Image
-                                source={{ uri: currentUri }}
-                                style={[imgStyle, { transform: [{ scale }], opacity }]}
-                                resizeMode="cover"
-                                onError={() => {
-                                  // try the alternative candidate if available
-                                  setSlideImageMap(prev => {
-                                    const next = prev[s.id] === candidates[0] ? candidates[1] : null as any;
-                                    if (next) return { ...prev, [s.id]: next };
-                                    return { ...prev, [s.id]: '' };
-                                  });
-                                }}
-                              />
-                            );
-                          })()
-                        ) : (
-                          <View style={{ width: imgStyle.width, height: imgStyle.height, borderRadius: 16, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Image unavailable</Text>
-                          </View>
-                        )}
-                        {/* caption removed - only image shown */}
-                      </Pressable>
-                    );
-                  })}
-                </Animated.ScrollView>
+                                return (
+                                  <Animated.Image
+                                    source={{ uri: currentUri }}
+                                    style={[imgStyle, { transform: [{ scale }], opacity }]}
+                                    resizeMode="cover"
+                                    onError={() => {
+                                      // try the alternative candidate if available
+                                      setSlideImageMap(prev => {
+                                        const next = prev[s.id] === candidates[0] ? candidates[1] : null as any;
+                                        if (next) return { ...prev, [s.id]: next };
+                                        return { ...prev, [s.id]: '' };
+                                      });
+                                    }}
+                                  />
+                                );
+                              })()
+                            ) : (
+                              <View style={{ width: imgStyle.width, height: imgStyle.height, borderRadius: 16, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Image unavailable</Text>
+                              </View>
+                            )}
+                            {/* caption removed - only image shown */}
+                          </Pressable>
+                        );
+                      })}
+                    </Animated.ScrollView>
 
-                <View className="flex-row items-center justify-center mt-2">
-                  {(slides || []).map((_, i) => {
-                    const w = viewportWidth || Dimensions.get('window').width;
-                    const inputRange = [Math.max(0, i - 1) * w, i * w, (i + 1) * w];
-                    const scale = animatedX.interpolate({ inputRange, outputRange: [0.8, 1.2, 0.8], extrapolate: 'clamp' });
-                    const opacity = animatedX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
-                    return (
-                      <Animated.View
-                        key={String(i)}
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 4,
-                          marginHorizontal: 4,
-                          backgroundColor: isPremium ? '#D4AF37' : '#2B5F9E',
-                          transform: [{ scale }],
-                          opacity,
-                        }}
-                      />
-                    );
-                  })}
-                </View>
-                </>
-              )}
+                    <View className="flex-row items-center justify-center mt-2">
+                      {(slides || []).map((_, i) => {
+                        const w = viewportWidth || Dimensions.get('window').width;
+                        const inputRange = [Math.max(0, i - 1) * w, i * w, (i + 1) * w];
+                        const scale = animatedX.interpolate({ inputRange, outputRange: [0.8, 1.2, 0.8], extrapolate: 'clamp' });
+                        const opacity = animatedX.interpolate({ inputRange, outputRange: [0.5, 1, 0.5], extrapolate: 'clamp' });
+                        return (
+                          <Animated.View
+                            key={String(i)}
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 4,
+                              marginHorizontal: 4,
+                              backgroundColor: isPremium ? '#D4AF37' : '#2B5F9E',
+                              transform: [{ scale }],
+                              opacity,
+                            }}
+                          />
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
               </View>
             </Animated.View>
           </View>
