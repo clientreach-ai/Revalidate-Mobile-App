@@ -147,7 +147,28 @@ export default function GeneralGalleryScreen() {
 
     const handleViewDocument = async (file: any) => {
         try {
-            const url = file.fullUrl;
+            let url = file.fullUrl;
+
+            // If the list item does not include the actual file URL, fetch it on demand
+            if (!url) {
+                const token = await AsyncStorage.getItem('authToken');
+                if (!token) {
+                    router.replace('/(auth)/login');
+                    return;
+                }
+
+                try {
+                    const res = await apiService.get<{ data: { document: string } }>(
+                        `${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${file.id}`,
+                        token || ''
+                    );
+                    url = res?.data?.document ? getFullUrl(res.data.document) : '';
+                } catch (e) {
+                    console.error('Failed to fetch document URL:', e);
+                    url = '';
+                }
+            }
+
             if (url) {
                 if (file.isImage) {
                     setViewerUrl(url);
