@@ -97,6 +97,61 @@ export async function updateUserProfile(
   if (dbUpdates.hourly_rate !== undefined) {
     updateData.hourly_rate = dbUpdates.hourly_rate;
   }
+  if (updates.work_hours_completed_already !== undefined) {
+    updateData.hours_completed_already = updates.work_hours_completed_already;
+  }
+  if (updates.training_hours_completed_already !== undefined) {
+    updateData.training_hours_completed_already = updates.training_hours_completed_already;
+  }
+  if (updates.earned_current_financial_year !== undefined) {
+    updateData.earned = updates.earned_current_financial_year;
+  }
+  if (updates.notepad !== undefined) {
+    updateData.notepad = updates.notepad;
+  }
+
+  // Handle 'description' JSON fields
+  const descriptionFields = [
+    'professional_registrations',
+    'registration_reference_pin',
+    'brief_description_of_work',
+    'professional_role' // Also update role if provided (though it maps to reg_type, we store it in JSON too)
+  ];
+
+  const hasDescriptionUpdates = descriptionFields.some(f => (updates as any)[f] !== undefined);
+
+  if (hasDescriptionUpdates) {
+    const existingUser = await prisma.users.findUnique({
+      where: { id: BigInt(userId) },
+      select: { description: true },
+    });
+
+    let descriptionData: any = {};
+    if (existingUser?.description) {
+      try {
+        descriptionData = typeof existingUser.description === 'string'
+          ? JSON.parse(existingUser.description)
+          : existingUser.description;
+      } catch (e) {
+        descriptionData = {};
+      }
+    }
+
+    if (updates.professional_registrations !== undefined) {
+      descriptionData.professionalRegistrations = updates.professional_registrations;
+    }
+    if (updates.registration_reference_pin !== undefined) {
+      descriptionData.registrationReferencePin = updates.registration_reference_pin;
+    }
+    if (updates.brief_description_of_work !== undefined) {
+      descriptionData.briefDescriptionOfWork = updates.brief_description_of_work;
+    }
+    if (updates.professional_role !== undefined) {
+      descriptionData.professionalRole = updates.professional_role;
+    }
+
+    updateData.description = JSON.stringify(descriptionData);
+  }
 
   if (Object.keys(updateData).length === 0) {
     throw new ApiError(400, 'No fields to update');

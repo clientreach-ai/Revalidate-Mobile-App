@@ -658,7 +658,7 @@ model permissions {
   guard_name            String                  @db.VarChar(100)
   created_at            DateTime                @default(now()) @db.Timestamp(0)
   updated_at            DateTime                @default(now()) @db.Timestamp(0)
-  model_has_permissions model_has_permissions[]
+  model_has_permissions model_has_permissions[] @ignore
   role_has_permissions  role_has_permissions[]
 }
 

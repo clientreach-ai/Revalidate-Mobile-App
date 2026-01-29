@@ -26,6 +26,13 @@ export interface UpdateUserProfile {
   work_setting?: string;
   scope_of_practice?: string;
   hourly_rate?: number;
+  professional_registrations?: string;
+  registration_reference_pin?: string;
+  work_hours_completed_already?: number;
+  training_hours_completed_already?: number;
+  earned_current_financial_year?: number;
+  brief_description_of_work?: string;
+  notepad?: string;
 }
 
 /**

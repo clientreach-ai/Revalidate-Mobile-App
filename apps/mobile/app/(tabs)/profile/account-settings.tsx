@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -21,7 +21,32 @@ export default function AccountSettingsScreen() {
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('');
   const [registrationNumber, setRegistrationNumber] = useState('');
+  const [revalidationDate, setRevalidationDate] = useState<Date | null>(null);
+  const [workSetting, setWorkSetting] = useState('');
+  const [scope, setScope] = useState('');
+  const [professionalRegistrations, setProfessionalRegistrations] = useState<string[]>([]);
+  const [registrationPin, setRegistrationPin] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [workHoursCompleted, setWorkHoursCompleted] = useState('');
+  const [trainingHoursCompleted, setTrainingHoursCompleted] = useState('');
+  const [earningsCurrentYear, setEarningsCurrentYear] = useState('');
+  const [workDescription, setWorkDescription] = useState('');
+  const [notepad, setNotepad] = useState('');
+
   const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // Modals / Selection state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
+  const [showScopeModal, setShowScopeModal] = useState(false);
+  const [showRegistrationsModal, setShowRegistrationsModal] = useState(false);
+  const [registrationOptions, setRegistrationOptions] = useState<{ value: string; label: string }[]>([]);
+  const [workSettingsOptions, setWorkSettingsOptions] = useState<{ value: string; label: string }[]>([]);
+  const [scopeOptions, setScopeOptions] = useState<{ value: string; label: string }[]>([]);
+
+  // Calendar state
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -84,6 +109,55 @@ export default function AccountSettingsScreen() {
         setPhone(data.step2?.phone || '');
         setRole(data.step1?.role || profile?.professionalRole || '');
         setRegistrationNumber(data.step3?.registrationNumber || profile?.registrationNumber || '');
+
+        if (data.step3) {
+          const s3 = data.step3;
+          if (s3.revalidationDate) setRevalidationDate(new Date(s3.revalidationDate));
+          setWorkSetting(s3.workSetting || '');
+          setScope(s3.scope || '');
+          setProfessionalRegistrations(Array.isArray(s3.professionalRegistrations) ? s3.professionalRegistrations : []);
+          setRegistrationPin(s3.registrationPin || '');
+          setHourlyRate(String(s3.hourlyRate || ''));
+          setWorkHoursCompleted(String(s3.workHoursCompleted || ''));
+          setTrainingHoursCompleted(String(s3.trainingHoursCompleted || ''));
+          setEarningsCurrentYear(String(s3.earningsCurrentYear || ''));
+          setWorkDescription(s3.workDescription || '');
+          setNotepad(s3.notepad || '');
+        }
+      }
+
+      // Load master lists for dropdowns
+      try {
+        const [rolesResp, workResp, scopeResp] = await Promise.all([
+          apiService.get<any>(API_ENDPOINTS.USERS.ONBOARDING.ROLES, token),
+          apiService.get<any>('/api/v1/profile/work', token),
+          apiService.get<any>('/api/v1/profile/scope', token),
+        ]);
+
+        if (rolesResp?.data?.roles) {
+          // Flatten roles into registration types if needed, or follow onboarding logic
+          // For now let's just use the ones already provided in onboarding
+        }
+
+        if (workResp?.data || Array.isArray(workResp)) {
+          const items = Array.isArray(workResp) ? workResp : workResp.data;
+          setWorkSettingsOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+        }
+
+        if (scopeResp?.data || Array.isArray(scopeResp)) {
+          const items = Array.isArray(scopeResp) ? scopeResp : scopeResp.data;
+          setScopeOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+        }
+
+        // Fetch registration options
+        const regResp = await apiService.get<any>('/api/v1/profile/registration', token);
+        if (regResp?.data || Array.isArray(regResp)) {
+          const items = Array.isArray(regResp) ? regResp : regResp.data;
+          setRegistrationOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+        }
+
+      } catch (e) {
+        console.log('Failed to load master lists', e);
       }
     } catch (error: any) {
       console.error('Error loading user data:', error);
@@ -155,7 +229,17 @@ export default function AccountSettingsScreen() {
 
       const updatePayload: any = {
         registration_number: registrationNumber,
-        professional_role: apiRole // Send plain string or validated role
+        revalidation_date: revalidationDate ? revalidationDate.toISOString().split('T')[0] : undefined,
+        work_setting: workSetting,
+        scope_of_practice: scope,
+        professional_registrations: professionalRegistrations.join(','),
+        registration_reference_pin: registrationPin,
+        hourly_rate: parseFloat(hourlyRate) || 0,
+        work_hours_completed_already: parseInt(workHoursCompleted) || 0,
+        training_hours_completed_already: parseInt(trainingHoursCompleted) || 0,
+        earned_current_financial_year: parseFloat(earningsCurrentYear) || 0,
+        brief_description_of_work: workDescription,
+        notepad: notepad,
       };
 
       if (validRoles.includes(apiRole)) {
@@ -183,11 +267,120 @@ export default function AccountSettingsScreen() {
     await refreshProfile();
   };
 
+  const formatDate = (date: Date | null): string => {
+    if (!date) return 'Select date';
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
+
+  const handleDateSelect = (day: number) => {
+    setRevalidationDate(new Date(selectedYear, selectedMonth, day));
+    setShowDatePicker(false);
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      if (selectedMonth === 0) {
+        setSelectedMonth(11);
+        setSelectedYear(selectedYear - 1);
+      } else {
+        setSelectedMonth(selectedMonth - 1);
+      }
+    } else {
+      if (selectedMonth === 11) {
+        setSelectedMonth(0);
+        setSelectedYear(selectedYear + 1);
+      } else {
+        setSelectedMonth(selectedMonth + 1);
+      }
+    }
+  };
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+    const firstDay = getFirstDayOfMonth(selectedMonth, selectedYear);
+    const nodes: any[] = [];
+    for (let i = 0; i < firstDay; i++) nodes.push(<View key={`empty-${i}`} className="w-10 h-10" />);
+    for (let day = 1; day <= daysInMonth; day++) {
+      const isSelected = revalidationDate?.getDate() === day && revalidationDate?.getMonth() === selectedMonth && revalidationDate?.getFullYear() === selectedYear;
+      nodes.push(
+        <Pressable
+          key={day}
+          onPress={() => handleDateSelect(day)}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#2563EB]' : isDark ? 'bg-slate-700/50' : 'bg-transparent'}`}
+        >
+          <Text className={`text-sm font-medium ${isSelected ? 'text-white' : isDark ? 'text-white' : 'text-gray-900'}`}>{day}</Text>
+        </Pressable>
+      );
+    }
+    return nodes;
+  };
+
+  const toggleRegistration = (value: string) => {
+    if (professionalRegistrations.includes(value)) {
+      setProfessionalRegistrations(professionalRegistrations.filter(r => r !== value));
+    } else {
+      setProfessionalRegistrations([...professionalRegistrations, value]);
+    }
+  };
+
+  const SectionHeader = ({ icon, title }: { icon: keyof typeof MaterialIcons.glyphMap; title: string }) => (
+    <View className="flex-row items-center mb-2 mt-4 px-1" style={{ gap: 8 }}>
+      <MaterialIcons name={icon} size={20} color={isDark ? "#D4AF37" : "#2B5E9C"} />
+      <Text className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+        {title}
+      </Text>
+    </View>
+  );
+
+  const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'default', multiline = false }: any) => (
+    <View>
+      <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>{label}</Text>
+      <View className={`rounded-2xl border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
+          className={`px-4 py-3 text-base ${isDark ? "text-white" : "text-slate-900"}`}
+          keyboardType={keyboardType}
+          multiline={multiline}
+          numberOfLines={multiline ? 4 : 1}
+          style={multiline ? { textAlignVertical: 'top', minHeight: 100 } : {}}
+        />
+      </View>
+    </View>
+  );
+
+  const SelectField = ({ label, value, onPress, placeholder }: any) => (
+    <View>
+      <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>{label}</Text>
+      <Pressable
+        onPress={onPress}
+        className={`flex-row items-center justify-between rounded-2xl border px-4 py-3 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}
+      >
+        <Text className={`text-base ${value ? (isDark ? "text-white" : "text-slate-900") : (isDark ? "text-gray-500" : "text-slate-400")}`}>
+          {value || placeholder}
+        </Text>
+        <MaterialIcons name="keyboard-arrow-down" size={20} color={isDark ? "#6B7280" : "#9CA3AF"} />
+      </Pressable>
+    </View>
+  );
+
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-slate-50"}`} edges={['top']}>
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -216,7 +409,7 @@ export default function AccountSettingsScreen() {
             <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
           </View>
         ) : (
-          <>
+          <View className="px-6 pb-8" style={{ gap: 24 }}>
             {/* Profile Picture Section */}
             <View className="items-center my-8">
               <View className="relative">
@@ -240,116 +433,189 @@ export default function AccountSettingsScreen() {
               </View>
             </View>
 
-            {/* Form Fields */}
-            <View className="px-6 pb-8" style={{ gap: 16 }}>
-              {/* Name */}
+            {/* Personal Details */}
+            <View style={{ gap: 16 }}>
+              <SectionHeader icon="person" title="Personal Details" />
+              <InputField label="Full Name" value={name} onChangeText={setName} placeholder="Enter your full name" />
+              <InputField label="Email Address" value={email} onChangeText={setEmail} placeholder="Enter your email" keyboardType="email-address" />
+              <InputField label="Phone Number" value={phone} onChangeText={setPhone} placeholder="Enter your phone number" keyboardType="phone-pad" />
               <View>
-                <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-400" : "text-slate-600"}`}>
-                  Full Name
-                </Text>
-                <View className={`rounded-2xl p-4 shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"
-                  }`}>
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}
-                    placeholder="Enter your full name"
-                    placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                  />
-                </View>
-              </View>
-
-              {/* Email */}
-              <View>
-                <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-400" : "text-slate-600"}`}>
-                  Email Address
-                </Text>
-                <View className={`rounded-2xl p-4 shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"
-                  }`}>
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}
-                    placeholder="Enter your email"
-                    placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {/* Phone */}
-              <View>
-                <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-400" : "text-slate-600"}`}>
-                  Phone Number
-                </Text>
-                <View className={`rounded-2xl p-4 shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"
-                  }`}>
-                  <TextInput
-                    value={phone}
-                    onChangeText={setPhone}
-                    className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}
-                    placeholder="Enter your phone number"
-                    placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </View>
-
-              {/* Role */}
-              <View>
-                <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-400" : "text-slate-600"}`}>
-                  Professional Role
-                </Text>
-                <View className={`rounded-2xl p-4 shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"
-                  }`}>
-                  <TextInput
-                    value={role}
-                    onChangeText={setRole}
-                    className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}
-                    placeholder="e.g. Doctor, Nurse"
-                    placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                  />
+                <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>Professional Role</Text>
+                <View className={`rounded-2xl border px-4 py-3 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}>
+                  <Text className={`text-base ${isDark ? "text-white" : "text-slate-900"}`}>{role || 'Other'}</Text>
                 </View>
                 <Text className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
-                  Supported: Doctor, Nurse, Pharmacist, Other
+                  Role is set during onboarding and affects requirements.
                 </Text>
               </View>
-
-              {/* Registration Number */}
-              <View>
-                <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-400" : "text-slate-600"}`}>
-                  Registration Number
-                </Text>
-                <View className={`rounded-2xl p-4 shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"
-                  }`}>
-                  <TextInput
-                    value={registrationNumber}
-                    onChangeText={setRegistrationNumber}
-                    className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}
-                    placeholder="Enter registration number"
-                    placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                  />
-                </View>
-              </View>
-
-              {/* Save Button */}
-              <Pressable
-                onPress={handleSave}
-                disabled={isSaving}
-                className={`rounded-2xl p-4 items-center shadow-sm mt-4 ${isSaving ? "bg-gray-400" : "bg-[#2B5E9C]"
-                  }`}
-              >
-                {isSaving ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text className="text-white font-semibold text-base">Save Changes</Text>
-                )}
-              </Pressable>
             </View>
-          </>
+
+            {/* Professional Details */}
+            <View style={{ gap: 16 }}>
+              <SectionHeader icon="badge" title="Professional Details" />
+              <InputField label="Registration Number" value={registrationNumber} onChangeText={setRegistrationNumber} placeholder="Enter registration number" />
+              <SelectField
+                label="Revalidation Date"
+                value={revalidationDate ? formatDate(revalidationDate) : ''}
+                onPress={() => setShowDatePicker(true)}
+                placeholder="Select revalidation date"
+              />
+              <InputField label="Registration PIN" value={registrationPin} onChangeText={setRegistrationPin} placeholder="Enter PIN (if applicable)" />
+              <SelectField
+                label="Professional Registrations"
+                value={professionalRegistrations.length > 0 ? `${professionalRegistrations.length} items selected` : ''}
+                onPress={() => setShowRegistrationsModal(true)}
+                placeholder="Select registrations"
+              />
+            </View>
+
+            {/* Practice Settings */}
+            <View style={{ gap: 16 }}>
+              <SectionHeader icon="business" title="Practice Settings" />
+              <SelectField
+                label="Work Setting"
+                value={workSetting}
+                onPress={() => setShowWorkSettingModal(true)}
+                placeholder="Select work setting"
+              />
+              <SelectField
+                label="Scope of Practice"
+                value={scope}
+                onPress={() => setShowScopeModal(true)}
+                placeholder="Select scope of practice"
+              />
+            </View>
+
+            {/* Financial Details */}
+            <View style={{ gap: 16 }}>
+              <SectionHeader icon="payments" title="Financial Details" />
+              <InputField label="Hourly Rate (£)" value={hourlyRate} onChangeText={setHourlyRate} placeholder="e.g. 50" keyboardType="numeric" />
+              <InputField label="Earned This Financial Year (£)" value={earningsCurrentYear} onChangeText={setEarningsCurrentYear} placeholder="e.g. 0" keyboardType="numeric" />
+            </View>
+
+            {/* Work Load */}
+            <View style={{ gap: 16 }}>
+              <SectionHeader icon="history" title="Work Load History" />
+              <InputField label="Work Hours Already Completed" value={workHoursCompleted} onChangeText={setWorkHoursCompleted} placeholder="e.g. 450" keyboardType="numeric" />
+              <InputField label="Training Hours Already Completed" value={trainingHoursCompleted} onChangeText={setTrainingHoursCompleted} placeholder="e.g. 35" keyboardType="numeric" />
+            </View>
+
+            {/* Notes */}
+            <View style={{ gap: 16 }}>
+              <SectionHeader icon="notes" title="Additional Information" />
+              <InputField label="Brief Description of Work" value={workDescription} onChangeText={setWorkDescription} placeholder="Describe your current role..." multiline />
+              <InputField label="Notepad" value={notepad} onChangeText={setNotepad} placeholder="Personal notes..." multiline />
+            </View>
+
+            {/* Save Button */}
+            <Pressable
+              onPress={handleSave}
+              disabled={isSaving}
+              className={`rounded-2xl p-4 items-center shadow-md mt-6 ${isSaving ? "bg-gray-400" : "bg-[#2B5E9C]"}`}
+              style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+                elevation: 8,
+              }}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text className="text-white font-bold text-lg">Save All Changes</Text>
+              )}
+            </Pressable>
+          </View>
         )}
       </ScrollView>
+
+      {/* Date Picker Modal */}
+      <Modal visible={showDatePicker} transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
+        <Pressable className="flex-1 bg-black/50 justify-end" onPress={() => setShowDatePicker(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-t-3xl p-6`}>
+            <View className="flex-row items-center justify-between mb-4">
+              <Pressable onPress={() => navigateMonth('prev')} className="p-2">
+                <MaterialIcons name="chevron-left" size={24} color={isDark ? '#D1D5DB' : '#4B5563'} />
+              </Pressable>
+              <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{monthNames[selectedMonth]} {selectedYear}</Text>
+              <Pressable onPress={() => navigateMonth('next')} className="p-2">
+                <MaterialIcons name="chevron-right" size={24} color={isDark ? '#D1D5DB' : '#4B5563'} />
+              </Pressable>
+            </View>
+            <View className="flex-row justify-between mb-3">
+              {dayNames.map(d => <View key={d} className="w-10 items-center"><Text className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{d}</Text></View>)}
+            </View>
+            <View className="flex-row flex-wrap justify-between mb-6">{renderCalendar()}</View>
+            <Pressable onPress={() => setShowDatePicker(false)} className={`py-4 rounded-2xl items-center ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+              <Text className={`font-semibold ${isDark ? 'text-white' : 'text-gray-700'}`}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Selection Lists (Work Setting, Scope) */}
+      <Modal visible={showWorkSettingModal || showScopeModal} transparent animationType="fade" onRequestClose={() => { setShowWorkSettingModal(false); setShowScopeModal(false); }}>
+        <Pressable className="flex-1 bg-black/50 justify-center px-6" onPress={() => { setShowWorkSettingModal(false); setShowScopeModal(false); }}>
+          <View className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-6 max-h-[70%]`}>
+            <Text className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              {showWorkSettingModal ? 'Select Work Setting' : 'Select Scope of Practice'}
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {(showWorkSettingModal ? workSettingsOptions : scopeOptions).map((opt) => (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => {
+                    if (showWorkSettingModal) setWorkSetting(opt.label);
+                    else setScope(opt.label);
+                    setShowWorkSettingModal(false);
+                    setShowScopeModal(false);
+                  }}
+                  className={`py-4 border-b ${isDark ? 'border-slate-700' : 'border-gray-100'}`}
+                >
+                  <Text className={`text-base ${isDark ? 'text-white' : 'text-gray-800'}`}>{opt.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Multi-select Registrations */}
+      <Modal visible={showRegistrationsModal} transparent animationType="slide" onRequestClose={() => setShowRegistrationsModal(false)}>
+        <Pressable className="flex-1 bg-black/50 justify-end" onPress={() => setShowRegistrationsModal(false)}>
+          <View className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-t-3xl p-6 max-h-[85%]`}>
+            <View className="flex-row items-center justify-between mb-6">
+              <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Professional Registrations</Text>
+              <Pressable onPress={() => setShowRegistrationsModal(false)}>
+                <MaterialIcons name="close" size={24} color={isDark ? '#9CA3AF' : '#64748B'} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-6">
+              <View className="gap-3">
+                {registrationOptions.map((opt) => {
+                  const isSelected = professionalRegistrations.includes(opt.value);
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => toggleRegistration(opt.value)}
+                      className={`flex-row items-center p-4 rounded-2xl border ${isSelected ? (isDark ? 'bg-blue-900/20 border-blue-500' : 'bg-blue-50 border-blue-500') : (isDark ? 'bg-slate-700 border-slate-600' : 'bg-white border-gray-200')}`}
+                    >
+                      <View className="flex-1">
+                        <Text className={`text-base font-medium ${isSelected ? (isDark ? 'text-blue-400' : '#2563EB') : (isDark ? 'text-white' : 'text-gray-800')}`}>{opt.label}</Text>
+                      </View>
+                      {isSelected && <MaterialIcons name="check-circle" size={20} color="#2563EB" />}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <Pressable onPress={() => setShowRegistrationsModal(false)} className={`py-4 rounded-2xl items-center bg-[#2563EB]`}>
+              <Text className="text-white font-bold text-base">Done</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

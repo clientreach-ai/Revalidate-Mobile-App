@@ -32,6 +32,14 @@ const updateProfileSchema = z.object({
   professional_role: z.enum(['doctor', 'nurse', 'pharmacist', 'other', 'other_healthcare']).optional(),
   work_setting: z.string().optional(),
   scope_of_practice: z.string().optional(),
+  hourly_rate: z.number().min(0).optional(),
+  professional_registrations: z.string().optional(),
+  registration_reference_pin: z.string().optional(),
+  work_hours_completed_already: z.number().int().min(0).optional(),
+  training_hours_completed_already: z.number().int().min(0).optional(),
+  earned_current_financial_year: z.number().min(0).optional(),
+  brief_description_of_work: z.string().optional(),
+  notepad: z.string().optional(),
 });
 
 function formatUserResponse(user: any, name?: string | null, requirements?: any) {
