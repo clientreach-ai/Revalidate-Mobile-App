@@ -15,26 +15,35 @@ export default function TabsLayout() {
   const inactiveColor = isDark ? '#6B7280' : '#94A3B8';
 
   // Premium height adjustments
-  const tabBarHeight = Platform.OS === 'ios'
-    ? 75 + insets.bottom
-    : 85;
+  const tabBarHeight = Platform.OS === 'ios' ? 70 + insets.bottom : 72;
 
-  const TabIcon = ({ name, focused, color }: { name: keyof typeof MaterialIcons.glyphMap; focused: boolean; color: string }) => (
-    <View className="items-center justify-center pt-2">
+  const TabIcon = ({
+    name,
+    focused,
+    color,
+  }: {
+    name: keyof typeof MaterialIcons.glyphMap;
+    focused: boolean;
+    color: string;
+  }) => (
+    <View className="items-center justify-center pt-1">
       <View
-        className={`items-center justify-center w-12 h-12 rounded-2xl ${focused ? (isPremium ? 'bg-premium-100/50' : 'bg-primary-50/50') : ''}`}
-        style={focused && Platform.OS === 'ios' ? { shadowColor: color, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 } : {}}
+        className="items-center justify-center w-10 h-10 rounded-2xl"
+        style={
+          focused
+            ? {
+                transform: [{ translateY: -0.5 }],
+                backgroundColor: isPremium ? '#D4AF3714' : '#2B5F9E14',
+              }
+            : {}
+        }
       >
-        <MaterialIcons
-          name={name}
-          size={focused ? 42 : 38}
-          color={color}
-        />
+        <MaterialIcons name={name} size={focused ? 28 : 26} color={color} />
       </View>
       {focused && (
         <View
-          className="w-1.5 h-1.5 rounded-full absolute -bottom-3"
-          style={{ backgroundColor: color }}
+          className="w-6 h-0.5 rounded-full absolute -bottom-3"
+          style={{ backgroundColor: color, opacity: 0.8 }}
         />
       )}
     </View>
@@ -47,22 +56,22 @@ export default function TabsLayout() {
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,
         tabBarStyle: {
-          backgroundColor: isDark ? '#0B1220' : '#FFFFFF',
+          backgroundColor: isDark ? '#0B1220F2' : '#FFFFFFF2',
           borderTopWidth: 0,
           height: tabBarHeight,
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 10,
-          paddingTop: 0,
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
+          paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 8) : 8,
+          paddingTop: 6,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
           position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          elevation: 20,
+          bottom: Platform.OS === 'ios' ? 8 : 0,
+          left: Platform.OS === 'ios' ? 16 : 0,
+          right: Platform.OS === 'ios' ? 16 : 0,
+          elevation: Platform.OS === 'ios' ? 0 : 12,
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -10 },
-          shadowOpacity: isDark ? 0.3 : 0.08,
-          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: isDark ? 0.25 : 0.12,
+          shadowRadius: 18,
         },
         tabBarLabelStyle: {
           display: 'none', // We'll handle labels inside custom components if needed, or hide for cleaner look
