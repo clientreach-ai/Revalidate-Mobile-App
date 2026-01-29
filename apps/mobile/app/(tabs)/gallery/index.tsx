@@ -196,6 +196,8 @@ export default function GalleryScreen() {
           cpd_hours: 'CPD Hours',
           working: 'Working Hours',
           work: 'Working Hours',
+          working_hours: 'Working Hours',
+          workinghours: 'Working Hours',
           feedback: 'Feedback Log',
           feedback_log: 'Feedback Log',
           reflection: 'Reflective Accounts',
@@ -203,6 +205,8 @@ export default function GalleryScreen() {
           appraisal: 'Appraisal',
           gallery: 'General Gallery',
           personal: 'General Gallery',
+          general: 'General Gallery',
+          uncategorized: 'General Gallery',
         };
 
         const mapToTitle = (docCat?: string | null) => {
@@ -213,11 +217,36 @@ export default function GalleryScreen() {
 
         const updatedCategories = categoryDefinitions.map(cat => {
           const catKey = normalize(cat.title);
+
+          // Documents belonging to this specific category
           const categoryDocs = mappedDocuments.filter(doc => {
             const mappedTitle = mapToTitle(doc.category);
             const mappedKey = normalize(mappedTitle);
-            return (mappedKey && mappedKey === catKey) || (!doc.category && cat.id === '6');
+
+            // Check for explicit match
+            if (mappedKey && mappedKey === catKey) return true;
+
+            // For General Gallery (ID '6'), also include documents with no category 
+            // or documents that don't match any other established category
+            if (cat.id === '6') {
+              const hasNoCategory = !doc.category || normalize(doc.category) === '';
+
+              if (hasNoCategory) return true;
+
+              // Check if this document matches ANY other category
+              const matchesAnyOther = categoryDefinitions
+                .filter(c => c.id !== '6')
+                .some(c => {
+                  const otherKey = normalize(c.title);
+                  return mappedKey === otherKey;
+                });
+
+              return !matchesAnyOther;
+            }
+
+            return false;
           });
+
           const count = categoryDocs.length;
           const latestDoc = categoryDocs.sort((a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
