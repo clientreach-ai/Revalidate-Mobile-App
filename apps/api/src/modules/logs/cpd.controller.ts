@@ -59,7 +59,14 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
       durationMinutes: cpdHours.duration_minutes,
       trainingName: cpdHours.training_name,
       activityType: cpdHours.activity_type,
-      documentIds: cpdHours.document_ids ? JSON.parse(cpdHours.document_ids) : [],
+      documentIds: (() => {
+        try {
+          return cpdHours.document_ids ? JSON.parse(cpdHours.document_ids) : [];
+        } catch (e) {
+          console.error('Error parsing document_ids in create:', e);
+          return [];
+        }
+      })(),
       createdAt: cpdHours.created_at,
       updatedAt: cpdHours.updated_at,
     },
@@ -97,7 +104,14 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
       durationMinutes: ch.duration_minutes,
       trainingName: ch.training_name,
       activityType: ch.activity_type,
-      documentIds: ch.document_ids ? JSON.parse(ch.document_ids) : [],
+      documentIds: (() => {
+        try {
+          return ch.document_ids ? JSON.parse(ch.document_ids) : [];
+        } catch (e) {
+          console.error(`Error parsing document_ids for CPD ID ${ch.id}:`, e);
+          return [];
+        }
+      })(),
       createdAt: ch.created_at,
       updatedAt: ch.updated_at,
     })),
@@ -132,7 +146,14 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
       durationMinutes: cpdHours.duration_minutes,
       trainingName: cpdHours.training_name,
       activityType: cpdHours.activity_type,
-      documentIds: cpdHours.document_ids ? JSON.parse(cpdHours.document_ids) : [],
+      documentIds: (() => {
+        try {
+          return cpdHours.document_ids ? JSON.parse(cpdHours.document_ids) : [];
+        } catch (e) {
+          console.error(`Error parsing document_ids for CPD ID ${cpdHours.id}:`, e);
+          return [];
+        }
+      })(),
       createdAt: cpdHours.created_at,
       updatedAt: cpdHours.updated_at,
     },
@@ -159,7 +180,14 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
       durationMinutes: updated.duration_minutes,
       trainingName: updated.training_name,
       activityType: updated.activity_type,
-      documentIds: updated.document_ids ? JSON.parse(updated.document_ids) : [],
+      documentIds: (() => {
+        try {
+          return updated.document_ids ? JSON.parse(updated.document_ids) : [];
+        } catch (e) {
+          console.error(`Error parsing document_ids for updated CPD ID ${updated.id}:`, e);
+          return [];
+        }
+      })(),
       createdAt: updated.created_at,
       updatedAt: updated.updated_at,
     },

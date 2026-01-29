@@ -1,17 +1,21 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, Animated, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useThemeStore } from "@/features/theme/theme.store";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuthStore, useAuthHydrated } from "@/features/auth/auth.store";
+import { useSubscriptionStore } from "@/features/subscription/subscription.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
+import { checkNetworkStatus } from "@/services/network-monitor";
 import "./global.css";
 
 export default function SplashScreen() {
     const spinAnim = useRef(new Animated.Value(0)).current;
     const router = useRouter();
     const { isDark, toggleTheme } = useThemeStore();
+    const hasHydrated = useAuthHydrated();
+    const [hasNavigated, setHasNavigated] = useState(false);
 
     // Spin animation for loader
     useEffect(() => {
@@ -24,68 +28,115 @@ export default function SplashScreen() {
         ).start();
     }, [spinAnim]);
 
-    // Check if user is already logged in — always send logged-in users to onboarding
+    // Check auth state and route accordingly
     useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                const token = await AsyncStorage.getItem('authToken');
+        // Wait for Zustand store to hydrate from AsyncStorage
+        if (!hasHydrated || hasNavigated) return;
 
+        const checkAuthAndRoute = async () => {
+            try {
+                let { isAuthenticated, onboardingCompleted, token } = useAuthStore.getState();
+                const { isPremium, canUseOffline } = useSubscriptionStore.getState();
+                const isOnline = await checkNetworkStatus();
+
+                // Fallback: check AsyncStorage for existing users who logged in before auth store was implemented
                 if (!token) {
-                    requestAnimationFrame(() => {
-                        setTimeout(() => {
-                            router.replace("/(auth)/login");
-                        }, 1500);
-                    });
+                    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                    const storedToken = await AsyncStorage.getItem('authToken');
+                    if (storedToken) {
+                        token = storedToken;
+                        isAuthenticated = true;
+                        // Migrate to auth store
+                        const userData = await AsyncStorage.getItem('userData');
+                        if (userData) {
+                            const user = JSON.parse(userData);
+                            useAuthStore.getState().setAuth(storedToken, {
+                                id: user.id,
+                                email: user.email,
+                                firstName: user.firstName,
+                                lastName: user.lastName,
+                            });
+                        }
+                    }
+                }
+
+                // Not authenticated - go to login
+                if (!isAuthenticated || !token) {
+                    navigateWithDelay("/(auth)/login");
                     return;
                 }
 
-                // Check onboarding progress to see if we can skip it
-                try {
-                    const progress = await apiService.get<{
-                        success: boolean;
-                        data: { completed: boolean; currentStep: number };
-                    }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
+                // Authenticated + Onboarding completed = go to home
+                // For premium users offline, trust local state
+                if (onboardingCompleted) {
+                    navigateWithDelay("/(tabs)/home");
+                    return;
+                }
 
-                    requestAnimationFrame(() => {
-                        setTimeout(() => {
-                            if (progress?.data?.completed) {
-                                router.replace("/(tabs)/home");
-                            } else {
-                                const step = progress?.data?.currentStep || 1;
-                                if (step === 2) {
-                                    router.replace("/(onboarding)/personal-details");
-                                } else if (step === 3) {
-                                    router.replace("/(onboarding)/professional-details");
-                                } else if (step === 4) {
-                                    router.replace("/(onboarding)/plan-choose");
-                                } else {
-                                    // if step is 1 or unknown, go to role selection directly
-                                    // to bypass the introductory carousels for registered users
-                                    router.replace("/(onboarding)/role-selection");
-                                }
-                            }
-                        }, 1500);
-                    });
-                } catch (apiError) {
-                    // Fallback to role selection if API fails but token exists
-                    requestAnimationFrame(() => {
-                        setTimeout(() => {
-                            router.replace("/(onboarding)/role-selection");
-                        }, 1500);
-                    });
+                // If online, check with API for fresh onboarding status
+                if (isOnline) {
+                    try {
+                        const progress = await apiService.get<{
+                            success: boolean;
+                            data: { completed: boolean; currentStep: number };
+                        }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
+
+                        if (progress?.data?.completed) {
+                            useAuthStore.getState().setOnboardingCompleted(true);
+                            navigateWithDelay("/(tabs)/home");
+                        } else {
+                            const step = progress?.data?.currentStep || 1;
+                            routeToOnboardingStep(step);
+                        }
+                    } catch (apiError) {
+                        // API failed but token exists - check if premium user offline
+                        if (isPremium || canUseOffline) {
+                            // Trust local state for premium users
+                            navigateWithDelay("/(tabs)/home");
+                        } else {
+                            // Free user without completed onboarding - go to onboarding
+                            navigateWithDelay("/(onboarding)/role-selection");
+                        }
+                    }
+                } else {
+                    // Offline mode
+                    if (isPremium || canUseOffline) {
+                        // Premium offline - trust local state
+                        navigateWithDelay("/(tabs)/home");
+                    } else {
+                        // Free user offline without completed onboarding
+                        navigateWithDelay("/(onboarding)/role-selection");
+                    }
                 }
             } catch (error) {
                 console.warn("Auth check error:", error);
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        router.replace("/(auth)/login");
-                    }, 1500);
-                });
+                navigateWithDelay("/(auth)/login");
             }
         };
 
-        checkAuth();
-    }, [router]);
+        const navigateWithDelay = (route: string) => {
+            setHasNavigated(true);
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    router.replace(route as any);
+                }, 1200);
+            });
+        };
+
+        const routeToOnboardingStep = (step: number) => {
+            if (step === 2) {
+                navigateWithDelay("/(onboarding)/personal-details");
+            } else if (step === 3) {
+                navigateWithDelay("/(onboarding)/professional-details");
+            } else if (step === 4) {
+                navigateWithDelay("/(onboarding)/plan-choose");
+            } else {
+                navigateWithDelay("/(onboarding)/role-selection");
+            }
+        };
+
+        checkAuthAndRoute();
+    }, [hasHydrated, hasNavigated, router]);
 
     const spin = spinAnim.interpolate({
         inputRange: [0, 1],

@@ -12,6 +12,7 @@ import {
     type OnboardingPlanInput,
 } from "@/validation/schema";
 import { useThemeStore } from "@/features/theme/theme.store";
+import { useAuthStore } from "@/features/auth/auth.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
 import { showToast } from "@/utils/toast";
 import "../global.css";
@@ -209,6 +210,8 @@ export default function PlanChoose() {
                         },
                         token
                     );
+                    // Mark onboarding as completed
+                    useAuthStore.getState().setOnboardingCompleted(true);
                     router.replace("/(tabs)/home");
                     return;
                 }
@@ -320,6 +323,8 @@ export default function PlanChoose() {
             setClientSecret(null);
             setPaymentIntentId(null);
             showToast.success("Payment successful! Premium plan activated.", "Success");
+            // Mark onboarding as completed
+            useAuthStore.getState().setOnboardingCompleted(true);
             router.replace("/(tabs)/home");
         } catch (error: unknown) {
             const errorMessage = error instanceof Error

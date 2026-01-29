@@ -194,3 +194,75 @@ export async function queueOperation(
     retryCount: 0,
   });
 }
+
+// ==========================================
+// User Data Caching for Premium Offline Mode
+// ==========================================
+
+const USER_PROFILE_KEY = 'user_profile';
+const USER_STATS_KEY = 'user_stats';
+const CPD_LOGS_KEY = 'cpd_logs';
+const PRACTICE_HOURS_KEY = 'practice_hours';
+
+export interface CachedUserProfile {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  professionalRole?: string;
+  subscriptionTier?: string;
+  subscriptionStatus?: string;
+  onboardingCompleted?: boolean;
+  cachedAt: number;
+}
+
+export async function cacheUserProfile(profile: Omit<CachedUserProfile, 'cachedAt'>): Promise<void> {
+  await saveOfflineData(USER_PROFILE_KEY, {
+    ...profile,
+    cachedAt: Date.now(),
+  });
+}
+
+export async function getCachedUserProfile(): Promise<CachedUserProfile | null> {
+  return getOfflineData<CachedUserProfile>(USER_PROFILE_KEY);
+}
+
+export async function cacheUserStats(stats: any): Promise<void> {
+  await saveOfflineData(USER_STATS_KEY, {
+    ...stats,
+    cachedAt: Date.now(),
+  });
+}
+
+export async function getCachedUserStats(): Promise<any> {
+  return getOfflineData(USER_STATS_KEY);
+}
+
+export async function cacheCPDLogs(logs: any[]): Promise<void> {
+  await saveOfflineData(CPD_LOGS_KEY, {
+    logs,
+    cachedAt: Date.now(),
+  });
+}
+
+export async function getCachedCPDLogs(): Promise<{ logs: any[]; cachedAt: number } | null> {
+  return getOfflineData(CPD_LOGS_KEY);
+}
+
+export async function cachePracticeHours(hours: any[]): Promise<void> {
+  await saveOfflineData(PRACTICE_HOURS_KEY, {
+    hours,
+    cachedAt: Date.now(),
+  });
+}
+
+export async function getCachedPracticeHours(): Promise<{ hours: any[]; cachedAt: number } | null> {
+  return getOfflineData(PRACTICE_HOURS_KEY);
+}
+
+export async function clearUserCache(): Promise<void> {
+  await deleteOfflineData(USER_PROFILE_KEY);
+  await deleteOfflineData(USER_STATS_KEY);
+  await deleteOfflineData(CPD_LOGS_KEY);
+  await deleteOfflineData(PRACTICE_HOURS_KEY);
+}

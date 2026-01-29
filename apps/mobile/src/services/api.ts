@@ -1,7 +1,6 @@
 import { API_CONFIG, API_ENDPOINTS } from '@revalidation-tracker/constants';
-import { queueOperation } from './offline-storage';
+import { queueOperation, saveOfflineData, getOfflineData } from './offline-storage';
 import { useSubscriptionStore } from '@/features/subscription/subscription.store';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { showToast } from '@/utils/toast';
 import { checkNetworkStatus } from './network-monitor';
 
@@ -149,32 +148,32 @@ class ApiService {
     return controller.signal;
   }
 
-  // Cache Management
+  // SQLite-based Cache Management for Premium Offline Mode
   private getCacheKey(endpoint: string): string {
-    return `api_cache_${endpoint}`;
+    return `api_cache_${endpoint.replace(/\//g, '_')}`;
   }
 
   private async setCache(endpoint: string, data: any): Promise<void> {
     try {
-      await AsyncStorage.setItem(this.getCacheKey(endpoint), JSON.stringify({
+      await saveOfflineData(this.getCacheKey(endpoint), {
         timestamp: Date.now(),
         data,
-      }));
+      });
     } catch (e) {
-      console.warn('Failed to cache response', e);
+      console.warn('Failed to cache response to SQLite', e);
     }
   }
 
   private async getCache<T>(endpoint: string): Promise<T | null> {
     try {
-      const cached = await AsyncStorage.getItem(this.getCacheKey(endpoint));
+      const cached = await getOfflineData<{ timestamp: number; data: T }>(this.getCacheKey(endpoint));
       if (!cached) return null;
-      const { data } = JSON.parse(cached);
-      return data as T;
+      return cached.data;
     } catch (e) {
       return null;
     }
   }
+
 
   /**
    * Fast Fetching Strategy:
@@ -183,7 +182,7 @@ class ApiService {
    */
   async get<T>(endpoint: string, token?: string): Promise<T> {
     const isOnlineMandatory = this.isOnlineOnly(endpoint);
-    const { isFreeUser } = this.getOfflineCapability();
+    const { isFreeUser, canOffline } = this.getOfflineCapability();
 
     if (isOnlineMandatory || isFreeUser) {
       // Force network for security/auth or Free plan
@@ -228,7 +227,8 @@ class ApiService {
         }
         return data;
       } catch (e) {
-        console.log('Background revalidation failed for', endpoint, e);
+        // Silently log - premium users get cached data, no need to surface error
+        console.log('Background revalidation failed for', endpoint);
         throw e;
       }
     };
@@ -239,8 +239,22 @@ class ApiService {
       return cachedData;
     }
 
-    // No cache available, wait for network
-    return fetchNewData();
+    // No cache available - try network, but gracefully fallback for premium offline
+    try {
+      return await fetchNewData();
+    } catch (error: any) {
+      if (error instanceof ServerError) throw error;
+
+      // Premium user offline with no cache - return empty/fallback response
+      const isConnected = await checkNetworkStatus();
+      if (!isConnected && canOffline) {
+        // Return a graceful empty response for premium users offline
+        console.log('Premium user offline, returning empty data for:', endpoint);
+        return { success: true, data: [], message: 'Offline mode - no cached data available' } as unknown as T;
+      }
+
+      throw error;
+    }
   }
 
   /**
@@ -258,19 +272,22 @@ class ApiService {
     const { canOffline, isFreeUser } = this.getOfflineCapability();
     const isOnlineMandatory = this.isOnlineOnly(endpoint);
 
+    // PREMIUM: Queue writes when offline
     if (canOffline && !isOnlineMandatory) {
-      // PREMIUM: Queue the write if it's a general feature
-      // BUT first check if we are actually offline
       const isConnected = await checkNetworkStatus();
       if (!isConnected) {
         await queueOperation(method, endpoint, data, token ? { Authorization: `Bearer ${token}` } : undefined);
+
+        // Optimistically update the UI cache so user sees changes immediately
+        await this.performOptimisticUpdate(method, endpoint, data);
+
         showToast.info('Action saved offline', 'Offline Mode');
         return { success: true, message: 'Action queued for sync', data: null } as unknown as T;
       }
     }
 
-    // FREE or Online-Mandatory or Premium-but-online-failure: Enforce connection check
-    if (isFreeUser || isOnlineMandatory || canOffline) {
+    // FREE or Online-Mandatory: Require connection
+    if (isFreeUser || isOnlineMandatory) {
       const isConnected = await checkNetworkStatus();
       if (!isConnected) {
         throw new Error('INTERNET_REQUIRED: This feature requires an internet connection.');
@@ -278,6 +295,129 @@ class ApiService {
     }
 
     throw originalError;
+  }
+
+  /**
+   * Updates local cache optimistically for offline actions
+   * "Fakes" the successful API response in the local cache
+   */
+  private async performOptimisticUpdate(method: string, endpoint: string, data: any): Promise<void> {
+    try {
+      // Determine the collection endpoint (e.g. /api/v1/cpd-hours)
+      // If endpoint has an ID (PUT/DELETE), strip it to get the list endpoint
+      const parts = endpoint.split('/');
+      const isItemEndpoint = parts.length > 0 && !isNaN(Number(parts[parts.length - 1]));
+      const listEndpoint = isItemEndpoint ? parts.slice(0, -1).join('/') : endpoint;
+
+      // Only support optimistic updates for known list endpoints
+      const supportedEndpoints = [
+        '/api/v1/cpd-hours',
+        '/api/v1/work-hours',
+        '/api/v1/reflections',
+        '/api/v1/feedback',
+        '/api/v1/appraisals',
+        '/api/v1/documents'
+      ];
+
+      const matchingSupported = supportedEndpoints.find(e => listEndpoint.includes(e));
+      if (!matchingSupported) return;
+
+      const cacheKey = this.getCacheKey(matchingSupported as string);
+      const cached = await getOfflineData<{ timestamp: number; data: any }>(cacheKey);
+
+      if (!cached || !cached.data) return; // Can't update if no cache exists
+
+      let list = cached.data.data || cached.data; // Handle {data: []} or []
+      if (!Array.isArray(list)) return; // Cache format not as expected
+
+      const now = new Date().toISOString();
+
+      if (method === 'POST') {
+        let newItem: any = {
+          ...data,
+          id: -Math.floor(Math.random() * 1000000), // Negative temp ID
+          tempId: true,
+          created_at: now,
+          updated_at: now,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // Feature-specific mappings to match API retrieval format (camelCase usually)
+        if (matchingSupported.includes('cpd-hours')) {
+          newItem = {
+            ...newItem,
+            activityDate: data.activity_date || data.activityDate,
+            durationMinutes: data.duration_minutes || data.durationMinutes,
+            trainingName: data.training_name || data.trainingName,
+            activityType: data.activity_type || data.activityType,
+            documentIds: data.document_ids || data.documentIds || [],
+          };
+        } else if (matchingSupported.includes('reflections')) {
+          newItem = {
+            ...newItem,
+            reflectionDate: data.reflection_date || data.reflectionDate,
+            reflectionText: data.reflection_text || data.reflectionText,
+            documentIds: data.document_ids || data.documentIds || [],
+          };
+        } else if (matchingSupported.includes('work-hours')) {
+          const start = data.start_time || data.startTime;
+          const end = data.end_time || data.endTime;
+          let duration = 0;
+          if (start && end) {
+            duration = Math.floor((new Date(end).getTime() - new Date(start).getTime()) / 60000);
+          }
+
+          newItem = {
+            ...newItem,
+            startTime: start,
+            endTime: end,
+            workDescription: data.work_description || data.workDescription,
+            durationMinutes: duration,
+            isActive: !end,
+            isManualEntry: true,
+          };
+        } else if (matchingSupported.includes('feedback')) {
+          newItem = {
+            ...newItem,
+            feedbackDate: data.feedback_date || data.feedbackDate,
+            feedbackText: data.feedback_text || data.feedbackText,
+            senderName: data.sender_name || data.senderName,
+          };
+        }
+
+        // Add to beginning of list
+        list.unshift(newItem);
+
+      } else if (method === 'PUT' || method === 'PATCH') {
+        const id = parseInt(parts[parts.length - 1] || '0', 10);
+        const index = list.findIndex((item: any) => item.id == id);
+        if (index !== -1) {
+          list[index] = { ...list[index], ...data, updated_at: now };
+        }
+
+      } else if (method === 'DELETE') {
+        const id = parseInt(parts[parts.length - 1] || '0', 10);
+        list = list.filter((item: any) => item.id != id);
+      }
+
+      // Save updated list back to cache
+      if (cached.data.data) {
+        cached.data.data = list;
+      } else {
+        cached.data = list;
+      }
+
+      await saveOfflineData(cacheKey, cached);
+
+      // If it's a calendar event related item, try to update calendar cache too
+      if (matchingSupported === '/api/v1/cpd-hours' || matchingSupported === '/api/v1/work-hours') {
+        // This is harder since calendar structure is different, but for now lists are main priority
+      }
+
+    } catch (e) {
+      console.warn('Optimistic update failed', e);
+    }
   }
 
   async post<T>(endpoint: string, data: unknown, token?: string): Promise<T> {
@@ -423,8 +563,20 @@ class ApiService {
     } catch (error: any) {
       if (error instanceof ServerError) throw error;
 
-      // Verify connectivity
+      // For premium users offline, queue the upload
+      const { canOffline } = this.getOfflineCapability();
       const isConnected = await checkNetworkStatus();
+
+      if (!isConnected && canOffline) {
+        // Queue file upload for later (store file info for sync)
+        await queueOperation('POST', endpoint, {
+          file: { uri: file.uri, type: file.type, name: file.name },
+          ...additionalData
+        }, token ? { Authorization: `Bearer ${token}` } : undefined);
+        showToast.info('File upload queued for when online', 'Offline Mode');
+        return { success: true, message: 'Upload queued for sync', data: null };
+      }
+
       if (!isConnected) {
         throw new Error('INTERNET_REQUIRED: This feature requires an internet connection.');
       }
