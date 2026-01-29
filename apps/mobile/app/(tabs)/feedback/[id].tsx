@@ -71,7 +71,7 @@ export default function FeedbackDetailScreen() {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     useEffect(() => {
-        if (feedback?.documentIds?.length) {
+        if (feedback?.documentIds && feedback.documentIds.length > 0) {
             checkAttachment(feedback.documentIds[0]);
         }
     }, [feedback]);

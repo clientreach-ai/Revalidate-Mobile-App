@@ -118,6 +118,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="feedback/[id]" options={{ href: null }} />
       <Tabs.Screen name="earings/index" options={{ href: null }} />
       <Tabs.Screen name="reflections/index" options={{ href: null }} />
+      <Tabs.Screen name="reflections/[id]" options={{ href: null }} />
       <Tabs.Screen name="profile/account-settings" options={{ href: null }} />
       <Tabs.Screen name="profile/all-stats" options={{ href: null }} />
       <Tabs.Screen name="profile/subscription" options={{ href: null }} />

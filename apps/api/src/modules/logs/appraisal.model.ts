@@ -9,6 +9,8 @@ export interface AppraisalRecord {
   id: number;
   user_id: number;
   appraisal_date: string;
+  discussion_with?: string;
+  hospital_id?: number;
   notes?: string;
   document_ids?: string; // JSON array of document IDs
   created_at: string;
@@ -17,12 +19,16 @@ export interface AppraisalRecord {
 
 export interface CreateAppraisalRecord {
   appraisal_date: string;
+  discussion_with?: string;
+  hospital_id?: number;
   notes?: string;
   document_ids?: number[];
 }
 
 export interface UpdateAppraisalRecord {
   appraisal_date?: string;
+  discussion_with?: string;
+  hospital_id?: number;
   notes?: string;
   document_ids?: number[];
 }
@@ -35,12 +41,14 @@ export async function createAppraisalRecord(
 
   const [result] = await pool.execute(
     `INSERT INTO appraisal_records (
-      user_id, appraisal_date, notes, document_ids, 
+      user_id, appraisal_date, discussion_with, hospital_id, notes, document_ids, 
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, NOW(), NOW())`,
+    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       userId,
       data.appraisal_date,
+      data.discussion_with || null,
+      data.hospital_id || null,
       data.notes || null,
       data.document_ids ? JSON.stringify(data.document_ids) : null,
     ]
@@ -138,6 +146,14 @@ export async function updateAppraisalRecord(
   if (updates.appraisal_date !== undefined) {
     fields.push('appraisal_date = ?');
     values.push(updates.appraisal_date);
+  }
+  if (updates.discussion_with !== undefined) {
+    fields.push('discussion_with = ?');
+    values.push(updates.discussion_with || null);
+  }
+  if (updates.hospital_id !== undefined) {
+    fields.push('hospital_id = ?');
+    values.push(updates.hospital_id || null);
   }
   if (updates.notes !== undefined) {
     fields.push('notes = ?');

@@ -14,6 +14,7 @@ import notificationsRoutes from './notifications.routes';
 import profileRoutes from './profile.routes';
 import slidersRoutes from './sliders.routes';
 import exportRoutes from './export.routes';
+import hospitalsRoutes from './hospitals.routes';
 
 const router = Router();
 
@@ -38,6 +39,7 @@ router.use(`${API_VERSION}/notifications`, notificationsRoutes);
 router.use(`${API_VERSION}/profile`, profileRoutes);
 router.use(`${API_VERSION}/sliders`, slidersRoutes);
 router.use(`${API_VERSION}/export`, exportRoutes);
+router.use(`${API_VERSION}/hospitals`, hospitalsRoutes);
 console.log(`🔎 mounted sliders routes at ${API_VERSION}/sliders`);
 console.log(`🔎 mounted export routes at ${API_VERSION}/export`);
 

@@ -1,4 +1,6 @@
-import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Modal, Image } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -42,6 +44,8 @@ export default function ReflectionsScreen() {
     text: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileUri, setFileUri] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<{ name: string, type: string } | null>(null);
 
   useEffect(() => {
     loadReflections();
@@ -119,6 +123,40 @@ export default function ReflectionsScreen() {
     await loadReflections();
   };
 
+  const handleFileSelect = async (source: 'gallery' | 'camera' | 'files') => {
+    try {
+      let result: any;
+      if (source === 'gallery') {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) return showToast.error('Gallery permission required', 'Permission Denied');
+        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, allowsEditing: false, quality: 1 });
+        if (!result.canceled && result.assets?.[0]) {
+          const asset = result.assets[0];
+          setFileUri(asset.uri);
+          setAttachment({ name: asset.fileName || 'image.jpg', type: asset.type || 'image/jpeg' });
+        }
+      } else if (source === 'camera') {
+        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permissionResult.granted) return showToast.error('Camera permission required', 'Permission Denied');
+        result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 1 });
+        if (!result.canceled && result.assets?.[0]) {
+          const asset = result.assets[0];
+          setFileUri(asset.uri);
+          setAttachment({ name: 'photo.jpg', type: 'image/jpeg' });
+        }
+      } else if (source === 'files') {
+        result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+        if (!result.canceled && result.assets?.[0]) {
+          const doc = result.assets[0];
+          setFileUri(doc.uri);
+          setAttachment({ name: doc.name, type: doc.mimeType || 'application/octet-stream' });
+        }
+      }
+    } catch (e) {
+      console.warn('File select error', e);
+    }
+  };
+
   const handleAddReflection = async () => {
     if (!newReflection.date) {
       showToast.error('Please select a date', 'Validation Error');
@@ -130,13 +168,36 @@ export default function ReflectionsScreen() {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) return;
 
+      // Upload file if selected
+      let documentIds: number[] = [];
+      if (fileUri && attachment) {
+        try {
+          const uploadRes: any = await apiService.uploadFile(
+            API_ENDPOINTS.DOCUMENTS.UPLOAD,
+            { uri: fileUri, type: attachment.type, name: attachment.name },
+            token,
+            { title: 'Reflection Attachment', category: 'reflection' }
+          );
+          if (uploadRes?.data?.id) {
+            documentIds.push(uploadRes.data.id);
+          }
+        } catch (e) {
+          console.error("Upload failed", e);
+          // Continue without attachment or show error?
+          // For now continue but maybe warn?
+        }
+      }
+
       await apiService.post(API_ENDPOINTS.REFLECTIONS.CREATE, {
         reflection_date: newReflection.date,
         reflection_text: newReflection.text,
+        document_ids: documentIds.length > 0 ? documentIds : undefined,
       }, token);
 
       showToast.success('Reflection added', 'Success');
       setShowAddModal(false);
+      setFileUri(null);
+      setAttachment(null);
       loadReflections();
       setNewReflection({
         date: new Date().toISOString().split('T')[0],
@@ -205,73 +266,7 @@ export default function ReflectionsScreen() {
           </Pressable>
         </View>
 
-        {/* Filter Buttons */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12, gap: 8 }}
-        >
-          <Pressable
-            onPress={() => setActiveFilter('all')}
-            className={`flex-row items-center justify-center rounded-full px-4 h-8 ${activeFilter === 'all'
-                ? 'bg-[#2B5E9C]'
-                : (isDark ? 'bg-slate-700' : 'bg-gray-100')
-              }`}
-            style={{ gap: 4 }}
-          >
-            <Text className={`text-xs font-medium ${activeFilter === 'all'
-                ? 'text-white'
-                : (isDark ? 'text-gray-300' : 'text-[#121417]')
-              }`}>
-              All Time
-            </Text>
-            <MaterialIcons
-              name="expand-more"
-              size={16}
-              color={activeFilter === 'all' ? '#FFFFFF' : (isDark ? '#9CA3AF' : '#121417')}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => setActiveFilter('category')}
-            className={`flex-row items-center justify-center rounded-full px-4 h-8 ${activeFilter === 'category'
-                ? 'bg-[#2B5E9C]'
-                : (isDark ? 'bg-slate-700' : 'bg-gray-100')
-              }`}
-            style={{ gap: 4 }}
-          >
-            <Text className={`text-xs font-medium ${activeFilter === 'category'
-                ? 'text-white'
-                : (isDark ? 'text-gray-300' : 'text-[#121417]')
-              }`}>
-              Category
-            </Text>
-            <MaterialIcons
-              name="expand-more"
-              size={16}
-              color={activeFilter === 'category' ? '#FFFFFF' : (isDark ? '#9CA3AF' : '#121417')}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => setActiveFilter('evidence')}
-            className={`flex-row items-center justify-center rounded-full px-4 h-8 ${activeFilter === 'evidence'
-                ? 'bg-[#2B5E9C]'
-                : (isDark ? 'bg-slate-700' : 'bg-gray-100')
-              }`}
-            style={{ gap: 4 }}
-          >
-            <Text className={`text-xs font-medium ${activeFilter === 'evidence'
-                ? 'text-white'
-                : (isDark ? 'text-gray-300' : 'text-[#121417]')
-              }`}>
-              Evidence
-            </Text>
-            <MaterialIcons
-              name="expand-more"
-              size={16}
-              color={activeFilter === 'evidence' ? '#FFFFFF' : (isDark ? '#9CA3AF' : '#121417')}
-            />
-          </Pressable>
-        </ScrollView>
+
       </View>
 
       {/* Loading State */}
@@ -334,7 +329,7 @@ export default function ReflectionsScreen() {
                     </Text>
                     <View className={`mt-3 pt-3 border-t flex-row justify-end ${isDark ? "border-slate-700" : "border-gray-50"
                       }`}>
-                      <Pressable className="flex-row items-center" style={{ gap: 4 }}>
+                      <Pressable onPress={() => router.push(`/(tabs)/reflections/${reflection.id}`)} className="flex-row items-center" style={{ gap: 4 }}>
                         <Text className="text-[#2B5E9C] text-xs font-bold">
                           VIEW FULL ACCOUNT
                         </Text>
@@ -409,6 +404,36 @@ export default function ReflectionsScreen() {
                   numberOfLines={6}
                   style={{ minHeight: 120 }}
                 />
+              </View>
+
+              <View>
+                <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Attach Evidence</Text>
+                {fileUri && attachment ? (
+                  <View className={`flex-row items-center justify-between p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200"}`}>
+                    <View className="flex-row items-center flex-1">
+                      <MaterialIcons name="description" size={20} color="#2B5E9C" />
+                      <Text className={`ml-2 ${isDark ? "text-gray-300" : "text-gray-700"}`} numberOfLines={1}>{attachment.name}</Text>
+                    </View>
+                    <Pressable onPress={() => { setFileUri(null); setAttachment(null); }} className="p-2">
+                      <MaterialIcons name="close" size={20} color="#EF4444" />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View className="flex-row gap-3">
+                    <Pressable onPress={() => handleFileSelect('camera')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                      <MaterialIcons name="camera-alt" size={24} color="#2B5E9C" />
+                      <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Camera</Text>
+                    </Pressable>
+                    <Pressable onPress={() => handleFileSelect('gallery')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                      <MaterialIcons name="photo-library" size={24} color="#2B5E9C" />
+                      <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Gallery</Text>
+                    </Pressable>
+                    <Pressable onPress={() => handleFileSelect('files')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                      <MaterialIcons name="folder" size={24} color="#2B5E9C" />
+                      <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Files</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
               <Pressable
                 onPress={handleAddReflection}

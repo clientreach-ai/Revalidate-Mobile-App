@@ -101,6 +101,9 @@ export const API_ENDPOINTS = {
     UPDATE: '/api/v1/appraisals',
     DELETE: '/api/v1/appraisals',
   },
+  HOSPITALS: {
+    LIST: '/api/v1/hospitals',
+  },
   HEALTH: '/health',
   PROFILE: {
     ROLES: '/api/v1/profile/roles',

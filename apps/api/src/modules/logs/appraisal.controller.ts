@@ -14,12 +14,16 @@ import { z } from 'zod';
 
 const createAppraisalSchema = z.object({
   appraisal_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  discussion_with: z.string().optional(),
+  hospital_id: z.number().int().optional(),
   notes: z.string().optional(),
   document_ids: z.array(z.number()).optional(),
 });
 
 const updateAppraisalSchema = z.object({
   appraisal_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  discussion_with: z.string().optional(),
+  hospital_id: z.number().int().optional(),
   notes: z.string().optional(),
   document_ids: z.array(z.number()).optional(),
 });
@@ -33,6 +37,8 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
     data: {
       id: appraisal.id,
       appraisalDate: appraisal.appraisal_date,
+      discussionWith: appraisal.discussion_with,
+      hospitalId: appraisal.hospital_id,
       notes: appraisal.notes,
       documentIds: appraisal.document_ids ? JSON.parse(appraisal.document_ids) : [],
       createdAt: appraisal.created_at,
@@ -55,6 +61,8 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
     data: appraisalRecords.map(a => ({
       id: a.id,
       appraisalDate: a.appraisal_date,
+      discussionWith: a.discussion_with,
+      hospitalId: a.hospital_id,
       notes: a.notes,
       documentIds: a.document_ids ? JSON.parse(a.document_ids) : [],
       createdAt: a.created_at,
@@ -73,6 +81,8 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
     data: {
       id: appraisal.id,
       appraisalDate: appraisal.appraisal_date,
+      discussionWith: appraisal.discussion_with,
+      hospitalId: appraisal.hospital_id,
       notes: appraisal.notes,
       documentIds: appraisal.document_ids ? JSON.parse(appraisal.document_ids) : [],
       createdAt: appraisal.created_at,
@@ -90,6 +100,8 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
     data: {
       id: updated.id,
       appraisalDate: updated.appraisal_date,
+      discussionWith: updated.discussion_with,
+      hospitalId: updated.hospital_id,
       notes: updated.notes,
       documentIds: updated.document_ids ? JSON.parse(updated.document_ids) : [],
       createdAt: updated.created_at,
