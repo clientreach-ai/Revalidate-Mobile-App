@@ -101,51 +101,36 @@ export default function Login() {
                     console.warn('Push notification setup failed:', err);
                 });
 
-                // After successful login, check onboarding status and route accordingly
-                try {
-                    // Fetch profile to check subscription and onboarding status
-                    try {
-                        const profile = await apiService.get<any>(API_ENDPOINTS.USERS.ME, token);
-                        if (profile?.data) {
-                            const tier = profile.data.subscriptionTier || 'free';
-                            const isPremium = tier === 'premium' || tier === 'premium_yearly';
+                // Check if user has a professional role set - if so, they have completed onboarding step 1 at least
+                // We'll treat having a role as "onboarding started/completed" enough to go to home
+                // New users from signup won't have a role yet until they complete onboarding
+                const hasRole = !!user.professionalRole;
 
-                            await setSubscriptionInfo({
-                                subscriptionTier: tier as 'free' | 'premium' | 'premium_yearly',
-                                subscriptionStatus: (profile.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
-                                isPremium,
-                                canUseOffline: isPremium,
-                            });
-
-                            // Check if onboarding is completed
-                            if (profile.data.onboardingCompleted) {
-                                useAuthStore.getState().setOnboardingCompleted(true);
-
-                                // Persist this critical flag to AsyncStorage for offline/restore stability
-                                try {
-                                    const storedUserStr = await AsyncStorage.getItem('userData');
-                                    if (storedUserStr) {
-                                        const storedUser = JSON.parse(storedUserStr);
-                                        storedUser.onboardingCompleted = true;
-                                        await AsyncStorage.setItem('userData', JSON.stringify(storedUser));
-                                    }
-                                } catch (e) {
-                                    console.warn('Failed to update userData storage', e);
-                                }
-
-                                router.replace("/(tabs)/home");
-                                return;
-                            }
-                        }
-                    } catch (_) {
-                        // ignore profile fetch errors — still send to onboarding
-                    }
-
-                    router.replace("/(onboarding)/role-selection");
-                } catch (err) {
-                    console.warn('Routing after login failed:', err);
+                if (hasRole) {
+                    // Existing user with role -> Go to Home
+                    router.replace("/(tabs)/home");
+                } else {
+                    // New user or incomplete profile -> Go to Onboarding
                     router.replace("/(onboarding)/role-selection");
                 }
+
+                // Fetch subscription info in background to ensure app state is correct
+                // We don't block navigation on this anymore
+                apiService.get<any>(API_ENDPOINTS.USERS.ME, token).then(profile => {
+                    if (profile?.data) {
+                        const tier = profile.data.subscriptionTier || 'free';
+                        const isPremium = tier === 'premium' || tier === 'premium_yearly';
+
+                        setSubscriptionInfo({
+                            subscriptionTier: tier as 'free' | 'premium' | 'premium_yearly',
+                            subscriptionStatus: (profile.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
+                            isPremium,
+                            canUseOffline: isPremium,
+                        });
+                    }
+                }).catch(err => {
+                    console.warn('Background profile fetch failed:', err);
+                });
             } else {
                 throw new Error("Invalid response from server");
             }

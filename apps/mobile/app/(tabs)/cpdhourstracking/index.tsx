@@ -382,54 +382,6 @@ export default function CPDHoursTrackingScreen() {
           </View>
         </View>
 
-        {/* Filter Tabs */}
-        <View className="px-6 mb-6">
-          <View className={`flex-row p-1 rounded-xl ${isDark ? "bg-slate-700/50" : "bg-slate-200/50"
-            }`} style={{ gap: 4 }}>
-            <Pressable
-              onPress={() => setActiveFilter('all')}
-              className={`flex-1 py-2 rounded-lg ${activeFilter === 'all'
-                ? (isDark ? 'bg-slate-800 shadow-sm' : 'bg-white shadow-sm')
-                : ''
-                }`}
-            >
-              <Text className={`text-sm text-center ${activeFilter === 'all'
-                ? 'font-semibold text-[#2563EB]'
-                : (isDark ? 'font-medium text-gray-400' : 'font-medium text-slate-500')
-                }`}>
-                All
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setActiveFilter('participatory')}
-              className={`flex-1 py-2 rounded-lg ${activeFilter === 'participatory'
-                ? (isDark ? 'bg-slate-800 shadow-sm' : 'bg-white shadow-sm')
-                : ''
-                }`}
-            >
-              <Text className={`text-sm text-center ${activeFilter === 'participatory'
-                ? 'font-semibold text-[#2563EB]'
-                : (isDark ? 'font-medium text-gray-400' : 'font-medium text-slate-500')
-                }`}>
-                Participatory
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setActiveFilter('non-participatory')}
-              className={`flex-1 py-2 rounded-lg ${activeFilter === 'non-participatory'
-                ? (isDark ? 'bg-slate-800 shadow-sm' : 'bg-white shadow-sm')
-                : ''
-                }`}
-            >
-              <Text className={`text-sm text-center ${activeFilter === 'non-participatory'
-                ? 'font-semibold text-[#2563EB]'
-                : (isDark ? 'font-medium text-gray-400' : 'font-medium text-slate-500')
-                }`}>
-                Non-Part.
-              </Text>
-            </Pressable>
-          </View>
-        </View>
 
         {/* Activities Section */}
         <View className="px-6" style={{ gap: 16 }}>

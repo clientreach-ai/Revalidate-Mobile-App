@@ -72,22 +72,15 @@ export async function createWorkHours(
   const [result] = await pool.execute(
     `INSERT INTO work_hours (
       user_id, start_time, end_time, duration_minutes, 
-      work_description, location, shift_type, hourly_rate, total_earnings,
-      work_setting, scope_of_practice,
+      work_description,
       document_ids, is_active, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       userId,
       data.start_time,
       data.end_time || null,
       duration || null,
       data.work_description || null,
-      data.location || null,
-      data.shift_type || null,
-      data.hourly_rate || null,
-      data.total_earnings || null,
-      data.work_setting || null,
-      data.scope_of_practice || null,
       data.document_ids ? JSON.stringify(data.document_ids) : null,
       !data.end_time, // Active if no end time
     ]
@@ -244,30 +237,14 @@ export async function updateWorkHours(
     fields.push('work_description = ?');
     values.push(updates.work_description || null);
   }
-  if (updates.location !== undefined) {
-    fields.push('location = ?');
-    values.push(updates.location || null);
-  }
-  if (updates.shift_type !== undefined) {
-    fields.push('shift_type = ?');
-    values.push(updates.shift_type || null);
-  }
-  if (updates.hourly_rate !== undefined) {
-    fields.push('hourly_rate = ?');
-    values.push(updates.hourly_rate || null);
-  }
-  if (updates.total_earnings !== undefined) {
-    fields.push('total_earnings = ?');
-    values.push(updates.total_earnings || null);
-  }
-  if (updates.work_setting !== undefined) {
-    fields.push('work_setting = ?');
-    values.push(updates.work_setting || null);
-  }
-  if (updates.scope_of_practice !== undefined) {
-    fields.push('scope_of_practice = ?');
-    values.push(updates.scope_of_practice || null);
-  }
+  // Missing columns excluded as per user request
+  // if (updates.location !== undefined) { ... }
+  // if (updates.shift_type !== undefined) { ... }
+  // if (updates.hourly_rate !== undefined) { ... }
+  // if (updates.total_earnings !== undefined) { ... }
+  // if (updates.work_setting !== undefined) { ... }
+  // if (updates.scope_of_practice !== undefined) { ... }
+
   if (updates.document_ids !== undefined) {
     fields.push('document_ids = ?');
     values.push(updates.document_ids.length > 0 ? JSON.stringify(updates.document_ids) : null);

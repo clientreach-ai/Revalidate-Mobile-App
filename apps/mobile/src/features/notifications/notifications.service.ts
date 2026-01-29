@@ -11,22 +11,29 @@ import Constants from 'expo-constants';
  */
 
 // Configure notification handler
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-    }),
-});
+// Only configure if NOT in Expo Go (or if strictly native)
+if (Constants.appOwnership !== 'expo') {
+    Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
+        }),
+    });
+}
 
 /**
  * Check if running on a physical device
  */
 function isPhysicalDevice(): boolean {
     // Check if running in Expo Go or on a physical device
-    return !__DEV__ || Constants.appOwnership === 'expo' || Platform.OS !== 'web';
+    // SDK 53+ removed remote notifications from Expo Go, so we must return false here to skip setup
+    if (Constants.appOwnership === 'expo') {
+        return false;
+    }
+    return !__DEV__ || Platform.OS !== 'web';
 }
 
 /**
