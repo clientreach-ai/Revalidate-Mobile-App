@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { ApiError } from '../../common/middleware/error-handler';
+import { sendPushNotification, isValidExpoPushToken } from '../notifications/push.service';
 
 export interface CalendarEvent {
   id: string;
@@ -407,6 +408,9 @@ export async function inviteAttendees(
 /**
  * Respond to an invite (accept/decline) by updating the attendee status.
  * Only the invited user (matched by user_id or attendee_email) may update their status.
+ * When accepted, the event organizer is notified:
+ * - Premium users: receive push notification + in-app notification
+ * - Free users: receive in-app notification message only
  */
 export async function respondToInvite(
   eventId: string,
@@ -419,24 +423,82 @@ export async function respondToInvite(
     throw new ApiError(404, 'Invite not found');
   }
 
+  // Get the event with organizer info
+  const event = await prisma.user_calendars.findFirst({
+    where: { id: BigInt(eventId) },
+    include: { users: { select: { id: true, name: true, email: true, subscription_tier: true, device_token: true } } }
+  });
+
+  if (!event) {
+    throw new ApiError(404, 'Event not found');
+  }
+
   // Allow only the invited user to respond
   const userIdNum = BigInt(userId);
   const isOwnerMatch = attendee.user_id && attendee.user_id === userIdNum;
 
+  // Get the responding user's info
+  let respondingUser = null;
   if (!isOwnerMatch) {
     // If not linked to a user, allow match by email
     if (!attendee.attendee_email) {
       throw new ApiError(403, 'Not authorized to respond to this invite');
     }
-    const user = await prisma.users.findFirst({ where: { id: userIdNum } });
-    if (!user || String(user.email).toLowerCase() !== String(attendee.attendee_email).toLowerCase()) {
+    respondingUser = await prisma.users.findFirst({ where: { id: userIdNum } });
+    if (!respondingUser || String(respondingUser.email).toLowerCase() !== String(attendee.attendee_email).toLowerCase()) {
       throw new ApiError(403, 'Not authorized to respond to this invite');
     }
+  } else {
+    respondingUser = await prisma.users.findFirst({ where: { id: userIdNum } });
   }
 
   const updated = await prisma.user_calendar_attendees.update({ where: { id: BigInt(attendeeId) }, data: { status } });
+
+  // Notify the organizer when invite is accepted
+  if (status === 'accepted' && event.users) {
+    const organizer = event.users;
+    const responderName = respondingUser?.name || respondingUser?.email || attendee.attendee_email || 'Someone';
+    const eventTitle = event.title || 'your event';
+    const eventDate = event.date.toISOString().split('T')[0];
+
+    const notificationTitle = 'Event Join Request Accepted';
+    const notificationMessage = `${responderName} has accepted your invitation to join "${eventTitle}" on ${eventDate}`;
+
+    // Always create in-app notification
+    try {
+      await prisma.notifications.create({
+        data: {
+          user_id: organizer.id,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: 'calendar_response',
+        },
+      });
+    } catch (err) {
+      console.warn('Failed to create in-app notification for organizer', err);
+    }
+
+    // For premium users, also send push notification
+    if (organizer.subscription_tier === 'premium' && organizer.device_token) {
+      try {
+        const deviceToken = String(organizer.device_token);
+        if (isValidExpoPushToken(deviceToken)) {
+          await sendPushNotification(
+            deviceToken,
+            notificationTitle,
+            notificationMessage,
+            { type: 'calendar_response', eventId: eventId, status: 'accepted' }
+          );
+        }
+      } catch (err) {
+        console.warn('Failed to send push notification to organizer', err);
+      }
+    }
+  }
+
   return { id: updated.id.toString(), userId: updated.user_id ? updated.user_id.toString() : null, email: updated.attendee_email, status: updated.status };
 }
+
 
 /**
  * Copy an existing calendar event to a new date. Copies attendees.

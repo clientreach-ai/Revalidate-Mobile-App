@@ -22,8 +22,7 @@ export default function CalendarScreen() {
   const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, inviteAttendees } = useCalendar();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showInvitesModal, setShowInvitesModal] = useState(false);
-  const [inviteRows, setInviteRows] = useState<Array<any>>([]);
-  const [isLoadingInvites, setIsLoadingInvites] = useState(false);
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
@@ -173,45 +172,30 @@ export default function CalendarScreen() {
     return () => { mounted = false; };
   }, []);
 
-  // When invites modal opens, fetch full event details for matching invites to obtain attendee records
+  // Filter events to find invites addressed to the current user
+  const inviteRows = events
+    .map(event => {
+      // Check if user is an attendee
+      if (!event.attendees || !Array.isArray(event.attendees) || !userEmail) return null;
+
+      const attendee = event.attendees.find(
+        a => a.email.toLowerCase() === userEmail.toLowerCase() && a.status === 'pending'
+      );
+
+      if (!attendee) return null;
+
+      return { event, attendee };
+    })
+    .filter((row): row is { event: CalendarEvent; attendee: any } => row !== null);
+
+  // When invites modal opens, we rely on the already loaded events
+  // If we needed to fetch fresh data, we could call refresh()
   useEffect(() => {
-    if (!showInvitesModal) return;
-    if (!userEmail) return;
-
-    let mounted = true;
-    (async () => {
-      setIsLoadingInvites(true);
-      try {
-        const matches = events.filter(e => e.invite && String(e.invite).toLowerCase().includes(userEmail.toLowerCase()));
-        const rows: any[] = [];
-        for (const m of matches) {
-          try {
-            const res = await getCalendarEventById(String(m.id));
-            const ev = res.data as CalendarEvent;
-            // find attendee record for this user
-            const attendee = (ev.attendees || []).find((a: any) => {
-              if (!a) return false;
-              if (a.userId && userEmail) {
-                // if attendee is linked to a user, compare by email
-                return String(a.email || '').toLowerCase() === String(userEmail).toLowerCase();
-              }
-              return String(a.email || '').toLowerCase() === String(userEmail).toLowerCase();
-            });
-            rows.push({ event: ev, attendee });
-          } catch (e) {
-            console.warn('Failed to load invite event detail', m.id, e);
-          }
-        }
-        if (mounted) setInviteRows(rows);
-      } catch (e) {
-        console.error('Failed to load invites', e);
-      } finally {
-        if (mounted) setIsLoadingInvites(false);
-      }
-    })();
-
-    return () => { mounted = false; };
-  }, [showInvitesModal, userEmail, events]);
+    if (showInvitesModal && !isLoading) {
+      // Optional: refresh events to ensure we have latest status
+      refresh();
+    }
+  }, [showInvitesModal]);
 
   const calendarDays = getDaysInMonth(currentDate);
 
@@ -745,11 +729,7 @@ export default function CalendarScreen() {
               </View>
 
               <ScrollView style={{ maxHeight: 320 }} nestedScrollEnabled>
-                {isLoadingInvites ? (
-                  <View className="p-4">
-                    <Text className={`${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Loading invites...</Text>
-                  </View>
-                ) : inviteRows.length > 0 ? (
+                {inviteRows.length > 0 ? (
                   inviteRows.map(({ event: ev, attendee }: any) => (
                     <View key={ev.id} className={`p-4 rounded-xl mb-2 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
                       <View>
@@ -762,9 +742,8 @@ export default function CalendarScreen() {
                             if (!attendee) return;
                             try {
                               await apiRespondToInvite(String(ev.id), String(attendee.id), 'accepted');
-                              // refresh events and update rows
+                              // refresh events to update list
                               await refresh();
-                              setInviteRows(prev => prev.map(r => r.event.id === ev.id ? { ...r, attendee: { ...r.attendee, status: 'accepted' } } : r));
                             } catch (e) {
                               console.error('Accept invite failed', e);
                             }
@@ -779,7 +758,6 @@ export default function CalendarScreen() {
                             try {
                               await apiRespondToInvite(String(ev.id), String(attendee.id), 'declined');
                               await refresh();
-                              setInviteRows(prev => prev.map(r => r.event.id === ev.id ? { ...r, attendee: { ...r.attendee, status: 'declined' } } : r));
                             } catch (e) {
                               console.error('Decline invite failed', e);
                             }

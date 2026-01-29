@@ -109,8 +109,12 @@ export async function updateUserProfile(
   if (updates.notepad !== undefined) {
     updateData.notepad = updates.notepad;
   }
+  if (updates.device_token !== undefined) {
+    updateData.device_token = updates.device_token;
+  }
 
   // Handle 'description' JSON fields
+
   const descriptionFields = [
     'professional_registrations',
     'registration_reference_pin',

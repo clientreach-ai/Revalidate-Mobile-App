@@ -18,6 +18,7 @@ import { apiService, API_ENDPOINTS } from "@/services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { showToast } from "@/utils/toast";
 import { setSubscriptionInfo } from "@/utils/subscription";
+import { setupPushNotifications } from "@/features/notifications/notifications.service";
 import "../global.css";
 
 export default function Login() {
@@ -93,6 +94,11 @@ export default function Login() {
                     email: user.email,
                     firstName: (user as any).firstName,
                     lastName: (user as any).lastName,
+                });
+
+                // Register for push notifications (runs async in background)
+                setupPushNotifications().catch(err => {
+                    console.warn('Push notification setup failed:', err);
                 });
 
                 // After successful login, check onboarding status and route accordingly

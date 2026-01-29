@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, Alert, Animated, RefreshControl, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert, Animated, RefreshControl, Image, Dimensions, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { API_CONFIG } from '@revalidation-tracker/constants';
@@ -58,6 +59,30 @@ export default function DashboardScreen() {
   });
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+
+  // Work Session Form State
+  const [showWorkForm, setShowWorkForm] = useState(false);
+  const [isSavingWork, setIsSavingWork] = useState(false);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [workSettingsOptions, setWorkSettingsOptions] = useState<any[]>([]);
+  const [scopeOptions, setScopeOptions] = useState<any[]>([]);
+  const [hospitalSearch, setHospitalSearch] = useState('');
+  const [showHospitalModal, setShowHospitalModal] = useState(false);
+  const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
+  const [showScopeModal, setShowScopeModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Form Fields
+  const [workingMode, setWorkingMode] = useState<'Full time' | 'Part time'>('Full time');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedHospital, setSelectedHospital] = useState<any>(null);
+  const [hours, setHours] = useState('');
+  const [rate, setRate] = useState('');
+  const [workSetting, setWorkSetting] = useState('');
+  const [scope, setScope] = useState('');
+  const [description, setDescription] = useState('');
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [slides, setSlides] = useState<Array<{ id: string; image: string; image_url?: string; name?: string; sort_order?: number }>>([]);
   const [slideImageMap, setSlideImageMap] = useState<Record<string, string>>({});
   const scrollRef = useRef<ScrollView | null>(null);
@@ -136,7 +161,8 @@ export default function DashboardScreen() {
         loadDashboardStats(),
         loadNotificationsCount(),
         loadRecentActivities(),
-        loadSlides()
+        loadSlides(),
+        loadFormOptions()
       ]);
       if (isMounted.current) setIsLoading(false);
     };
@@ -383,6 +409,200 @@ export default function DashboardScreen() {
     ]);
   };
 
+  const loadFormOptions = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      // Check cache first for hospitals
+      const cachedHospitals = await AsyncStorage.getItem('cached_hospitals');
+      if (cachedHospitals) {
+        setHospitals(JSON.parse(cachedHospitals));
+      }
+
+      const [hospResp, workResp, scopeResp] = await Promise.all([
+        apiService.get<any>(API_ENDPOINTS.HOSPITALS.LIST, token).catch(() => null),
+        apiService.get<any>('/api/v1/profile/work', token).catch(() => null),
+        apiService.get<any>('/api/v1/profile/scope', token).catch(() => null),
+      ]);
+
+      if (hospResp?.data) {
+        setHospitals(hospResp.data);
+        await AsyncStorage.setItem('cached_hospitals', JSON.stringify(hospResp.data));
+      }
+      if (workResp?.data || Array.isArray(workResp)) {
+        const items = Array.isArray(workResp) ? workResp : workResp.data;
+        setWorkSettingsOptions(items.filter((i: any) => i.status === 'one' || i.status === 1));
+      }
+      if (scopeResp?.data || Array.isArray(scopeResp)) {
+        const items = Array.isArray(scopeResp) ? scopeResp : scopeResp.data;
+        setScopeOptions(items.filter((i: any) => i.status === 'one' || i.status === 1));
+      }
+    } catch (error) {
+      console.error('Error loading form options:', error);
+    }
+  };
+
+  const handleStopSession = async () => {
+    if (!activeSession) return;
+
+    Alert.alert(
+      'Stop Session',
+      'Would you like to save this session to your working hours?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'No',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('authToken');
+              if (!token) return;
+              const endTime = new Date().toISOString();
+              await apiService.put(`${API_ENDPOINTS.WORK_HOURS.UPDATE}/${activeSession.id}`, { end_time: endTime }, token);
+              setActiveSession(null);
+              showToast.success('Session ended');
+              loadDashboardStats();
+            } catch (error: any) {
+              showToast.error(error?.message || 'Failed to stop session');
+            }
+          }
+        },
+        {
+          text: 'Yes',
+          onPress: () => {
+            // Pre-fill form
+            const totalHours = timer.hours + (timer.minutes / 60) + (timer.seconds / 3600);
+            setHours(totalHours.toFixed(2));
+            setWorkingMode('Full time');
+            setSelectedDate(new Date());
+
+            // Try to find default rate from profile if needed (though already fetched in loadUserData)
+            // But rate state hasn't been set yet, let's look at userData
+            if (userData) {
+              // We might need to fetch hourly rate explicitly if it's not in UserData interface
+            }
+
+            setShowWorkForm(true);
+          }
+        }
+      ]
+    );
+  };
+
+  const handleCopySchedule = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+      const res = await apiService.get<any>(API_ENDPOINTS.WORK_HOURS.LIST + '?limit=1', token);
+      if (res?.data?.[0]) {
+        const last = res.data[0];
+        setWorkSetting(last.workSetting || '');
+        setScope(last.scopeOfPractice || '');
+        setRate(String(last.hourlyRate || rate));
+        if (last.location) {
+          const hosp = hospitals.find(h => h.name === last.location);
+          if (hosp) setSelectedHospital(hosp);
+          else setSelectedHospital({ name: last.location });
+        }
+        showToast.success('Details copied from last session');
+      } else {
+        showToast.info('No previous session found');
+      }
+    } catch (e) {
+      showToast.error('Failed to copy schedule');
+    }
+  };
+
+  const handleSaveWorkSession = async () => {
+    if (!selectedHospital || !hours || !workSetting || !scope || !rate) {
+      showToast.error('Please fill all required fields');
+      return;
+    }
+
+    try {
+      setIsSavingWork(true);
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const endTime = new Date().toISOString();
+      const startTimeDate = new Date(activeSession!.startTime);
+      // Ensure date matches what user selected
+      startTimeDate.setFullYear(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+
+      const payload = {
+        end_time: endTime,
+        start_time: startTimeDate.toISOString(),
+        location: selectedHospital.name,
+        shift_type: workingMode,
+        duration_minutes: Math.round(parseFloat(hours) * 60),
+        hourly_rate: parseFloat(rate),
+        work_description: description,
+        work_setting: workSetting,
+        scope_of_practice: scope,
+        document_ids: documents.map(d => d.id),
+      };
+
+      await apiService.put(`${API_ENDPOINTS.WORK_HOURS.UPDATE}/${activeSession!.id}`, payload, token);
+
+      setActiveSession(null);
+      setShowWorkForm(false);
+      showToast.success('Work session saved successfully');
+      loadDashboardStats();
+      loadRecentActivities();
+    } catch (error: any) {
+      showToast.error(error?.message || 'Failed to save session');
+    } finally {
+      setIsSavingWork(false);
+    }
+  };
+
+  const handleDocumentPick = async (source: 'gallery' | 'camera') => {
+    try {
+      const permission = source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        showToast.error(`${source} permission required`);
+        return;
+      }
+
+      const result = await (source === 'camera'
+        ? ImagePicker.launchCameraAsync({ quality: 0.5 })
+        : ImagePicker.launchImageLibraryAsync({ quality: 0.5 }));
+
+      if (!result.canceled && result.assets[0]) {
+        setIsUploading(true);
+        const token = await AsyncStorage.getItem('authToken');
+        if (!token) return;
+
+        const uploadResp = await apiService.uploadFile(
+          API_ENDPOINTS.DOCUMENTS.UPLOAD,
+          {
+            uri: result.assets[0].uri,
+            type: 'image/jpeg',
+            name: `evidence_${Date.now()}.jpg`,
+          },
+          token,
+          { category: 'work_hours' }
+        );
+
+        if (uploadResp?.data) {
+          setDocuments(prev => [...prev, uploadResp.data]);
+          showToast.success('Document uploaded');
+        }
+      }
+    } catch (error) {
+      showToast.error('Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const loadUserData = async () => {
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -396,6 +616,7 @@ export default function DashboardScreen() {
         const userName = data.name || data.email?.split('@')[0] || 'User';
         if (isMounted.current) {
           setUserData({ name: userName, email: data.email, professionalRole: data.professionalRole, registrationNumber: data.registrationNumber, revalidationDate: data.revalidationDate, image: data.image || null });
+          if (data.hourlyRate) setRate(String(data.hourlyRate));
         }
         if (data.subscriptionTier) {
           await setSubscriptionInfo({ subscriptionTier: data.subscriptionTier as any, subscriptionStatus: data.subscriptionStatus as any, isPremium: data.subscriptionTier === 'premium', canUseOffline: data.subscriptionTier === 'premium' });
@@ -429,6 +650,58 @@ export default function DashboardScreen() {
     if (hr < 12) return 'Good Morning';
     if (hr < 17) return 'Good Afternoon';
     return 'Good Evening';
+  };
+
+  const formatDateShort = (date: Date): string => {
+    return date.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+
+  const getDaysInMonth = (m: number, y: number) => new Date(y, m + 1, 0).getDate();
+  const getFirstDayOfMonth = (m: number, y: number) => new Date(y, m, 1).getDay();
+
+  const handleCalDateSelect = (day: number) => {
+    setSelectedDate(new Date(calYear, calMonth, day));
+    setShowDatePicker(false);
+  };
+
+  const navigateCalMonth = (dir: 'prev' | 'next') => {
+    if (dir === 'prev') {
+      if (calMonth === 0) { setCalMonth(11); setCalYear(calYear - 1); }
+      else setCalMonth(calMonth - 1);
+    } else {
+      if (calMonth === 11) { setCalMonth(0); setCalYear(calYear + 1); }
+      else setCalMonth(calMonth + 1);
+    }
+  };
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const renderCalendarDays = () => {
+    const daysInMonth = getDaysInMonth(calMonth, calYear);
+    const firstDay = getFirstDayOfMonth(calMonth, calYear);
+    const nodes: any[] = [];
+    for (let i = 0; i < firstDay; i++) nodes.push(<View key={`empty-${i}`} className="w-10 h-10" />);
+    for (let day = 1; day <= daysInMonth; day++) {
+      const isSelected = selectedDate.getDate() === day && selectedDate.getMonth() === calMonth && selectedDate.getFullYear() === calYear;
+      nodes.push(
+        <Pressable
+          key={day}
+          onPress={() => handleCalDateSelect(day)}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-blue-600' : ''}`}
+        >
+          <Text className={`text-sm font-medium ${isSelected ? 'text-white' : (isDark ? 'text-white' : 'text-slate-800')}`}>{day}</Text>
+        </Pressable>
+      );
+    }
+    return nodes;
   };
 
   const formatUserName = () => {
@@ -599,7 +872,11 @@ export default function DashboardScreen() {
                 <Text className={`text-4xl font-mono font-bold ${isDark ? "text-white" : "text-slate-800"}`}>{formatTime(timer.hours)}:{formatTime(timer.minutes)}:{formatTime(timer.seconds)}</Text>
                 <View className="flex-row gap-2">
                   <Pressable onPress={handleRestartSession} className="p-3 rounded-2xl bg-slate-200"><MaterialIcons name="refresh" size={20} /></Pressable>
-                  <Pressable onPress={isPaused ? handleResumeSession : handlePauseSession} className={`px-6 py-3 rounded-2xl flex-row items-center gap-2 ${isPaused ? "bg-green-500" : "bg-amber-500"}`}><MaterialIcons name={isPaused ? "play-arrow" : "pause"} color="white" size={20} /><Text className="text-white font-bold">{isPaused ? "Resume" : "Pause"}</Text></Pressable>
+                  <Pressable onPress={isPaused ? handleResumeSession : handlePauseSession} className={`px-5 py-3 rounded-2xl flex-row items-center gap-2 ${isPaused ? "bg-green-500" : "bg-amber-500"}`}><MaterialIcons name={isPaused ? "play-arrow" : "pause"} color="white" size={20} /></Pressable>
+                  <Pressable onPress={handleStopSession} className="px-5 py-3 rounded-2xl bg-red-500 flex-row items-center gap-2">
+                    <MaterialIcons name="stop" color="white" size={20} />
+
+                  </Pressable>
                 </View>
               </View>
             </View>
@@ -607,7 +884,7 @@ export default function DashboardScreen() {
             <View className={`p-5 rounded-3xl shadow-lg border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
               <View className="flex-row items-center justify-between">
                 <View><Text className="text-lg font-semibold text-slate-600">No active session</Text><Text className="text-xs text-slate-400">Track your clinical hours</Text></View>
-                <Pressable onPress={handleStartSession} className="bg-green-500 px-6 py-3 rounded-2xl flex-row items-center gap-2"><MaterialIcons name="play-arrow" color="white" size={20} /><Text className="text-white font-bold">Start</Text></Pressable>
+                <Pressable onPress={handleStartSession} className="bg-green-500 px-6 py-3 rounded-2xl flex-row items-center gap-2"><MaterialIcons name="play-arrow" color="white" size={20} /></Pressable>
               </View>
             </View>
           )}
@@ -635,6 +912,263 @@ export default function DashboardScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Work Session Form Modal */}
+      <Modal visible={showWorkForm} transparent animationType="slide">
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className={`h-[90%] rounded-t-[40px] ${isDark ? "bg-slate-900" : "bg-white"} p-6`}>
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className={`text-2xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Save Work Session</Text>
+              <Pressable onPress={() => setShowWorkForm(false)} className="p-2"><MaterialIcons name="close" size={24} color={isDark ? "white" : "black"} /></Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+              {/* Copy Schedule */}
+              <Pressable
+                onPress={handleCopySchedule}
+                className={`mb-6 p-4 rounded-2xl border flex-row items-center justify-center gap-2 ${isDark ? "bg-slate-800 border-slate-700" : "bg-blue-50 border-blue-100"}`}
+              >
+                <MaterialIcons name="content-copy" size={20} color="#2B5F9E" />
+                <Text className="text-[#2B5F9E] font-bold">Copy Details From Previous Session</Text>
+              </Pressable>
+
+              {/* Working Mode */}
+              <View className="mb-6">
+                <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>WORKING MODE (REQUIRED)</Text>
+                <View className="flex-row gap-4">
+                  {['Full time', 'Part time'].map((mode) => (
+                    <Pressable
+                      key={mode}
+                      onPress={() => setWorkingMode(mode as any)}
+                      className={`flex-1 py-3 items-center rounded-2xl border ${workingMode === mode ? "bg-blue-500 border-blue-500" : (isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200")}`}
+                    >
+                      <Text className={`font-bold ${workingMode === mode ? "text-white" : (isDark ? "text-slate-400" : "text-slate-600")}`}>{mode}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {/* Date */}
+              <View className="mb-6">
+                <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>DATE (REQUIRED)</Text>
+                <Pressable
+                  onPress={() => setShowDatePicker(true)}
+                  className={`p-4 rounded-2xl border flex-row justify-between items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <Text className={isDark ? "text-white" : "text-slate-800"}>{formatDateShort(selectedDate)}</Text>
+                  <MaterialIcons name="calendar-today" size={20} color={isDark ? "white" : "gray"} />
+                </Pressable>
+              </View>
+
+              {/* Hospital */}
+              <View className="mb-6">
+                <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>HOSPITAL (REQUIRED)</Text>
+                <Pressable
+                  onPress={() => setShowHospitalModal(true)}
+                  className={`p-4 rounded-2xl border flex-row justify-between items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <Text className={isDark ? "text-white" : "text-slate-800"}>{selectedHospital?.name || 'Select Hospital'}</Text>
+                  <MaterialIcons name="search" size={20} color={isDark ? "white" : "gray"} />
+                </Pressable>
+              </View>
+
+              {/* Hours and Rate */}
+              <View className="flex-row gap-4 mb-6">
+                <View className="flex-1">
+                  <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>HOURS (REQUIRED)</Text>
+                  <TextInput
+                    value={hours}
+                    onChangeText={setHours}
+                    keyboardType="numeric"
+                    placeholder="0.00"
+                    placeholderTextColor="gray"
+                    className={`p-4 rounded-2xl border ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>RATE (£/HR) (REQUIRED)</Text>
+                  <TextInput
+                    value={rate}
+                    onChangeText={setRate}
+                    keyboardType="numeric"
+                    placeholder="0.00"
+                    placeholderTextColor="gray"
+                    className={`p-4 rounded-2xl border ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                  />
+                </View>
+              </View>
+
+              {/* Work Setting */}
+              <View className="mb-6">
+                <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>WORK SETTING (REQUIRED)</Text>
+                <Pressable
+                  onPress={() => setShowWorkSettingModal(true)}
+                  className={`p-4 rounded-2xl border flex-row justify-between items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <Text className={isDark ? "text-white" : "text-slate-800"}>{workSetting || 'Select Setting'}</Text>
+                  <MaterialIcons name="expand-more" size={20} color={isDark ? "white" : "gray"} />
+                </Pressable>
+              </View>
+
+              {/* Scope of Practice */}
+              <View className="mb-6">
+                <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>SCOPE OF PRACTICE (REQUIRED)</Text>
+                <Pressable
+                  onPress={() => setShowScopeModal(true)}
+                  className={`p-4 rounded-2xl border flex-row justify-between items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200"}`}
+                >
+                  <Text className={isDark ? "text-white" : "text-slate-800"}>{scope || 'Select Scope'}</Text>
+                  <MaterialIcons name="expand-more" size={20} color={isDark ? "white" : "gray"} />
+                </Pressable>
+              </View>
+
+              {/* Description */}
+              <View className="mb-6">
+                <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>BRIEF DESCRIPTION</Text>
+                <TextInput
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  numberOfLines={4}
+                  placeholder="Describe your work..."
+                  placeholderTextColor="gray"
+                  style={{ minHeight: 100, textAlignVertical: 'top' }}
+                  className={`p-4 rounded-2xl border ${isDark ? "bg-slate-800 border-slate-700 text-white" : "bg-slate-50 border-slate-200 text-slate-800"}`}
+                />
+              </View>
+
+              {/* Evidence */}
+              <View className="mb-8">
+                <Text className={`text-sm font-semibold mb-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>EVIDENCE (DOCUMENTS)</Text>
+                <View className="flex-row flex-wrap gap-3">
+                  {documents.map((doc, idx) => (
+                    <View key={idx} className="w-20 h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
+                      <Image source={{ uri: doc.url }} className="w-full h-full" />
+                      <Pressable
+                        onPress={() => setDocuments(docs => docs.filter((_, i) => i !== idx))}
+                        className="absolute top-1 right-1 bg-red-500 rounded-full p-1"
+                      >
+                        <MaterialIcons name="close" size={12} color="white" />
+                      </Pressable>
+                    </View>
+                  ))}
+                  <Pressable
+                    onPress={() => {
+                      Alert.alert('Upload Evidence', 'Choose source', [
+                        { text: 'Gallery', onPress: () => handleDocumentPick('gallery') },
+                        { text: 'Camera', onPress: () => handleDocumentPick('camera') },
+                        { text: 'Cancel', style: 'cancel' }
+                      ]);
+                    }}
+                    className={`w-20 h-20 rounded-xl border-2 border-dashed items-center justify-center ${isDark ? "border-slate-700 bg-slate-800" : "border-slate-300 bg-slate-50"}`}
+                  >
+                    {isUploading ? <ActivityIndicator size="small" color="#2B5F9E" /> : <MaterialIcons name="add-a-photo" size={24} color="gray" />}
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Save Button */}
+              <Pressable
+                onPress={handleSaveWorkSession}
+                disabled={isSavingWork}
+                className={`py-4 rounded-2xl items-center bg-[#2B5F9E] ${isSavingWork ? 'opacity-70' : ''}`}
+              >
+                {isSavingWork ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-lg">Save Session</Text>}
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* Hospital Selection Modal */}
+        <Modal visible={showHospitalModal} transparent animationType="fade">
+          <View className="flex-1 bg-black/50 justify-center px-6">
+            <View className={`h-[80%] rounded-3xl ${isDark ? "bg-slate-900" : "bg-white"} p-6`}>
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Select Hospital</Text>
+                <Pressable onPress={() => setShowHospitalModal(false)}><MaterialIcons name="close" size={24} color={isDark ? "white" : "black"} /></Pressable>
+              </View>
+              <View className={`flex-row items-center px-4 rounded-xl mb-4 border ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-100 border-slate-200"}`}>
+                <MaterialIcons name="search" size={20} color="gray" />
+                <TextInput
+                  value={hospitalSearch}
+                  onChangeText={setHospitalSearch}
+                  placeholder="Search hospital..."
+                  placeholderTextColor="gray"
+                  className={`flex-1 p-3 ${isDark ? "text-white" : "text-slate-800"}`}
+                />
+              </View>
+              <ScrollView>
+                {hospitals
+                  .filter(h => h.name.toLowerCase().includes(hospitalSearch.toLowerCase()))
+                  .map((h) => (
+                    <Pressable
+                      key={h.id}
+                      onPress={() => {
+                        setSelectedHospital(h);
+                        setShowHospitalModal(false);
+                      }}
+                      className={`py-4 border-b ${isDark ? "border-slate-800" : "border-slate-100"}`}
+                    >
+                      <Text className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}>{h.name}</Text>
+                      <Text className="text-xs text-slate-400">{h.town}, {h.postcode}</Text>
+                    </Pressable>
+                  ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Selector Modal (Work Setting / Scope) */}
+        <Modal visible={showWorkSettingModal || showScopeModal} transparent animationType="fade">
+          <Pressable className="flex-1 bg-black/50 justify-center px-6" onPress={() => { setShowWorkSettingModal(false); setShowScopeModal(false); }}>
+            <View className={`rounded-3xl ${isDark ? "bg-slate-900" : "bg-white"} p-6 max-h-[70%]`}>
+              <Text className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
+                {showWorkSettingModal ? 'Select Work Setting' : 'Select Scope of Practice'}
+              </Text>
+              <ScrollView>
+                {(showWorkSettingModal ? workSettingsOptions : scopeOptions).map((opt: any) => (
+                  <Pressable
+                    key={opt.id || opt.value}
+                    onPress={() => {
+                      if (showWorkSettingModal) setWorkSetting(opt.name || opt.label);
+                      else setScope(opt.name || opt.label);
+                      setShowWorkSettingModal(false);
+                      setShowScopeModal(false);
+                    }}
+                    className={`py-4 border-b ${isDark ? "border-slate-800" : "border-slate-100"}`}
+                  >
+                    <Text className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}>{opt.name || opt.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Modal>
+      </Modal>
+
+      {/* Date Picker Modal */}
+      <Modal visible={showDatePicker} transparent animationType="slide">
+        <Pressable className="flex-1 bg-black/50 justify-end" onPress={() => setShowDatePicker(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-900' : 'bg-white'} rounded-t-3xl p-6`}>
+            <View className="flex-row items-center justify-between mb-4">
+              <Pressable onPress={() => navigateCalMonth('prev')} className="p-2">
+                <MaterialIcons name="chevron-left" size={24} color={isDark ? 'white' : 'black'} />
+              </Pressable>
+              <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{monthNames[calMonth]} {calYear}</Text>
+              <Pressable onPress={() => navigateCalMonth('next')} className="p-2">
+                <MaterialIcons name="chevron-right" size={24} color={isDark ? 'white' : 'black'} />
+              </Pressable>
+            </View>
+            <View className="flex-row justify-between mb-3">
+              {dayNames.map(d => <View key={d} className="w-10 items-center"><Text className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{d}</Text></View>)}
+            </View>
+            <View className="flex-row flex-wrap justify-between mb-6">{renderCalendarDays()}</View>
+            <Pressable onPress={() => setShowDatePicker(false)} className={`py-4 rounded-2xl items-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+              <Text className={`font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }

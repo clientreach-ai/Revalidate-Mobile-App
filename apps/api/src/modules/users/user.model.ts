@@ -33,7 +33,9 @@ export interface UpdateUserProfile {
   earned_current_financial_year?: number;
   brief_description_of_work?: string;
   notepad?: string;
+  device_token?: string; // Expo push token for push notifications
 }
+
 
 /**
  * Onboarding step data types

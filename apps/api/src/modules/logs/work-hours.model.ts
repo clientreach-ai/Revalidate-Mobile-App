@@ -16,6 +16,8 @@ export interface WorkHours {
   shift_type?: string;
   hourly_rate?: number;
   total_earnings?: number;
+  work_setting?: string;
+  scope_of_practice?: string;
   document_ids?: string; // JSON array of document IDs
   is_active: boolean;
   created_at: string;
@@ -31,6 +33,8 @@ export interface CreateWorkHours {
   shift_type?: string;
   hourly_rate?: number;
   total_earnings?: number;
+  work_setting?: string;
+  scope_of_practice?: string;
   document_ids?: number[];
 }
 
@@ -43,6 +47,8 @@ export interface UpdateWorkHours {
   shift_type?: string;
   hourly_rate?: number;
   total_earnings?: number;
+  work_setting?: string;
+  scope_of_practice?: string;
   document_ids?: number[];
 }
 
@@ -67,8 +73,9 @@ export async function createWorkHours(
     `INSERT INTO work_hours (
       user_id, start_time, end_time, duration_minutes, 
       work_description, location, shift_type, hourly_rate, total_earnings,
+      work_setting, scope_of_practice,
       document_ids, is_active, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       userId,
       data.start_time,
@@ -79,6 +86,8 @@ export async function createWorkHours(
       data.shift_type || null,
       data.hourly_rate || null,
       data.total_earnings || null,
+      data.work_setting || null,
+      data.scope_of_practice || null,
       data.document_ids ? JSON.stringify(data.document_ids) : null,
       !data.end_time, // Active if no end time
     ]
@@ -250,6 +259,14 @@ export async function updateWorkHours(
   if (updates.total_earnings !== undefined) {
     fields.push('total_earnings = ?');
     values.push(updates.total_earnings || null);
+  }
+  if (updates.work_setting !== undefined) {
+    fields.push('work_setting = ?');
+    values.push(updates.work_setting || null);
+  }
+  if (updates.scope_of_practice !== undefined) {
+    fields.push('scope_of_practice = ?');
+    values.push(updates.scope_of_practice || null);
   }
   if (updates.document_ids !== undefined) {
     fields.push('document_ids = ?');
