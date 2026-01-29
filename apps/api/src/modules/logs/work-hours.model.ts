@@ -35,6 +35,7 @@ export interface CreateWorkHours {
 }
 
 export interface UpdateWorkHours {
+  start_time?: string;
   end_time?: string;
   duration_minutes?: number;
   work_description?: string;
@@ -208,6 +209,10 @@ export async function updateWorkHours(
   const fields: string[] = [];
   const values: any[] = [];
 
+  if (updates.start_time !== undefined) {
+    fields.push('start_time = ?');
+    values.push(updates.start_time);
+  }
   if (updates.end_time !== undefined) {
     fields.push('end_time = ?');
     values.push(updates.end_time);
@@ -216,13 +221,15 @@ export async function updateWorkHours(
   if (updates.duration_minutes !== undefined) {
     fields.push('duration_minutes = ?');
     values.push(updates.duration_minutes);
-  } else if (updates.end_time && existing.start_time) {
-    // Calculate duration if end_time is set
-    const start = new Date(existing.start_time);
-    const end = new Date(updates.end_time);
-    const duration = Math.round((end.getTime() - start.getTime()) / 1000 / 60);
-    fields.push('duration_minutes = ?');
-    values.push(duration);
+  } else if ((updates.end_time || updates.start_time) && (updates.start_time || existing.start_time) && (updates.end_time || existing.end_time)) {
+    // Calculate duration if either time is set and both become available
+    const start = new Date(updates.start_time || existing.start_time);
+    const end = new Date(updates.end_time || existing.end_time || '');
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+      const duration = Math.round((end.getTime() - start.getTime()) / 1000 / 60);
+      fields.push('duration_minutes = ?');
+      values.push(duration);
+    }
   }
   if (updates.work_description !== undefined) {
     fields.push('work_description = ?');

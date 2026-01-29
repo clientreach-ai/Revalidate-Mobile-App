@@ -343,15 +343,7 @@ export default function FeedbackScreen() {
           <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-[#121417]"}`}>Feedback Log</Text>
           <View className="w-12" />
         </View>
-        {/* Filter Tabs - keep simple */}
-        <ScrollView horizontal contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 12 }}>
-          {['all', 'patient', 'colleague', 'manager'].map((f) => (
-            <Pressable key={f} onPress={() => setActiveFilter(f as any)}
-              className={`px-4 py-1.5 rounded-full border ${activeFilter === f ? 'bg-[#2B5E9C] border-[#2B5E9C]' : (isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white')}`}>
-              <Text className={`capitalize text-xs font-bold ${activeFilter === f ? 'text-white' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>{f}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+
       </View>
 
       {/* List */}

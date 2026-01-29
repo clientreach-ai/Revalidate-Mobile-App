@@ -19,6 +19,10 @@ interface CPDActivity {
   date: string;
   hours: number;
   type: 'participatory' | 'non-participatory';
+  learningMethod?: string;
+  cpdLearningType?: string;
+  linkToStandard?: string;
+  linkToStandardProficiency?: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   iconBgColor: string;
   iconColor: string;
@@ -45,6 +49,10 @@ export default function CPDHoursTrackingScreen() {
     activityDate: '', // YYYY-MM-DD
     durationMinutes: 0,
     activityType: 'participatory',
+    learningMethod: 'independent learning',
+    cpdLearningType: 'work based learning',
+    linkToStandard: '',
+    linkToStandardProficiency: '',
   });
   const [cpdSubmitting, setCpdSubmitting] = useState(false);
   const [fileUri, setFileUri] = useState<string | null>(null);
@@ -56,6 +64,10 @@ export default function CPDHoursTrackingScreen() {
     'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'
   ];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  // Info Modal States
+  const [showHCPCInfo, setShowHCPCInfo] = useState(false);
+  const [showNMCInfo, setShowNMCInfo] = useState(false);
 
   const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
@@ -126,12 +138,22 @@ export default function CPDHoursTrackingScreen() {
           showToast.error('Permission to access gallery is required', 'Permission Denied');
           return;
         }
-        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, allowsEditing: false, quality: 1 });
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images', 'videos'],
+          allowsEditing: false,
+          quality: 1
+        });
         if (!result.canceled && result.assets && result.assets[0]) {
           const asset = result.assets[0];
-          const sizeInMB = asset.fileSize ? `${(asset.fileSize / (1024 * 1024)).toFixed(2)} MB` : '0 MB';
+          const sizeInMB = asset.fileSize ? `${(asset.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'Unknown size';
+          const mimeType = asset.mimeType || (asset.type === 'image' ? 'image/jpeg' : asset.type === 'video' ? 'video/mp4' : 'application/octet-stream');
+
           setFileUri(asset.uri);
-          setCpdFile({ name: asset.fileName || `image_${Date.now()}.jpg`, size: sizeInMB, type: asset.type || asset.mimeType || 'image/jpeg' });
+          setCpdFile({
+            name: asset.fileName || `image_${Date.now()}.jpg`,
+            size: sizeInMB,
+            type: mimeType
+          });
         }
       } else if (source === 'camera') {
         const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -139,14 +161,25 @@ export default function CPDHoursTrackingScreen() {
           showToast.error('Permission to access camera is required', 'Permission Denied');
           return;
         }
-        result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 1 });
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 1
+        });
         if (!result.canceled && result.assets && result.assets[0]) {
           const asset = result.assets[0];
-          const sizeInMB = asset.fileSize ? `${(asset.fileSize / (1024 * 1024)).toFixed(2)} MB` : '0 MB';
+          const sizeInMB = asset.fileSize ? `${(asset.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'Unknown size';
+          const mimeType = asset.mimeType || (asset.type === 'image' ? 'image/jpeg' : asset.type === 'video' ? 'video/mp4' : 'application/octet-stream');
+
           setFileUri(asset.uri);
-          setCpdFile({ name: asset.fileName || `photo_${Date.now()}.jpg`, size: sizeInMB, type: asset.type || asset.mimeType || 'image/jpeg' });
+          setCpdFile({
+            name: asset.fileName || `photo_${Date.now()}.jpg`,
+            size: sizeInMB,
+            type: mimeType
+          });
         }
-      } else if (source === 'files') {
+      }
+      else if (source === 'files') {
         result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
         if (!result.canceled && result.size != null) {
           const sizeInMB = `${(result.size / (1024 * 1024)).toFixed(2)} MB`;
@@ -197,6 +230,10 @@ export default function CPDHoursTrackingScreen() {
         date: it.activityDate || it.activity_date || it.createdAt || it.created_at || '',
         hours: (it.durationMinutes || it.duration_minutes || 0) / 60,
         type: (it.activityType || it.activity_type) as 'participatory' | 'non-participatory',
+        learningMethod: it.learningMethod || it.learning_method || '',
+        cpdLearningType: it.cpdLearningType || it.cpd_learning_type || '',
+        linkToStandard: it.linkToStandard || it.link_to_standard || it.linkCode || it.link_code || '',
+        linkToStandardProficiency: it.linkToStandardProficiency || it.link_to_standard_proficiency || it.standardsProficiency || it.standards_proficiency || '',
         icon: (it.activityType || it.activity_type) === 'participatory' ? 'school' : 'menu-book',
         iconBgColor: (it.activityType || it.activity_type) === 'participatory' ? 'bg-blue-100' : 'bg-amber-100',
         iconColor: (it.activityType || it.activity_type) === 'participatory' ? '#2563EB' : '#F59E0B',
@@ -501,23 +538,61 @@ export default function CPDHoursTrackingScreen() {
               </View>
 
               <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-                <View className="px-6 pt-6" style={{ gap: 12 }}>
+                <View className="px-6 pt-6" style={{ gap: 16 }}>
                   <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Title</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Topic *</Text>
                     <TextInput
                       value={cpdForm.trainingName}
                       onChangeText={(t) => setCpdForm({ ...cpdForm, trainingName: t })}
-                      placeholder="e.g. Advanced Clinical Assessment"
+                      placeholder="e.g. Clinical Assessment"
                       placeholderTextColor={isDark ? '#6B7280' : '#94A3B8'}
                       className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-800 border-slate-200'}`}
                     />
                   </View>
 
                   <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Date</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Learning Method *</Text>
+                    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                      {['independent learning', 'online learning', 'course attendance', 'other'].map((m) => (
+                        <Pressable
+                          key={m}
+                          onPress={() => setCpdForm({ ...cpdForm, learningMethod: m })}
+                          className={`px-4 py-2 rounded-xl border ${cpdForm.learningMethod === m ? 'bg-[#2563EB] border-[#2563EB]' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                        >
+                          <Text className={`text-xs capitalize ${cpdForm.learningMethod === m ? 'text-white font-bold' : isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+                            {m}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View>
+                    <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Type of CPD Learning *</Text>
+                    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                      {['work based learning', 'professional activities', 'formal and educational', 'other'].map((t) => (
+                        <Pressable
+                          key={t}
+                          onPress={() => setCpdForm({ ...cpdForm, cpdLearningType: t })}
+                          className={`px-4 py-2 rounded-xl border ${cpdForm.cpdLearningType === t ? 'bg-[#2563EB] border-[#2563EB]' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                        >
+                          <Text className={`text-xs capitalize ${cpdForm.cpdLearningType === t ? 'text-white font-bold' : isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+                            {t}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View>
+                    <View className="flex-row items-center justify-between mb-2">
+                      <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Date *</Text>
+                      <Pressable onPress={() => setShowHCPCInfo(true)}>
+                        <MaterialIcons name="info-outline" size={18} color="#2563EB" />
+                      </Pressable>
+                    </View>
                     <Pressable
                       onPress={() => {
-                        // open calendar modal and set to current or selected month
                         if (cpdForm.activityDate) {
                           const parts = cpdForm.activityDate.split('-').map(Number);
                           if (parts.length === 3) {
@@ -537,36 +612,70 @@ export default function CPDHoursTrackingScreen() {
                     </Pressable>
                   </View>
 
+                  <View className="flex-row items-center" style={{ gap: 12 }}>
+                    <View className="flex-1">
+                      <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Number of Hours *</Text>
+                      <TextInput
+                        value={cpdForm.durationMinutes ? String(cpdForm.durationMinutes / 60) : ''}
+                        onChangeText={(t) => setCpdForm({ ...cpdForm, durationMinutes: Math.round(parseFloat(t || '0') * 60) })}
+                        placeholder="e.g. 2.5"
+                        keyboardType={Platform.OS === 'web' ? 'numeric' : 'decimal-pad'}
+                        placeholderTextColor={isDark ? '#6B7280' : '#94A3B8'}
+                        className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-800 border-slate-200'}`}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Activity Type</Text>
+                      <View className="flex-row items-center border rounded-2xl overflow-hidden" style={{ borderColor: isDark ? '#475569' : '#E2E8F0' }}>
+                        <Pressable
+                          onPress={() => setCpdForm({ ...cpdForm, activityType: 'participatory' })}
+                          className={`flex-1 py-3 items-center ${cpdForm.activityType === 'participatory' ? 'bg-[#2563EB]' : 'bg-transparent'}`}
+                        >
+                          <Text className={`text-[10px] font-bold ${cpdForm.activityType === 'participatory' ? 'text-white' : isDark ? 'text-gray-400' : 'text-slate-500'}`}>Part.</Text>
+                        </Pressable>
+                        <View className={`w-[1px] h-full ${isDark ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                        <Pressable
+                          onPress={() => setCpdForm({ ...cpdForm, activityType: 'non-participatory' })}
+                          className={`flex-1 py-3 items-center ${cpdForm.activityType === 'non-participatory' ? 'bg-[#2563EB]' : 'bg-transparent'}`}
+                        >
+                          <Text className={`text-[10px] font-bold ${cpdForm.activityType === 'non-participatory' ? 'text-white' : isDark ? 'text-gray-400' : 'text-slate-500'}`}>Non-Part.</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+
                   <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Duration (minutes)</Text>
+                    <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Link to code/standard</Text>
                     <TextInput
-                      value={cpdForm.durationMinutes ? String(cpdForm.durationMinutes) : ''}
-                      onChangeText={(t) => setCpdForm({ ...cpdForm, durationMinutes: parseInt(t || '0', 10) || 0 })}
-                      placeholder="e.g. 90"
-                      keyboardType={Platform.OS === 'web' ? 'numeric' : 'number-pad'}
+                      value={cpdForm.linkToStandard}
+                      onChangeText={(t) => setCpdForm({ ...cpdForm, linkToStandard: t })}
+                      placeholder="e.g. HCPC Standard 1"
                       placeholderTextColor={isDark ? '#6B7280' : '#94A3B8'}
                       className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-800 border-slate-200'}`}
                     />
                   </View>
 
                   <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Type</Text>
-                    <View className="flex-row" style={{ gap: 8 }}>
-                      <Pressable onPress={() => setCpdForm({ ...cpdForm, activityType: 'participatory' })} className={`px-4 py-2 rounded-2xl ${cpdForm.activityType === 'participatory' ? (isDark ? 'bg-slate-700' : 'bg-white') : ''}`}>
-                        <Text className={cpdForm.activityType === 'participatory' ? 'font-semibold' : ''}>Participatory</Text>
-                      </Pressable>
-                      <Pressable onPress={() => setCpdForm({ ...cpdForm, activityType: 'non-participatory' })} className={`px-4 py-2 rounded-2xl ${cpdForm.activityType === 'non-participatory' ? (isDark ? 'bg-slate-700' : 'bg-white') : ''}`}>
-                        <Text className={cpdForm.activityType === 'non-participatory' ? 'font-semibold' : ''}>Non-Part.</Text>
+                    <View className="flex-row items-center justify-between mb-2">
+                      <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Link to standard proficiency</Text>
+                      <Pressable onPress={() => setShowNMCInfo(true)}>
+                        <MaterialIcons name="help-outline" size={18} color="#D97706" />
                       </Pressable>
                     </View>
+                    <TextInput
+                      value={cpdForm.linkToStandardProficiency}
+                      onChangeText={(t) => setCpdForm({ ...cpdForm, linkToStandardProficiency: t })}
+                      placeholder="Identify parts of relevant standard"
+                      placeholderTextColor={isDark ? '#6B7280' : '#94A3B8'}
+                      className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-800 border-slate-200'}`}
+                    />
                   </View>
 
-                  <View className="pt-4">
+                  <View className="pt-2">
                     <Pressable
                       onPress={async () => {
-                        // simple validation
                         if (!cpdForm.trainingName.trim() || !cpdForm.activityDate || cpdForm.durationMinutes <= 0) {
-                          console.warn('Please fill all fields');
+                          showToast.error('Please fill all required fields (*)', 'Missing Info');
                           return;
                         }
                         setCpdSubmitting(true);
@@ -599,13 +708,26 @@ export default function CPDHoursTrackingScreen() {
                             activity_date: cpdForm.activityDate,
                             duration_minutes: cpdForm.durationMinutes,
                             activity_type: cpdForm.activityType,
+                            learning_method: cpdForm.learningMethod,
+                            cpd_learning_type: cpdForm.cpdLearningType,
+                            link_to_standard: cpdForm.linkToStandard,
+                            link_to_standard_proficiency: cpdForm.linkToStandardProficiency,
                             ...(documentIds ? { document_ids: documentIds } : {}),
                           }, token);
 
                           // reload
                           await loadCpdActivities();
                           setShowAddCpdModal(false);
-                          setCpdForm({ trainingName: '', activityDate: '', durationMinutes: 0, activityType: 'participatory' });
+                          setCpdForm({
+                            trainingName: '',
+                            activityDate: '',
+                            durationMinutes: 0,
+                            activityType: 'participatory',
+                            learningMethod: 'independent learning',
+                            cpdLearningType: 'work based learning',
+                            linkToStandard: '',
+                            linkToStandardProficiency: '',
+                          });
                           setCpdFile(null);
                           setFileUri(null);
                         } catch (err) {
@@ -698,6 +820,91 @@ export default function CPDHoursTrackingScreen() {
                 <Text className={`text-center font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Cancel</Text>
               </Pressable>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* HCPC Standards Info Modal */}
+      <Modal
+        visible={showHCPCInfo}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowHCPCInfo(false)}
+      >
+        <Pressable className="flex-1 bg-black/50 items-center justify-center p-6" onPress={() => setShowHCPCInfo(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-8 w-full max-w-sm`}>
+            <View className="flex-row items-center mb-6">
+              <View className="w-12 h-12 rounded-2xl bg-blue-100 items-center justify-center mr-4">
+                <MaterialIcons name="info" size={28} color="#2563EB" />
+              </View>
+              <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>HCPC Standards</Text>
+            </View>
+
+            <ScrollView className="max-h-96">
+              <View style={{ gap: 16 }}>
+                <View>
+                  <Text className={`font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>Standard 1</Text>
+                  <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>A registrant must maintain a continuous, up-to-date and accurate record of their CPD activities.</Text>
+                </View>
+                <View>
+                  <Text className={`font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>Standard 2</Text>
+                  <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>A registrant must demonstrate that their CPD activities are a mixture of learning activities relevant to current or future practice.</Text>
+                </View>
+                <View>
+                  <Text className={`font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>Standard 3</Text>
+                  <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>A registrant must seek to ensure that their CPD has contributed to the quality of their practice and service delivery.</Text>
+                </View>
+                <View>
+                  <Text className={`font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>Standard 4</Text>
+                  <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>A registrant must seek to ensure that their CPD benefits the service user.</Text>
+                </View>
+                <View>
+                  <Text className={`font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>Standard 5</Text>
+                  <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>A registrant must present a written profile explaining how they have met the standards for CPD if requested by the HCPC.</Text>
+                </View>
+                <Text className={`text-xs italic mt-4 ${isDark ? 'text-gray-500' : 'text-slate-400'}`}>HCPC, 2024</Text>
+              </View>
+            </ScrollView>
+
+            <Pressable
+              onPress={() => setShowHCPCInfo(false)}
+              className="mt-8 bg-[#2563EB] py-4 rounded-2xl items-center"
+            >
+              <Text className="text-white font-bold">Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* NMC Standards Info Modal */}
+      <Modal
+        visible={showNMCInfo}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNMCInfo(false)}
+      >
+        <Pressable className="flex-1 bg-black/50 items-center justify-center p-6" onPress={() => setShowNMCInfo(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-8 w-full max-w-sm`}>
+            <View className="flex-row items-center mb-6">
+              <View className="w-12 h-12 rounded-2xl bg-amber-100 items-center justify-center mr-4">
+                <MaterialIcons name="help" size={28} color="#D97706" />
+              </View>
+              <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Standard Proficiency</Text>
+            </View>
+
+            <View>
+              <Text className={`text-base leading-6 mb-4 ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+                Please identify the parts of the relevant standard that you used to inform your CPD.
+              </Text>
+              <Text className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-slate-400'}`}>NMC, 2024</Text>
+            </View>
+
+            <Pressable
+              onPress={() => setShowNMCInfo(false)}
+              className="mt-8 bg-[#2563EB] py-4 rounded-2xl items-center"
+            >
+              <Text className="text-white font-bold">Got it</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>

@@ -3,6 +3,7 @@ import { queueOperation, saveOfflineData, getOfflineData } from './offline-stora
 import { useSubscriptionStore } from '@/features/subscription/subscription.store';
 import { showToast } from '@/utils/toast';
 import { checkNetworkStatus } from './network-monitor';
+import { Platform } from 'react-native';
 
 // Custom error to distinguish server responses from network failures
 class ServerError extends Error {
@@ -577,13 +578,27 @@ class ApiService {
     file: { uri: string; type: string; name: string },
     token?: string,
     additionalData?: Record<string, string>
-  ): Promise<unknown> {
+  ): Promise<any> {
     const formData = new FormData();
-    formData.append('file', {
-      uri: file.uri,
-      type: file.type,
-      name: file.name,
-    } as any);
+
+    if (Platform.OS === 'web' && (file.uri.startsWith('blob:') || file.uri.startsWith('data:') || file.uri.startsWith('http'))) {
+      // On Web, we might need to convert URI to Blob for fetch to handle it correctly as a file
+      try {
+        const response = await fetch(file.uri);
+        const blob = await response.blob();
+        formData.append('file', blob, file.name);
+      } catch (e) {
+        console.warn('[ApiService] Failed to convert URI to blob, falling back to raw append', e);
+        formData.append('file', { uri: file.uri, type: file.type, name: file.name } as any);
+      }
+    } else {
+      // Standard React Native / Native File handling
+      formData.append('file', {
+        uri: file.uri,
+        type: file.type,
+        name: file.name,
+      } as any);
+    }
 
     if (additionalData) {
       Object.entries(additionalData).forEach(([key, value]) => {
@@ -599,21 +614,31 @@ class ApiService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    const url = this.getUrl(endpoint);
+    console.log(`[ApiService] Uploading file to ${url} on ${Platform.OS}`, {
+      uri: file.uri,
+      type: file.type,
+      name: file.name
+    });
+
     try {
-      const response = await fetch(this.getUrl(endpoint), {
+      const response = await fetch(url, {
         method: 'POST',
         headers,
         body: formData as any,
-        signal: this.createTimeoutSignal(this.timeout * 2) as any,
+        // Increased timeout for uploads
+        signal: this.createTimeoutSignal(60000) as any,
       });
 
       if (!response.ok) {
         const errorMessage = await this.parseErrorResponse(response);
+        console.error(`[ApiService] Upload failed with status ${response.status}: ${errorMessage}`);
         throw new ServerError(errorMessage, response.status);
       }
 
       return response.json();
     } catch (error: any) {
+      console.error('[ApiService] Upload error details:', error);
       if (error instanceof ServerError) throw error;
 
       // For premium users offline, queue the upload

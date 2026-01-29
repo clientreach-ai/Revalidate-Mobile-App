@@ -75,6 +75,14 @@ class ApiService {
   async getUserDetails(userId: string) {
     return this.request(`/admin/users/${userId}`);
   }
+
+  // CPD
+  async createCpdRecord(data: any) {
+    return this.request('/cpd-hours', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
 
 export const apiService = new ApiService();

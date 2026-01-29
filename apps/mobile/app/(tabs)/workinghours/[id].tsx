@@ -1,5 +1,5 @@
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput, Linking, Image, RefreshControl } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import '../../global.css';
 
 interface WorkSession {
@@ -15,6 +17,8 @@ interface WorkSession {
   endTime: string | null;
   durationMinutes: number | null;
   workDescription: string | null;
+  location?: string;
+  shiftType?: string;
   documentIds: number[];
   isActive: boolean;
   createdAt: string;
@@ -24,9 +28,29 @@ interface WorkSession {
 export default function WorkHistoryDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
   const [session, setSession] = useState<WorkSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Edit State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    date: '',
+    startTime: '',
+    endTime: '',
+    description: '',
+    location: '',
+    shiftType: '',
+  });
+
+  // Edit Files State
+  const [fileUri, setFileUri] = useState<string | null>(null);
+  const [attachment, setAttachment] = useState<{ name: string, type: string } | null>(null);
+  const [hasExistingAttachment, setHasExistingAttachment] = useState(false);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -34,9 +58,32 @@ export default function WorkHistoryDetailScreen() {
     }
   }, [id]);
 
+  useEffect(() => {
+    if (session?.documentIds && session.documentIds.length > 0) {
+      checkAttachment(session.documentIds[0] as number);
+    }
+  }, [session]);
+
+  const checkAttachment = async (docId: number) => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+      const res = await apiService.get<{ data: { document: string } }>(`${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${docId}`, token);
+      if (res?.data?.document) {
+        let url = res.data.document;
+        if (!url.startsWith('http')) {
+          url = apiService.baseUrl + (url.startsWith('/') ? '' : '/') + url;
+        }
+        setAttachmentUrl(url);
+      }
+    } catch (e) {
+      console.warn('Failed to load attachment info', e);
+    }
+  };
+
   const loadWorkSession = async () => {
     try {
-      setLoading(true);
+      if (!refreshing) setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
         router.replace('/(auth)/login');
@@ -60,6 +107,140 @@ export default function WorkHistoryDetailScreen() {
       router.back();
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleEditOpen = () => {
+    if (!session) return;
+    const start = new Date(session.startTime);
+    const end = session.endTime ? new Date(session.endTime) : null;
+
+    setForm({
+      date: session.startTime.split('T')[0],
+      startTime: `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`,
+      endTime: end ? `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}` : '',
+      description: session.workDescription || '',
+      location: session.location || '',
+      shiftType: session.shiftType || '',
+    });
+
+    setFileUri(null);
+    setAttachment(null);
+    setHasExistingAttachment(session.documentIds && session.documentIds.length > 0);
+    setShowEditModal(true);
+  };
+
+  const handleFileSelect = async (source: 'gallery' | 'camera' | 'files') => {
+    try {
+      let result: any;
+      if (source === 'gallery') {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) return showToast.error('Gallery permission required', 'Permission Denied');
+        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, allowsEditing: false, quality: 1 });
+        if (!result.canceled && result.assets?.[0]) {
+          const asset = result.assets[0];
+          setFileUri(asset.uri);
+          setAttachment({ name: asset.fileName || 'image.jpg', type: asset.type || 'image/jpeg' });
+          setHasExistingAttachment(false);
+        }
+      } else if (source === 'camera') {
+        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permissionResult.granted) return showToast.error('Camera permission required', 'Permission Denied');
+        result = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 1 });
+        if (!result.canceled && result.assets?.[0]) {
+          const asset = result.assets[0];
+          setFileUri(asset.uri);
+          setAttachment({ name: 'photo.jpg', type: 'image/jpeg' });
+          setHasExistingAttachment(false);
+        }
+      } else if (source === 'files') {
+        result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+        if (!result.canceled && result.assets?.[0]) {
+          const doc = result.assets[0];
+          setFileUri(doc.uri);
+          setAttachment({ name: doc.name, type: doc.mimeType || 'application/octet-stream' });
+          setHasExistingAttachment(false);
+        }
+      }
+    } catch (e) {
+      console.warn('File select error', e);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!form.date || !form.startTime) {
+      showToast.error('Date and start time are required', 'Validation Error');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const start_time = new Date(`${form.date}T${form.startTime}:00`).toISOString();
+      let end_time = null;
+      if (form.endTime) {
+        end_time = new Date(`${form.date}T${form.endTime}:00`).toISOString();
+      }
+
+      // Upload file if selected
+      let documentIds: number[] = hasExistingAttachment && session ? session.documentIds : [];
+      if (fileUri && attachment) {
+        try {
+          const uploadRes: any = await apiService.uploadFile(
+            API_ENDPOINTS.DOCUMENTS.UPLOAD,
+            { uri: fileUri, type: attachment.type, name: attachment.name },
+            token,
+            { title: 'Work Session Attachment', category: 'workinghours' }
+          );
+          if (uploadRes?.data?.id) {
+            documentIds = [uploadRes.data.id];
+          }
+        } catch (e) {
+          console.error("Upload failed in edit", e);
+        }
+      } else if (!hasExistingAttachment && !fileUri) {
+        documentIds = [];
+      }
+
+      await apiService.put(`${API_ENDPOINTS.WORK_HOURS.UPDATE}/${id}`, {
+        start_time,
+        end_time,
+        work_description: form.description,
+        location: form.location,
+        shift_type: form.shiftType,
+        document_ids: documentIds
+      }, token);
+
+      showToast.success('Work session updated', 'Success');
+      setShowEditModal(false);
+      loadWorkSession();
+    } catch (error: any) {
+      console.error('Update failed:', error);
+      showToast.error(error.message || 'Failed to update session', 'Error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleViewDocument = async () => {
+    if (attachmentUrl) {
+      const canOpen = await Linking.canOpenURL(attachmentUrl);
+      if (canOpen) {
+        await Linking.openURL(attachmentUrl);
+      } else {
+        showToast.error('Cannot open document', 'Error');
+      }
+      return;
+    }
+
+    if (session?.documentIds && session.documentIds.length > 0) {
+      checkAttachment(session.documentIds[0]);
+      showToast.info('Loading document...', 'Please wait');
+    } else {
+      showToast.error('No document attached', 'Error');
     }
   };
 
@@ -112,12 +293,12 @@ export default function WorkHistoryDetailScreen() {
   const hours = session.durationMinutes ? session.durationMinutes / 60 : 0;
   const avgHourlyRate = 35; // Should come from user settings
   const earnings = hours * avgHourlyRate;
-  
+
   // Extract location and shift type from description or use defaults
   const descriptionLines = session.workDescription?.split('\n') || [];
   const location = descriptionLines[0] || 'Work Session';
   const shiftType = descriptionLines[1] || 'General Work';
-  
+
   // Format time range
   const startTime = new Date(session.startTime);
   const endTime = session.endTime ? new Date(session.endTime) : null;
@@ -126,18 +307,15 @@ export default function WorkHistoryDetailScreen() {
     : `${startTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} - Ongoing`;
 
   const DetailRow = ({ label, value, icon }: { label: string; value: string; icon: string }) => (
-    <View className={`flex-row items-start mb-4 p-4 rounded-xl ${
-      isDark ? "bg-slate-800 border border-slate-700" : "bg-slate-50 border border-slate-100"
-    }`}>
-      <View className={`w-10 h-10 rounded-lg items-center justify-center mr-3 ${
-        isDark ? "bg-slate-700" : "bg-white"
+    <View className={`flex-row items-start mb-4 p-4 rounded-xl ${isDark ? "bg-slate-800 border border-slate-700" : "bg-slate-50 border border-slate-100"
       }`}>
+      <View className={`w-10 h-10 rounded-lg items-center justify-center mr-3 ${isDark ? "bg-slate-700" : "bg-white"
+        }`}>
         <MaterialIcons name={icon as any} size={20} color={isDark ? "#9CA3AF" : "#64748B"} />
       </View>
       <View className="flex-1">
-        <Text className={`text-xs font-semibold uppercase tracking-wider mb-1 ${
-          isDark ? "text-gray-400" : "text-slate-500"
-        }`}>
+        <Text className={`text-xs font-semibold uppercase tracking-wider mb-1 ${isDark ? "text-gray-400" : "text-slate-500"
+          }`}>
           {label}
         </Text>
         <Text className={`text-base font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
@@ -150,15 +328,13 @@ export default function WorkHistoryDetailScreen() {
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       {/* Header */}
-      <View className={`px-4 py-4 border-b ${
-        isDark ? "border-slate-700" : "border-slate-200"
-      }`}>
+      <View className={`px-4 py-4 border-b ${isDark ? "border-slate-700" : "border-slate-200"
+        }`}>
         <View className="flex-row items-center">
           <Pressable
             onPress={() => router.back()}
-            className={`w-10 h-10 items-center justify-center rounded-full mr-3 ${
-              isDark ? "bg-slate-700" : "bg-slate-100"
-            }`}
+            className={`w-10 h-10 items-center justify-center rounded-full mr-3 ${isDark ? "bg-slate-700" : "bg-slate-100"
+              }`}
           >
             <MaterialIcons name="arrow-back" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
           </Pressable>
@@ -173,50 +349,51 @@ export default function WorkHistoryDetailScreen() {
         </View>
       </View>
 
-      <ScrollView 
-        className="flex-1" 
+      <ScrollView
+        className="flex-1"
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); loadWorkSession(); }}
+            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
+          />
+        }
       >
         {/* Date Badge Card */}
         <View className="px-4 pt-6 pb-4">
-          <View className={`p-6 rounded-3xl shadow-lg ${
-            isDark ? "bg-gradient-to-br from-blue-900/30 to-blue-800/20" : "bg-[#1E61EB]"
-          }`}>
+          <View className={`p-6 rounded-3xl shadow-lg ${isDark ? "bg-gradient-to-br from-blue-900/30 to-blue-800/20" : "bg-[#1E61EB]"
+            }`}>
             <View className="flex-row items-center justify-between">
               <View>
-                <Text className={`text-sm font-medium uppercase tracking-wider mb-2 ${
-                  isDark ? "text-blue-300" : "text-white/80"
-                }`}>
+                <Text className={`text-sm font-medium uppercase tracking-wider mb-2 ${isDark ? "text-blue-300" : "text-white/80"
+                  }`}>
                   Session Date
                 </Text>
                 <View className="flex-row items-baseline">
-                  <Text className={`text-4xl font-bold mr-2 ${
-                    isDark ? "text-blue-200" : "text-white"
-                  }`}>
+                  <Text className={`text-4xl font-bold mr-2 ${isDark ? "text-blue-200" : "text-white"
+                    }`}>
                     {dateInfo.day}
                   </Text>
                   <View>
-                    <Text className={`text-lg font-semibold ${
-                      isDark ? "text-blue-300" : "text-white"
-                    }`}>
+                    <Text className={`text-lg font-semibold ${isDark ? "text-blue-300" : "text-white"
+                      }`}>
                       {dateInfo.month.substring(0, 3).toUpperCase()}
                     </Text>
-                    <Text className={`text-sm ${
-                      isDark ? "text-blue-400" : "text-white/70"
-                    }`}>
+                    <Text className={`text-sm ${isDark ? "text-blue-400" : "text-white/70"
+                      }`}>
                       {dateInfo.year}
                     </Text>
                   </View>
                 </View>
               </View>
-              <View className={`w-20 h-20 rounded-2xl items-center justify-center ${
-                isDark ? "bg-blue-800/30" : "bg-white/20"
-              }`}>
-                <MaterialIcons 
-                  name="schedule" 
-                  size={40} 
-                  color={isDark ? "#93C5FD" : "#FFFFFF"} 
+              <View className={`w-20 h-20 rounded-2xl items-center justify-center ${isDark ? "bg-blue-800/30" : "bg-white/20"
+                }`}>
+                <MaterialIcons
+                  name="schedule"
+                  size={40}
+                  color={isDark ? "#93C5FD" : "#FFFFFF"}
                 />
               </View>
             </View>
@@ -262,23 +439,48 @@ export default function WorkHistoryDetailScreen() {
               icon="description"
             />
           )}
+
+          {/* Evidence Preview */}
+          {attachmentUrl && (
+            <View className={`mt-2 mb-4 p-4 rounded-xl border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
+              <View className="flex-row items-center mb-4">
+                <MaterialIcons name="attach-file" size={20} color={isDark ? "#fff" : "#333"} />
+                <Text className={`text-lg font-bold ml-2 ${isDark ? "text-white" : "text-slate-800"}`}>Evidence</Text>
+              </View>
+
+              {/\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentUrl) && (
+                <View className="mb-4 rounded-xl overflow-hidden border border-gray-200 dark:border-slate-700">
+                  <Image source={{ uri: attachmentUrl }} className="w-full h-48 bg-gray-100 dark:bg-slate-700" resizeMode="cover" />
+                </View>
+              )}
+
+              <Pressable
+                onPress={handleViewDocument}
+                className={`bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-600 flex-row items-center active:opacity-70`}
+              >
+                <MaterialIcons name="description" size={24} color="#2B5E9C" />
+                <View className="ml-3">
+                  <Text className={`font-medium ${isDark ? "text-gray-200" : "text-gray-700"}`}>Attached Evidence</Text>
+                  <Text className="text-xs text-blue-500">Tap to View File</Text>
+                </View>
+              </Pressable>
+            </View>
+          )}
         </View>
 
         {/* Description Section */}
         {session.workDescription && (
           <View className="px-4 mt-2 mb-6">
-            <View className={`p-4 rounded-xl ${
-              isDark ? "bg-slate-800 border border-slate-700" : "bg-slate-50 border border-slate-100"
-            }`}>
+            <View className={`p-4 rounded-xl ${isDark ? "bg-slate-800 border border-slate-700" : "bg-slate-50 border border-slate-100"
+              }`}>
               <View className="flex-row items-center mb-3">
-                <MaterialIcons 
-                  name="description" 
-                  size={20} 
-                  color={isDark ? "#9CA3AF" : "#64748B"} 
+                <MaterialIcons
+                  name="description"
+                  size={20}
+                  color={isDark ? "#9CA3AF" : "#64748B"}
                 />
-                <Text className={`text-xs font-semibold uppercase tracking-wider ml-2 ${
-                  isDark ? "text-gray-400" : "text-slate-500"
-                }`}>
+                <Text className={`text-xs font-semibold uppercase tracking-wider ml-2 ${isDark ? "text-gray-400" : "text-slate-500"
+                  }`}>
                   Description
                 </Text>
               </View>
@@ -292,28 +494,28 @@ export default function WorkHistoryDetailScreen() {
         {/* Action Buttons */}
         <View className="px-4 mb-6" style={{ gap: 12 }}>
           <Pressable
-            className={`p-4 rounded-xl flex-row items-center justify-center ${
-              isDark ? "bg-slate-800 border border-slate-700" : "bg-white border border-slate-200"
-            }`}
+            onPress={handleEditOpen}
+            className={`p-4 rounded-xl flex-row items-center justify-center active:opacity-70 ${isDark ? "bg-slate-800 border border-slate-700" : "bg-white border border-slate-200"
+              }`}
           >
-            <MaterialIcons 
-              name="edit" 
-              size={20} 
-              color={isDark ? "#9CA3AF" : "#64748B"} 
+            <MaterialIcons
+              name="edit"
+              size={20}
+              color={isDark ? "#9CA3AF" : "#64748B"}
             />
             <Text className={`ml-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>
               Edit Session
             </Text>
           </Pressable>
           <Pressable
-            className={`p-4 rounded-xl flex-row items-center justify-center ${
-              isDark ? "bg-slate-800 border border-slate-700" : "bg-white border border-slate-200"
-            }`}
+            onPress={handleViewDocument}
+            className={`p-4 rounded-xl flex-row items-center justify-center active:opacity-70 ${isDark ? "bg-slate-800 border border-slate-700" : "bg-white border border-slate-200"
+              }`}
           >
-            <MaterialIcons 
-              name="photo-library" 
-              size={20} 
-              color={isDark ? "#9CA3AF" : "#64748B"} 
+            <MaterialIcons
+              name="photo-library"
+              size={20}
+              color={isDark ? "#9CA3AF" : "#64748B"}
             />
             <Text className={`ml-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>
               View Documents
@@ -321,6 +523,148 @@ export default function WorkHistoryDetailScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Edit Session Modal */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className={`rounded-t-3xl max-h-[90%] w-full ${isDark ? "bg-slate-800" : "bg-white"}`}>
+            <SafeAreaView edges={['bottom']}>
+              <View className={`flex-row justify-between items-center p-4 border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                <Text className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Edit Work Session</Text>
+                <Pressable onPress={() => setShowEditModal(false)}>
+                  <MaterialIcons name="close" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
+                </Pressable>
+              </View>
+
+              <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+                <View>
+                  <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Date (YYYY-MM-DD)</Text>
+                  <TextInput
+                    value={form.date}
+                    onChangeText={t => setForm({ ...form, date: t })}
+                    placeholder="2024-03-20"
+                    className={`p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`}
+                  />
+                </View>
+
+                <View className="flex-row gap-4">
+                  <View className="flex-1">
+                    <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Start Time (HH:MM)</Text>
+                    <TextInput
+                      value={form.startTime}
+                      onChangeText={t => setForm({ ...form, startTime: t })}
+                      placeholder="09:00"
+                      className={`p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>End Time (HH:MM)</Text>
+                    <TextInput
+                      value={form.endTime}
+                      onChangeText={t => setForm({ ...form, endTime: t })}
+                      placeholder="17:00"
+                      className={`p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`}
+                    />
+                  </View>
+                </View>
+
+                <View>
+                  <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Location</Text>
+                  <TextInput
+                    value={form.location}
+                    onChangeText={t => setForm({ ...form, location: t })}
+                    placeholder="Hospital/Clinic name"
+                    className={`p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`}
+                  />
+                </View>
+
+                <View>
+                  <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Shift Type</Text>
+                  <TextInput
+                    value={form.shiftType}
+                    onChangeText={t => setForm({ ...form, shiftType: t })}
+                    placeholder="Day, Night, Weekend..."
+                    className={`p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`}
+                  />
+                </View>
+
+                <View>
+                  <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Description</Text>
+                  <TextInput
+                    value={form.description}
+                    onChangeText={t => setForm({ ...form, description: t })}
+                    placeholder="Notes about the session..."
+                    multiline
+                    numberOfLines={4}
+                    className={`p-3 rounded-xl border min-h-[100px] ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`}
+                  />
+                </View>
+
+                {/* Evidence Section */}
+                <View>
+                  <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Evidence</Text>
+
+                  {hasExistingAttachment ? (
+                    <View className={`flex-row items-center justify-between p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200"}`}>
+                      <View className="flex-row items-center flex-1">
+                        <MaterialIcons name="attach-file" size={20} color={isDark ? "#9CA3AF" : "#64748B"} />
+                        <Text className={`ml-2 ${isDark ? "text-gray-300" : "text-gray-700"}`} numberOfLines={1}>Existing Evidence</Text>
+                      </View>
+                      <Pressable onPress={() => setHasExistingAttachment(false)} className="p-2">
+                        <MaterialIcons name="close" size={20} color="#EF4444" />
+                      </Pressable>
+                    </View>
+                  ) : fileUri && attachment ? (
+                    <View className={`flex-row items-center justify-between p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200"}`}>
+                      <View className="flex-row items-center flex-1">
+                        <MaterialIcons name="upload-file" size={20} color="#2B5E9C" />
+                        <Text className={`ml-2 ${isDark ? "text-gray-300" : "text-gray-700"}`} numberOfLines={1}>{attachment.name}</Text>
+                      </View>
+                      <Pressable onPress={() => { setFileUri(null); setAttachment(null); }} className="p-2">
+                        <MaterialIcons name="close" size={20} color="#EF4444" />
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <View className="flex-row gap-3">
+                      <Pressable onPress={() => handleFileSelect('camera')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                        <MaterialIcons name="camera-alt" size={24} color="#2B5E9C" />
+                        <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Camera</Text>
+                      </Pressable>
+                      <Pressable onPress={() => handleFileSelect('gallery')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                        <MaterialIcons name="photo-library" size={24} color="#2B5E9C" />
+                        <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Gallery</Text>
+                      </Pressable>
+                      <Pressable onPress={() => handleFileSelect('files')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                        <MaterialIcons name="folder" size={24} color="#2B5E9C" />
+                        <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Files</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+
+                <Pressable
+                  onPress={handleUpdate}
+                  disabled={isSubmitting}
+                  className={`p-4 rounded-xl items-center mt-4 shadow-sm ${isSubmitting ? "bg-gray-400" : "bg-[#2B5E9C]"}`}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white font-bold text-base">Save Changes</Text>
+                  )}
+                </Pressable>
+
+                <View style={{ height: 20 }} />
+              </ScrollView>
+            </SafeAreaView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

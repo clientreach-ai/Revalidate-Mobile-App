@@ -18,6 +18,10 @@ const createCpdHoursSchema = z.object({
   duration_minutes: z.number().int().positive(),
   training_name: z.string().min(1),
   activity_type: z.enum(['participatory', 'non-participatory']),
+  learning_method: z.string().min(1),
+  cpd_learning_type: z.string().min(1),
+  link_to_standard: z.string().optional(),
+  link_to_standard_proficiency: z.string().optional(),
   document_ids: z.array(z.number()).optional(),
 });
 
@@ -26,6 +30,10 @@ const updateCpdHoursSchema = z.object({
   duration_minutes: z.number().int().positive().optional(),
   training_name: z.string().min(1).optional(),
   activity_type: z.enum(['participatory', 'non-participatory']).optional(),
+  learning_method: z.string().optional(),
+  cpd_learning_type: z.string().optional(),
+  link_to_standard: z.string().optional(),
+  link_to_standard_proficiency: z.string().optional(),
   document_ids: z.array(z.number()).optional(),
 });
 
@@ -41,10 +49,14 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
   // Normalize request body to accept both camelCase and snake_case fields
   const body = req.body || {};
   const normalized = {
-    activity_date: body.activity_date || body.activityDate || body.activityDate || body.activity || '',
+    activity_date: body.activity_date || body.activityDate || body.activity || '',
     duration_minutes: body.duration_minutes || body.durationMinutes || body.duration || 0,
-    training_name: body.training_name || body.trainingName || body.training || '',
+    training_name: body.training_name || body.trainingName || body.training || body.topic || '',
     activity_type: body.activity_type || body.activityType || 'participatory',
+    learning_method: body.learning_method || body.learningMethod || '',
+    cpd_learning_type: body.cpd_learning_type || body.cpdLearningType || '',
+    link_to_standard: body.link_to_standard || body.linkToStandard || body.linkCode || body.link_code,
+    link_to_standard_proficiency: body.link_to_standard_proficiency || body.linkToStandardProficiency || body.standardsProficiency || body.standards_proficiency,
     document_ids: body.document_ids || body.documentIds || undefined,
   } as CreateCpdHours;
 
@@ -59,6 +71,10 @@ export const create = asyncHandler(async (req: Request, res: Response) => {
       durationMinutes: cpdHours.duration_minutes,
       trainingName: cpdHours.training_name,
       activityType: cpdHours.activity_type,
+      learningMethod: cpdHours.learning_method,
+      cpdLearningType: cpdHours.cpd_learning_type,
+      linkToStandard: cpdHours.link_to_standard,
+      linkToStandardProficiency: cpdHours.link_to_standard_proficiency,
       documentIds: (() => {
         try {
           return cpdHours.document_ids ? JSON.parse(cpdHours.document_ids) : [];
@@ -104,6 +120,10 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
       durationMinutes: ch.duration_minutes,
       trainingName: ch.training_name,
       activityType: ch.activity_type,
+      learningMethod: ch.learning_method,
+      cpdLearningType: ch.cpd_learning_type,
+      linkToStandard: ch.link_to_standard,
+      linkToStandardProficiency: ch.link_to_standard_proficiency,
       documentIds: (() => {
         try {
           return ch.document_ids ? JSON.parse(ch.document_ids) : [];
@@ -146,6 +166,10 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
       durationMinutes: cpdHours.duration_minutes,
       trainingName: cpdHours.training_name,
       activityType: cpdHours.activity_type,
+      learningMethod: cpdHours.learning_method,
+      cpdLearningType: cpdHours.cpd_learning_type,
+      linkToStandard: cpdHours.link_to_standard,
+      linkToStandardProficiency: cpdHours.link_to_standard_proficiency,
       documentIds: (() => {
         try {
           return cpdHours.document_ids ? JSON.parse(cpdHours.document_ids) : [];
@@ -180,6 +204,10 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
       durationMinutes: updated.duration_minutes,
       trainingName: updated.training_name,
       activityType: updated.activity_type,
+      learningMethod: updated.learning_method,
+      cpdLearningType: updated.cpd_learning_type,
+      linkToStandard: updated.link_to_standard,
+      linkToStandardProficiency: updated.link_to_standard_proficiency,
       documentIds: (() => {
         try {
           return updated.document_ids ? JSON.parse(updated.document_ids) : [];

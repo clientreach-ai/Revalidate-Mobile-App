@@ -12,6 +12,10 @@ export interface CpdHours {
   duration_minutes: number;
   training_name: string;
   activity_type: 'participatory' | 'non-participatory';
+  learning_method?: string;
+  cpd_learning_type?: string;
+  link_to_standard?: string;
+  link_to_standard_proficiency?: string;
   document_ids?: string; // JSON array of document IDs
   created_at: string;
   updated_at: string;
@@ -22,6 +26,10 @@ export interface CreateCpdHours {
   duration_minutes: number;
   training_name: string;
   activity_type: 'participatory' | 'non-participatory';
+  learning_method: string;
+  cpd_learning_type: string;
+  link_to_standard?: string;
+  link_to_standard_proficiency?: string;
   document_ids?: number[];
 }
 
@@ -30,6 +38,10 @@ export interface UpdateCpdHours {
   duration_minutes?: number;
   training_name?: string;
   activity_type?: 'participatory' | 'non-participatory';
+  learning_method?: string;
+  cpd_learning_type?: string;
+  link_to_standard?: string;
+  link_to_standard_proficiency?: string;
   document_ids?: number[];
 }
 
@@ -45,13 +57,18 @@ export async function createCpdHours(
   const [result] = await pool.execute(
     `INSERT INTO cpd_hours (
       user_id, date, duration_minutes, topic, 
+      method, learning_type, link_code, standards_proficiency,
       participatory_hours, document, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       userId,
       data.activity_date,
       data.duration_minutes,
       data.training_name,
+      data.learning_method,
+      data.cpd_learning_type,
+      data.link_to_standard || null,
+      data.link_to_standard_proficiency || null,
       // Map activity_type to participatory_hours (string column in DB)
       data.activity_type === 'participatory' ? String(data.duration_minutes) : '0',
       data.document_ids ? JSON.stringify(data.document_ids) : null,
@@ -72,6 +89,10 @@ export async function createCpdHours(
     duration_minutes: row.duration_minutes,
     training_name: row.topic,
     activity_type: parseInt(row.participatory_hours) > 0 ? 'participatory' : 'non-participatory',
+    learning_method: row.method,
+    cpd_learning_type: row.learning_type,
+    link_to_standard: row.link_code,
+    link_to_standard_proficiency: row.standards_proficiency,
     document_ids: row.document,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -153,6 +174,10 @@ export async function getUserCpdHours(
     duration_minutes: row.duration_minutes,
     training_name: row.topic,
     activity_type: parseInt(row.participatory_hours) > 0 ? 'participatory' : 'non-participatory',
+    learning_method: row.method,
+    cpd_learning_type: row.learning_type,
+    link_to_standard: row.link_code,
+    link_to_standard_proficiency: row.standards_proficiency,
     document_ids: row.document,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -233,6 +258,22 @@ export async function updateCpdHours(
   if (updates.document_ids !== undefined) {
     fields.push('document = ?');
     values.push(updates.document_ids.length > 0 ? JSON.stringify(updates.document_ids) : null);
+  }
+  if (updates.learning_method !== undefined) {
+    fields.push('method = ?');
+    values.push(updates.learning_method);
+  }
+  if (updates.cpd_learning_type !== undefined) {
+    fields.push('learning_type = ?');
+    values.push(updates.cpd_learning_type);
+  }
+  if (updates.link_to_standard !== undefined) {
+    fields.push('link_code = ?');
+    values.push(updates.link_to_standard);
+  }
+  if (updates.link_to_standard_proficiency !== undefined) {
+    fields.push('standards_proficiency = ?');
+    values.push(updates.link_to_standard_proficiency);
   }
 
   if (fields.length === 0) {

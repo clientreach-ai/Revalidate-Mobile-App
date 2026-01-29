@@ -27,6 +27,7 @@ const createWorkHoursSchema = z.object({
 });
 
 const updateWorkHoursSchema = z.object({
+  start_time: z.string().datetime().optional(),
   end_time: z.string().datetime().optional(),
   duration_minutes: z.number().int().positive().optional(),
   work_description: z.string().optional(),

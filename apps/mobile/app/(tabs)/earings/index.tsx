@@ -336,17 +336,7 @@ export default function EarningsScreen() {
               Add Session
             </Text>
           </Pressable>
-          <Pressable
-            onPress={() => {
-              router.push('/(tabs)/gallery');
-            }}
-            className="flex-[2] flex-row items-center justify-center gap-2 px-4 h-11 bg-[#2B5E9C] rounded-lg shadow-sm"
-          >
-            <MaterialIcons name="ios-share" size={20} color="#FFFFFF" />
-            <Text className="text-white font-semibold text-sm">
-              Export Report
-            </Text>
-          </Pressable>
+
         </View>
 
         {/* Loading State */}
