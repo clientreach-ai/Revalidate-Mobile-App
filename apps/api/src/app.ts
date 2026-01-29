@@ -4,6 +4,11 @@ import { SERVER_CONFIG } from './config/env';
 import { errorHandler, notFoundHandler } from './common/middleware/error-handler';
 import { logger } from './common/logger';
 
+// Global BigInt serialization fix
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 const app = express();
 
 // Startup trace for route mounting/debugging
@@ -13,8 +18,8 @@ console.log('🔎 app.ts initialized');
 // CORS configuration - allow all origins for mobile apps
 // When CORS_ORIGIN is "*", use a function to allow all origins (required when credentials: true)
 app.use(cors({
-  origin: SERVER_CONFIG.corsOrigin === '*' 
-    ? (_origin, callback) => callback(null, true) 
+  origin: SERVER_CONFIG.corsOrigin === '*'
+    ? (_origin, callback) => callback(null, true)
     : SERVER_CONFIG.corsOrigin,
   credentials: true,
 }));
@@ -38,8 +43,8 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     message: 'Revalidation Tracker API is running',
     timestamp: new Date().toISOString(),
   });
@@ -53,7 +58,7 @@ console.log('🔎 api routes mounted');
 
 // Root endpoint
 app.get('/', (_req, res) => {
-  res.json({ 
+  res.json({
     message: 'Revalidation Tracker API',
     version: '1.0.0',
     docs: '/api/docs', // TODO: Add API documentation

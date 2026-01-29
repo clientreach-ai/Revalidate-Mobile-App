@@ -209,7 +209,7 @@ export default function GalleryScreen() {
           'general': 'General Gallery',
           'uncategorized': 'General Gallery',
           'profilepicture': 'General Gallery',
-          'discussion': 'General Gallery',
+          'discussion': 'Feedback Log',
         };
 
         const mapToTitle = (docCat?: string | null) => {

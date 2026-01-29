@@ -18,7 +18,7 @@ model addressbooks {
   postcode            String
   type                addressbooks_type
   address1            String?                        @db.VarChar(500)
-  recyclebin_status   addressbooks_recyclebin_status @default(dbgenerated("0"))
+  recyclebin_status   addressbooks_recyclebin_status @default(zero)
   recyclebin_datetime DateTime?                      @db.DateTime(0)
   created_at          DateTime                       @default(now()) @db.Timestamp(0)
   updated_at          DateTime                       @default(now()) @db.Timestamp(0)
@@ -50,7 +50,7 @@ model attendances {
   work_settings  Int
   scope_practice Int
   registration   Int
-  status         attendances_status @default(dbgenerated("0"))
+  status         attendances_status @default(zero)
   created_at     DateTime           @default(now()) @db.Timestamp(0)
   updated_at     DateTime           @default(now()) @db.Timestamp(0)
   users          users              @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "attendance_hours_user_id_foreign")
@@ -65,7 +65,7 @@ model banners {
   image       String         @db.VarChar(100)
   short_order Int            @default(0)
   type        String?
-  status      banners_status @default(dbgenerated("0"))
+  status      banners_status @default(zero)
   created_at  DateTime       @default(now()) @db.Timestamp(0)
   updated_at  DateTime       @default(now()) @db.Timestamp(0)
 }
@@ -77,8 +77,8 @@ model brands {
   image       String        @db.VarChar(100)
   short_order Int           @default(0)
   description String?       @db.LongText
-  home        brands_home   @default(dbgenerated("0"))
-  status      brands_status @default(dbgenerated("0"))
+  home        brands_home   @default(zero)
+  status      brands_status @default(zero)
   created_at  DateTime      @default(now()) @db.Timestamp(0)
   updated_at  DateTime      @default(now()) @db.Timestamp(0)
 }
@@ -93,7 +93,7 @@ model calender_bookings {
   end_date    DateTime                 @db.Date
   start_time  DateTime                 @db.Time(0)
   end_time    DateTime                 @db.Time(0)
-  status      calender_bookings_status @default(dbgenerated("0"))
+  status      calender_bookings_status @default(zero)
   created_at  DateTime                 @default(now()) @db.Timestamp(0)
   updated_at  DateTime                 @default(now()) @db.Timestamp(0)
 }
@@ -109,10 +109,10 @@ model categories {
   image               String?
   description         String?                      @db.LongText
   top_category        Int                          @default(0)
-  must_try_status     categories_must_try_status   @default(dbgenerated("0"))
-  status              categories_status            @default(dbgenerated("0"))
+  must_try_status     categories_must_try_status   @default(zero)
+  status              categories_status            @default(zero)
   banner_image        String?
-  recyclebin_status   categories_recyclebin_status @default(dbgenerated("0"))
+  recyclebin_status   categories_recyclebin_status @default(zero)
   recyclebin_datetime DateTime?                    @db.DateTime(0)
   created_at          DateTime                     @default(now()) @db.Timestamp(0)
   updated_at          DateTime                     @default(now()) @db.Timestamp(0)
@@ -156,7 +156,7 @@ model company_setups {
   facebook_client_id     String?               @db.VarChar(200)
   facebook_client_secret String?               @db.VarChar(200)
   address_api_key        String?               @db.VarChar(200)
-  status                 company_setups_status @default(dbgenerated("0"))
+  status                 company_setups_status @default(zero)
   created_at             DateTime              @default(now()) @db.Timestamp(0)
   updated_at             DateTime              @default(now()) @db.Timestamp(0)
 }
@@ -213,8 +213,8 @@ model cpd_hours {
   learning_type         String?          @db.VarChar(200)
   standard              String?          @db.VarChar(200)
   learning              String?          @db.VarChar(200)
-  status                cpd_hours_status @default(dbgenerated("0"))
-  reset                 cpd_hours_reset  @default(dbgenerated("0"))
+  status                cpd_hours_status @default(zero)
+  reset                 cpd_hours_reset  @default(zero)
   created_at            DateTime         @default(now()) @db.Timestamp(0)
   updated_at            DateTime         @default(now()) @db.Timestamp(0)
   duration_minutes      Int?
@@ -228,7 +228,7 @@ model criterias {
   id         BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
   name       String
   questions  String?          @db.Text
-  status     criterias_status @default(dbgenerated("0"))
+  status     criterias_status @default(zero)
   created_at DateTime         @default(now()) @db.Timestamp(0)
   updated_at DateTime         @default(now()) @db.Timestamp(0)
 }
@@ -249,7 +249,7 @@ model currency_values {
 model designations {
   id           BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
   designations String              @db.VarChar(100)
-  status       designations_status @default(dbgenerated("1"))
+  status       designations_status @default(one)
   created_at   DateTime            @default(now()) @db.Timestamp(0)
   updated_at   DateTime            @default(now()) @db.Timestamp(0)
 }
@@ -262,8 +262,8 @@ model discussions {
   discussion String             @db.VarChar(200)
   notes      String?            @db.LongText
   document   String?            @db.VarChar(200)
-  status     discussions_status @default(dbgenerated("1"))
-  reset      discussions_reset  @default(dbgenerated("0"))
+  status     discussions_status @default(one)
+  reset      discussions_reset  @default(zero)
   created_at DateTime           @default(now()) @db.Timestamp(0)
   updated_at DateTime           @default(now()) @db.Timestamp(0)
   users      users?             @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "discussions_hours_user_id_foreign")
@@ -321,7 +321,7 @@ model file_managers {
   id         BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
   name       String               @db.VarChar(200)
   image      String               @db.VarChar(200)
-  status     file_managers_status @default(dbgenerated("0"))
+  status     file_managers_status @default(zero)
   created_at DateTime             @default(now()) @db.Timestamp(0)
   updated_at DateTime             @default(now()) @db.Timestamp(0)
 }
@@ -364,7 +364,7 @@ model hospitals {
   town       String           @db.VarChar(200)
   mobile     String?          @db.VarChar(200)
   email      String?          @db.VarChar(200)
-  status     hospitals_status @default(dbgenerated("0"))
+  status     hospitals_status @default(zero)
   created_at DateTime         @default(now()) @db.Timestamp(0)
   updated_at DateTime         @default(now()) @db.Timestamp(0)
 }
@@ -381,7 +381,7 @@ model informations {
 model learning_methods {
   id         BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
   name       String
-  status     learning_methods_status @default(dbgenerated("0"))
+  status     learning_methods_status @default(zero)
   created_at DateTime                @default(now()) @db.Timestamp(0)
   updated_at DateTime                @default(now()) @db.Timestamp(0)
 }
@@ -390,7 +390,7 @@ model learning_methods {
 model link_codes {
   id         BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
   name       String
-  status     link_codes_status @default(dbgenerated("0"))
+  status     link_codes_status @default(zero)
   created_at DateTime          @default(now()) @db.Timestamp(0)
   updated_at DateTime          @default(now()) @db.Timestamp(0)
 }
@@ -407,7 +407,7 @@ model mail_automations {
   id         BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
   name       String?                 @db.VarChar(200)
   list_id    Int
-  status     mail_automations_status @default(dbgenerated("0"))
+  status     mail_automations_status @default(zero)
   created_at DateTime                @default(now()) @db.Timestamp(0)
   updated_at DateTime                @default(now()) @db.Timestamp(0)
 }
@@ -423,7 +423,7 @@ model mail_campaigns {
   time           DateTime?             @db.Time(0)
   subject        String?               @db.VarChar(500)
   description    String?               @db.LongText
-  status         mail_campaigns_status @default(dbgenerated("0"))
+  status         mail_campaigns_status @default(zero)
   created_at     DateTime              @default(now()) @db.Timestamp(0)
   updated_at     DateTime              @default(now()) @db.Timestamp(0)
 }
@@ -433,7 +433,7 @@ model mail_categories {
   id         BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
   name       String                 @db.VarChar(200)
   user_ids   String                 @db.LongText
-  status     mail_categories_status @default(dbgenerated("0"))
+  status     mail_categories_status @default(zero)
   created_at DateTime               @default(now()) @db.Timestamp(0)
   updated_at DateTime               @default(now()) @db.Timestamp(0)
 }
@@ -443,7 +443,7 @@ model mail_list_users {
   id         BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
   list_id    Int
   user_id    Int
-  status     mail_list_users_status @default(dbgenerated("0"))
+  status     mail_list_users_status @default(zero)
   created_at DateTime               @default(now()) @db.Timestamp(0)
   updated_at DateTime               @default(now()) @db.Timestamp(0)
 }
@@ -459,7 +459,7 @@ model mail_settings {
   mail_encryption   String               @db.VarChar(200)
   mail_from_address String               @db.VarChar(200)
   mail_from_name    String               @db.VarChar(200)
-  status            mail_settings_status @default(dbgenerated("0"))
+  status            mail_settings_status @default(zero)
   created_at        DateTime             @default(now()) @db.Timestamp(0)
   updated_at        DateTime             @default(now()) @db.Timestamp(0)
 }
@@ -471,7 +471,7 @@ model mail_templates {
   name        String                @db.VarChar(200)
   subject     String?               @db.VarChar(200)
   description String                @db.LongText
-  status      mail_templates_status @default(dbgenerated("0"))
+  status      mail_templates_status @default(zero)
   created_at  DateTime              @default(now()) @db.Timestamp(0)
   updated_at  DateTime              @default(now()) @db.Timestamp(0)
 }
@@ -485,7 +485,7 @@ model menus {
   icon        String       @db.VarChar(100)
   parent      Int
   sort        Int
-  status      menus_status @default(dbgenerated("1"))
+  status      menus_status @default(one)
   created_at  DateTime     @default(now()) @db.Timestamp(0)
   updated_at  DateTime     @default(now()) @db.Timestamp(0)
 }
@@ -532,8 +532,8 @@ model notifications {
   title               String                          @db.LongText
   message             String                          @db.LongText
   type                String?                         @db.VarChar(200)
-  status              notifications_status            @default(dbgenerated("0"))
-  recyclebin_status   notifications_recyclebin_status @default(dbgenerated("0"))
+  status              notifications_status            @default(zero)
+  recyclebin_status   notifications_recyclebin_status @default(zero)
   recyclebin_datetime DateTime?                       @db.DateTime(0)
   created_at          DateTime                        @default(now()) @db.Timestamp(0)
   updated_at          DateTime                        @default(now()) @db.Timestamp(0)
@@ -610,7 +610,7 @@ model order_setups {
   splash_image    String?             @db.VarChar(200)
   home_image      String?             @db.VarChar(200)
   other_image     String?             @db.VarChar(200)
-  status          order_setups_status @default(dbgenerated("0"))
+  status          order_setups_status @default(zero)
   created_at      DateTime            @default(now()) @db.Timestamp(0)
   updated_at      DateTime            @default(now()) @db.Timestamp(0)
 }
@@ -618,7 +618,7 @@ model order_setups {
 model other_healthcare_reg {
   id         Int                         @id @default(autoincrement())
   name       String                      @db.VarChar(264)
-  status     other_healthcare_reg_status @default(dbgenerated("1"))
+  status     other_healthcare_reg_status @default(one)
   created_at DateTime                    @default(now()) @db.Timestamp(0)
   updated_at DateTime                    @default(now()) @db.Timestamp(0)
 }
@@ -627,7 +627,7 @@ model particulars {
   id          BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
   name        String
   description String             @db.Text
-  status      particulars_status @default(dbgenerated("1"))
+  status      particulars_status @default(one)
   created_at  DateTime           @default(now()) @db.Timestamp(0)
   updated_at  DateTime           @default(now()) @db.Timestamp(0)
 }
@@ -658,7 +658,7 @@ model permissions {
   guard_name            String                  @db.VarChar(100)
   created_at            DateTime                @default(now()) @db.Timestamp(0)
   updated_at            DateTime                @default(now()) @db.Timestamp(0)
-  model_has_permissions model_has_permissions[] @ignore
+  model_has_permissions model_has_permissions[]
   role_has_permissions  role_has_permissions[]
 }
 
@@ -670,7 +670,7 @@ model personal_documents {
   document_name String                    @db.VarChar(200)
   type          String                    @default("personal") @db.VarChar(256)
   date          DateTime?                 @db.Date
-  status        personal_documents_status @default(dbgenerated("0"))
+  status        personal_documents_status @default(zero)
   created_at    DateTime                  @default(now()) @db.Timestamp(0)
   updated_at    DateTime                  @default(now()) @db.Timestamp(0)
 }
@@ -681,7 +681,7 @@ model portfolio_images {
   name         String?                 @db.VarChar(200)
   portfolio_id Int
   image        String                  @db.VarChar(200)
-  status       portfolio_images_status @default(dbgenerated("0"))
+  status       portfolio_images_status @default(zero)
   created_at   DateTime                @default(now()) @db.Timestamp(0)
   updated_at   DateTime                @default(now()) @db.Timestamp(0)
 }
@@ -692,8 +692,8 @@ model portfolios {
   services_id Int
   name        String            @db.VarChar(200)
   image       String            @db.VarChar(200)
-  status      portfolios_status @default(dbgenerated("0"))
-  home        portfolios_home   @default(dbgenerated("1"))
+  status      portfolios_status @default(zero)
+  home        portfolios_home   @default(zero)
   created_at  DateTime          @default(now()) @db.Timestamp(0)
   updated_at  DateTime          @default(now()) @db.Timestamp(0)
 }
@@ -709,8 +709,8 @@ model reflective_account_forms {
   improve_practice String                          @db.VarChar(200)
   relevant_code    String                          @db.VarChar(200)
   document         String?                         @db.VarChar(200)
-  status           reflective_account_forms_status @default(dbgenerated("0"))
-  reset            reflective_account_forms_reset  @default(dbgenerated("0"))
+  status           reflective_account_forms_status @default(zero)
+  reset            reflective_account_forms_reset  @default(zero)
   created_at       DateTime                        @default(now()) @db.Timestamp(0)
   updated_at       DateTime                        @default(now()) @db.Timestamp(0)
   users            users                           @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "reflective_account_forms_user_id_foreign")
@@ -736,7 +736,7 @@ model reflective_accounts {
 model reflective_codes {
   id         BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
   name       String
-  status     reflective_codes_status @default(dbgenerated("0"))
+  status     reflective_codes_status @default(zero)
   created_at DateTime                @default(now()) @db.Timestamp(0)
   updated_at DateTime                @default(now()) @db.Timestamp(0)
 }
@@ -766,7 +766,7 @@ model role_masters {
   feedback_time   Int                 @default(0)
   discussion_time Int                 @default(0)
   CPDWork_time    Int                 @default(0)
-  status          role_masters_status @default(dbgenerated("0"))
+  status          role_masters_status @default(zero)
   sort_status     Int                 @default(0)
   created_at      DateTime            @default(now()) @db.Timestamp(0)
   updated_at      DateTime            @default(now()) @db.Timestamp(0)
@@ -811,7 +811,7 @@ model sequences {
   before        String           @db.VarChar(200)
   days          DateTime?        @db.Date
   time          DateTime         @db.Time(0)
-  status        sequences_status @default(dbgenerated("0"))
+  status        sequences_status @default(zero)
   created_at    DateTime         @default(now()) @db.Timestamp(0)
   updated_at    DateTime         @default(now()) @db.Timestamp(0)
 }
@@ -834,8 +834,8 @@ model sliders {
   image               String
   cate_id             Int?
   sort_order          Int                       @default(0)
-  status              sliders_status            @default(dbgenerated("0"))
-  recyclebin_status   sliders_recyclebin_status @default(dbgenerated("0"))
+  status              sliders_status            @default(zero)
+  recyclebin_status   sliders_recyclebin_status @default(zero)
   recyclebin_datetime DateTime?                 @db.DateTime(0)
   created_at          DateTime                  @default(now()) @db.Timestamp(0)
   updated_at          DateTime                  @default(now()) @db.Timestamp(0)
@@ -850,8 +850,8 @@ model sliderss {
   image               String
   cate_id             Int?
   sort_order          Int                        @default(0)
-  status              sliderss_status            @default(dbgenerated("0"))
-  recyclebin_status   sliderss_recyclebin_status @default(dbgenerated("0"))
+  status              sliderss_status            @default(zero)
+  recyclebin_status   sliderss_recyclebin_status @default(zero)
   recyclebin_datetime DateTime?                  @db.DateTime(0)
   link                String?                    @db.LongText
   name                String?
@@ -864,7 +864,7 @@ model sliderss {
 model sources_feedback {
   id         BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
   name       String
-  status     sources_feedback_status @default(dbgenerated("0"))
+  status     sources_feedback_status @default(zero)
   created_at DateTime                @default(now()) @db.Timestamp(0)
   updated_at DateTime                @default(now()) @db.Timestamp(0)
 }
@@ -876,8 +876,8 @@ model testimonials {
   designation         String                         @db.VarChar(100)
   image               String                         @db.VarChar(100)
   description         String                         @db.Text
-  status              testimonials_status            @default(dbgenerated("0"))
-  recyclebin_status   testimonials_recyclebin_status @default(dbgenerated("0"))
+  status              testimonials_status            @default(zero)
+  recyclebin_status   testimonials_recyclebin_status @default(zero)
   recyclebin_datetime DateTime?                      @db.DateTime(0)
   created_at          DateTime                       @default(now()) @db.Timestamp(0)
   updated_at          DateTime                       @default(now()) @db.Timestamp(0)
@@ -898,7 +898,7 @@ model timers {
 model types_feedback {
   id         BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
   name       String
-  status     types_feedback_status @default(dbgenerated("0"))
+  status     types_feedback_status @default(zero)
   created_at DateTime              @default(now()) @db.Timestamp(0)
   updated_at DateTime              @default(now()) @db.Timestamp(0)
 }
@@ -915,30 +915,29 @@ model user_calendars {
   end_time   String?                   @db.VarChar(10)
   venue      String?
   invite     String?
-  status     user_calendars_status     @default(dbgenerated("0"))
+  status     user_calendars_status     @default(zero)
   created_at DateTime                  @default(now()) @db.Timestamp(0)
   updated_at DateTime                  @default(now()) @db.Timestamp(0)
-  users      users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "user_calendars_user_id_foreign")
   attendees  user_calendar_attendees[]
+  users      users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "user_calendars_user_id_foreign")
 
   @@index([user_id], map: "user_calendars_user_id_foreign")
 }
 
 /// Attendees for user calendar events. Stores optional linked user or raw email.
 model user_calendar_attendees {
-  id             BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  event_id       BigInt   @db.UnsignedBigInt
-  user_id        BigInt?  @db.UnsignedBigInt
-  attendee_email String?  @db.VarChar(255)
-  status         String?  @db.VarChar(50)
-  created_at     DateTime @default(now()) @db.Timestamp(0)
-  updated_at     DateTime @default(now()) @db.Timestamp(0)
+  id             BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  event_id       BigInt         @db.UnsignedBigInt
+  user_id        BigInt?        @db.UnsignedBigInt
+  attendee_email String?        @db.VarChar(255)
+  status         String?        @default("invited") @db.VarChar(50)
+  created_at     DateTime       @default(now()) @db.Timestamp(0)
+  updated_at     DateTime       @default(now()) @db.Timestamp(0)
+  user_calendars user_calendars @relation(fields: [event_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_calendar_attendees_event_id_foreign")
+  users          users?         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_calendar_attendees_user_id_foreign")
 
-  user_calendars user_calendars @relation(fields: [event_id], references: [id], onDelete: Cascade, map: "user_calendar_attendees_event_id_foreign")
-  users          users?         @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "user_calendar_attendees_user_id_foreign")
-
-  @@index([event_id], map: "user_calendar_attendees_event_id_foreign")
-  @@index([user_id], map: "user_calendar_attendees_user_id_foreign")
+  @@index([event_id], map: "idx_event_id")
+  @@index([user_id], map: "idx_user_id")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -952,7 +951,7 @@ model user_calendars_old {
   end_time   DateTime                  @db.Time(0)
   venue      String
   invite     String?
-  status     user_calendars_old_status @default(dbgenerated("0"))
+  status     user_calendars_old_status @default(zero)
   created_at DateTime                  @default(now()) @db.Timestamp(0)
   updated_at DateTime                  @default(now()) @db.Timestamp(0)
 }
@@ -973,8 +972,8 @@ model user_feedback_logs {
   types_feedback   Int?
   content_feedback String?                   @db.VarChar(250)
   document         String                    @db.LongText
-  status           user_feedback_logs_status @default(dbgenerated("0"))
-  reset            user_feedback_logs_reset  @default(dbgenerated("0"))
+  status           user_feedback_logs_status @default(zero)
+  reset            user_feedback_logs_reset  @default(zero)
   created_at       DateTime                  @default(now()) @db.Timestamp(0)
   updated_at       DateTime                  @default(now()) @db.Timestamp(0)
   users            users                     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "user_feedback_logs_user_id_foreign")
@@ -987,7 +986,7 @@ model user_roles {
   id             BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
   designation_id BigInt            @db.UnsignedBigInt
   menu_id        BigInt            @db.UnsignedBigInt
-  status         user_roles_status @default(dbgenerated("1"))
+  status         user_roles_status @default(one)
   created_at     DateTime          @default(now()) @db.Timestamp(0)
   updated_at     DateTime          @default(now()) @db.Timestamp(0)
 
@@ -1007,7 +1006,7 @@ model users {
   phone_code                       String?                    @db.VarChar(100)
   mobile                           String?                    @db.VarChar(100)
   reg_type                         users_reg_type
-  status                           users_status               @default(dbgenerated("0"))
+  status                           users_status               @default(zero)
   user_type                        users_user_type            @default(Customer)
   otp                              Int                        @default(0)
   password                         String?
@@ -1025,8 +1024,8 @@ model users {
   earned                           Decimal                    @default(0.00) @db.Decimal(18, 2)
   earning_home                     String?                    @db.VarChar(200)
   image                            String?                    @db.VarChar(200)
-  block_user                       users_block_user           @default(dbgenerated("1"))
-  update_status                    users_update_status        @default(dbgenerated("0"))
+  block_user                       users_block_user           @default(one)
+  update_status                    users_update_status        @default(one)
   device_token                     String?                    @db.LongText
   description                      String?                    @db.LongText
   notepad                          String?                    @db.Text
@@ -1052,8 +1051,8 @@ model users {
   reflective_account_forms         reflective_account_forms[]
   reflective_accounts              reflective_accounts[]
   timers                           timers[]
-  user_calendars                   user_calendars[]
   user_calendar_attendees          user_calendar_attendees[]
+  user_calendars                   user_calendars[]
   user_feedback_logs               user_feedback_logs[]
   work_hours                       work_hours[]
   working_hours                    working_hours[]
@@ -1068,6 +1067,10 @@ model work_hours {
   end_time         DateTime? @db.DateTime(0)
   duration_minutes Int?
   work_description String?   @db.Text
+  location         String?   @db.VarChar(255)
+  shift_type       String?   @db.VarChar(100)
+  hourly_rate      Decimal?  @db.Decimal(10, 2)
+  total_earnings   Decimal?  @db.Decimal(10, 2)
   document_ids     String?   @db.Text
   is_active        Boolean?  @default(false)
   created_at       DateTime  @default(now()) @db.Timestamp(0)
@@ -1093,14 +1096,26 @@ model working_hours {
   hourly_rate    Decimal              @default(0.00) @db.Decimal(18, 2)
   description    String?              @db.Text
   document       String?              @db.VarChar(200)
-  status         working_hours_status @default(dbgenerated("0"))
-  reset          working_hours_reset  @default(dbgenerated("0"))
+  status         working_hours_status @default(zero)
+  reset          working_hours_reset  @default(zero)
   created_at     DateTime             @default(now()) @db.Timestamp(0)
   updated_at     DateTime             @default(now()) @db.Timestamp(0)
   earnings       earnings[]
   users          users                @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "working_hours_user_id_foreign")
 
   @@index([user_id], map: "working_hours_user_id_foreign")
+}
+
+model email_otps {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  email      String   @db.VarChar(255)
+  otp        String   @db.VarChar(10)
+  used       Boolean? @default(false)
+  expires_at DateTime @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([email], map: "idx_email")
+  @@map("email_otps")
 }
 
 enum designations_status {
@@ -1446,16 +1461,4 @@ enum users_subscription_status {
   trial
   expired
   cancelled
-}
-
-model email_otps {
-  id         BigInt   @id @default(autoincrement())
-  email      String   @db.VarChar(255)
-  otp        String   @db.VarChar(10)
-  used       Boolean  @default(false)
-  expires_at DateTime @db.DateTime
-  created_at DateTime @default(now()) @db.Timestamp(0)
-
-  @@index([email])
-  @@map("email_otps")
 }
