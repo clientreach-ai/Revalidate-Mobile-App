@@ -149,7 +149,7 @@ export default function GalleryScreen() {
       const response = await apiService.get<{
         success: boolean;
         data: ApiDocument[];
-      }>(API_ENDPOINTS.DOCUMENTS.LIST, token);
+      }>(`${API_ENDPOINTS.DOCUMENTS.LIST}?limit=1000`, token);
 
       if (response.success && response.data) {
         const mappedDocuments: Document[] = response.data.map((apiDoc) => {
@@ -191,22 +191,25 @@ export default function GalleryScreen() {
           return String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
         };
 
+        // Standardized mapping of variations to canonical UI titles
         const categoryMap: Record<string, string> = {
-          cpd: 'CPD Hours',
-          cpd_hours: 'CPD Hours',
-          working: 'Working Hours',
-          work: 'Working Hours',
-          working_hours: 'Working Hours',
-          workinghours: 'Working Hours',
-          feedback: 'Feedback Log',
-          feedback_log: 'Feedback Log',
-          reflection: 'Reflective Accounts',
-          reflections: 'Reflective Accounts',
-          appraisal: 'Appraisal',
-          gallery: 'General Gallery',
-          personal: 'General Gallery',
-          general: 'General Gallery',
-          uncategorized: 'General Gallery',
+          'cpd': 'CPD Hours',
+          'cpdhours': 'CPD Hours',
+          'working': 'Working Hours',
+          'work': 'Working Hours',
+          'workinghours': 'Working Hours',
+          'feedback': 'Feedback Log',
+          'feedbacklog': 'Feedback Log',
+          'reflection': 'Reflective Accounts',
+          'reflections': 'Reflective Accounts',
+          'reflective': 'Reflective Accounts',
+          'appraisal': 'Appraisal',
+          'gallery': 'General Gallery',
+          'personal': 'General Gallery',
+          'general': 'General Gallery',
+          'uncategorized': 'General Gallery',
+          'profilepicture': 'General Gallery',
+          'discussion': 'General Gallery',
         };
 
         const mapToTitle = (docCat?: string | null) => {
@@ -226,14 +229,11 @@ export default function GalleryScreen() {
             // Check for explicit match
             if (mappedKey && mappedKey === catKey) return true;
 
-            // For General Gallery (ID '6'), also include documents with no category 
-            // or documents that don't match any other established category
+            // For General Gallery (ID '6'), include everything that doesn't match other cards
             if (cat.id === '6') {
               const hasNoCategory = !doc.category || normalize(doc.category) === '';
-
               if (hasNoCategory) return true;
 
-              // Check if this document matches ANY other category
               const matchesAnyOther = categoryDefinitions
                 .filter(c => c.id !== '6')
                 .some(c => {
@@ -248,7 +248,7 @@ export default function GalleryScreen() {
           });
 
           const count = categoryDocs.length;
-          const latestDoc = categoryDocs.sort((a, b) =>
+          const latestDoc = [...categoryDocs].sort((a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
           )[0];
 

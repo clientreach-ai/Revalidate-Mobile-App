@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { View, Text, Pressable, Animated, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -6,14 +6,12 @@ import { useRouter } from "expo-router";
 import { useThemeStore } from "@/features/theme/theme.store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiService, API_ENDPOINTS } from "@/services/api";
-import { setSubscriptionInfo } from "@/utils/subscription";
 import "./global.css";
 
 export default function SplashScreen() {
     const spinAnim = useRef(new Animated.Value(0)).current;
     const router = useRouter();
     const { isDark, toggleTheme } = useThemeStore();
-    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
     // Spin animation for loader
     useEffect(() => {
@@ -33,7 +31,6 @@ export default function SplashScreen() {
                 const token = await AsyncStorage.getItem('authToken');
 
                 if (!token) {
-                    setIsCheckingAuth(false);
                     requestAnimationFrame(() => {
                         setTimeout(() => {
                             router.replace("/(auth)/login");
@@ -42,16 +39,43 @@ export default function SplashScreen() {
                     return;
                 }
 
-                // If token exists, route to onboarding unconditionally
-                setIsCheckingAuth(false);
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        router.replace("/(onboarding)");
-                    }, 1500);
-                });
+                // Check onboarding progress to see if we can skip it
+                try {
+                    const progress = await apiService.get<{
+                        success: boolean;
+                        data: { completed: boolean; currentStep: number };
+                    }>(API_ENDPOINTS.USERS.ONBOARDING.PROGRESS, token);
+
+                    requestAnimationFrame(() => {
+                        setTimeout(() => {
+                            if (progress?.data?.completed) {
+                                router.replace("/(tabs)/home");
+                            } else {
+                                const step = progress?.data?.currentStep || 1;
+                                if (step === 2) {
+                                    router.replace("/(onboarding)/personal-details");
+                                } else if (step === 3) {
+                                    router.replace("/(onboarding)/professional-details");
+                                } else if (step === 4) {
+                                    router.replace("/(onboarding)/plan-choose");
+                                } else {
+                                    // if step is 1 or unknown, go to role selection directly
+                                    // to bypass the introductory carousels for registered users
+                                    router.replace("/(onboarding)/role-selection");
+                                }
+                            }
+                        }, 1500);
+                    });
+                } catch (apiError) {
+                    // Fallback to role selection if API fails but token exists
+                    requestAnimationFrame(() => {
+                        setTimeout(() => {
+                            router.replace("/(onboarding)/role-selection");
+                        }, 1500);
+                    });
+                }
             } catch (error) {
                 console.warn("Auth check error:", error);
-                setIsCheckingAuth(false);
                 requestAnimationFrame(() => {
                     setTimeout(() => {
                         router.replace("/(auth)/login");
