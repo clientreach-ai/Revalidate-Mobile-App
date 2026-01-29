@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Modal, Image, FlatList } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Modal, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,6 +17,7 @@ interface Appraisal {
     notes: string;
     discussionWith?: string;
     hospitalName?: string;
+    hasDocuments?: boolean;
     createdAt: string;
 }
 
@@ -113,7 +114,7 @@ export default function AppraisalScreen() {
                         date: formatDate(a.appraisalDate),
                         notes: a.notes || 'No notes provided',
                         discussionWith: a.discussionWith,
-                        // Hospital name isn't returned by list yet, would need join, but storing ID for now
+                        hasDocuments: a.documentIds && a.documentIds.length > 0,
                         createdAt: a.createdAt,
                     };
                 });
@@ -250,7 +251,9 @@ export default function AppraisalScreen() {
                         <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
                     </Pressable>
                     <Text className={`text-lg font-bold flex-1 text-center ${isDark ? "text-white" : "text-[#121417]"}`}>Appraisals</Text>
-                    <View className="w-12" />
+                    <Pressable onPress={() => setShowAddModal(true)} className="w-12 h-12 shrink-0 items-center justify-center active:opacity-60">
+                        <MaterialIcons name="add" size={32} color="#E11D48" />
+                    </Pressable>
                 </View>
             </View>
 
@@ -265,25 +268,60 @@ export default function AppraisalScreen() {
                             {appraisals.map((appraisal) => (
                                 <View key={appraisal.id} className={`rounded-xl shadow-sm border p-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
                                     <View className="flex-row justify-between items-start mb-2">
-                                        <Text className={`font-bold text-base ${isDark ? "text-white" : "text-[#121417]"}`}>Annual Appraisal</Text>
-                                        <Text className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-[#687482]"}`}>{appraisal.date}</Text>
+                                        <View className="flex-row items-center gap-2">
+                                            <MaterialIcons name="verified" size={20} color="#E11D48" />
+                                            <Text className={`font-bold text-base ${isDark ? "text-white" : "text-[#121417]"}`}>
+                                                Annual Appraisal
+                                            </Text>
+                                        </View>
+                                        <View className="flex-row items-center gap-2">
+                                            {appraisal.hasDocuments && <MaterialIcons name="attachment" size={16} color="#2B5E9C" />}
+                                            <Text className={`text-xs font-medium ${isDark ? "text-gray-400" : "text-[#687482]"}`}>
+                                                {appraisal.date}
+                                            </Text>
+                                        </View>
                                     </View>
                                     {appraisal.discussionWith && <Text className={`text-xs mb-2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>With: {appraisal.discussionWith}</Text>}
-                                    <Text className={`text-sm leading-relaxed ${isDark ? "text-gray-300" : "text-[#121417]"}`}>{appraisal.notes}</Text>
+                                    <Text className={`text-sm leading-relaxed ${isDark ? "text-gray-300" : "text-[#121417]"}`} numberOfLines={3}>
+                                        {appraisal.notes}
+                                    </Text>
+                                    <View className={`mt-3 pt-3 border-t flex-row justify-end ${isDark ? "border-slate-700" : "border-gray-50"}`}>
+                                        <Pressable
+                                            onPress={() => router.push(`/(tabs)/appraisal/${appraisal.id}`)}
+                                            className="flex-row items-center"
+                                            style={{ gap: 4 }}
+                                        >
+                                            <Text className="text-[#E11D48] text-xs font-bold uppercase">
+                                                View Details
+                                            </Text>
+                                            <MaterialIcons name="chevron-right" size={16} color="#E11D48" />
+                                        </Pressable>
+                                    </View>
                                 </View>
                             ))}
                         </View>
                     ) : (
-                        <View className={`p-8 rounded-2xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
-                            <MaterialIcons name="verified" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
-                            <Text className={`mt-4 text-center font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>No appraisals recorded</Text>
+                        <View className={`p-8 rounded-3xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
+                            <View className="w-20 h-20 rounded-full bg-rose-50 items-center justify-center mb-4">
+                                <MaterialIcons name="verified" size={48} color="#E11D48" />
+                            </View>
+                            <Text className={`text-xl text-center font-bold mb-2 ${isDark ? "text-white" : "text-slate-800"}`}>No appraisals recorded</Text>
+                            <Text className={`text-center text-sm mb-6 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+                                Log your annual appraisals to keep your revalidation portofolio up to date.
+                            </Text>
+                            <Pressable
+                                onPress={() => setShowAddModal(true)}
+                                className="bg-[#E11D48] px-8 py-3 rounded-2xl shadow-md active:opacity-90"
+                            >
+                                <Text className="text-white font-bold">Log First Appraisal</Text>
+                            </Pressable>
                         </View>
                     )}
                 </ScrollView>
             )}
 
-            <View className="absolute right-6 items-center" style={{ bottom: 20 + insets.bottom }}>
-                <Pressable onPress={() => setShowAddModal(true)} className="w-14 h-14 bg-[#E11D48] rounded-full shadow-lg items-center justify-center">
+            <View className="absolute right-6 items-center" style={{ bottom: 100 + insets.bottom }}>
+                <Pressable onPress={() => setShowAddModal(true)} className="w-14 h-14 bg-[#E11D48] rounded-full shadow-lg items-center justify-center active:bg-[#C41A3B]">
                     <MaterialIcons name="add" size={32} color="#FFFFFF" />
                 </Pressable>
             </View>
@@ -341,18 +379,17 @@ export default function AppraisalScreen() {
                                 </View>
 
                                 {showHospitalDropdown && hospitalResults.length > 0 && !selectedHospital && (
-                                    <View className={`absolute top-full left-0 right-0 mt-1 max-h-48 rounded-xl border shadow-lg z-50 ${isDark ? "bg-slate-800 border-slate-600" : "bg-white border-gray-200"}`}>
-                                        <FlatList
-                                            data={hospitalResults}
-                                            keyExtractor={item => String(item.id)}
-                                            nestedScrollEnabled
-                                            renderItem={({ item }) => (
-                                                <Pressable onPress={() => { setSelectedHospital(item); setHospitalQuery(item.name); setShowHospitalDropdown(false); }} className={`p-3 border-b ${isDark ? "border-slate-700 active:bg-slate-700" : "border-gray-100 active:bg-gray-50"}`}>
-                                                    <Text className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>{item.name}</Text>
-                                                    <Text className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{item.town}, {item.postcode}</Text>
-                                                </Pressable>
-                                            )}
-                                        />
+                                    <View className={`mt-2 max-h-60 rounded-xl border overflow-hidden ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-gray-200"}`}>
+                                        {hospitalResults.map((item) => (
+                                            <Pressable
+                                                key={item.id}
+                                                onPress={() => { setSelectedHospital(item); setHospitalQuery(item.name); setShowHospitalDropdown(false); }}
+                                                className={`p-3 border-b ${isDark ? "border-slate-700 active:bg-slate-700" : "border-gray-100 active:bg-gray-100"}`}
+                                            >
+                                                <Text className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>{item.name}</Text>
+                                                <Text className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{item.town}, {item.postcode}</Text>
+                                            </Pressable>
+                                        ))}
                                     </View>
                                 )}
                             </View>
