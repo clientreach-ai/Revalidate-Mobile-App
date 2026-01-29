@@ -28,7 +28,7 @@ export async function getAllHospitals(search?: string): Promise<Hospital[]> {
     const params: any[] = [];
 
     if (search) {
-        query += ' AND (name LIKE ? OR town LIKE ? OR post_code LIKE ?)';
+        query += ' AND (name LIKE ? OR town LIKE ? OR postcode LIKE ?)';
         const term = `%${search}%`;
         params.push(term, term, term);
     }

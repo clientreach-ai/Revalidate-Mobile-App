@@ -159,9 +159,9 @@ async function refreshUserCacheIfPremium(): Promise<void> {
 
     console.log('[SyncService] Pre-caching data for offline use...');
 
-    // Fetch and cache user profile
+    // Fetch and cache user profile (FORCE fetch for sync)
     try {
-      const profile = await apiService.get<any>(API_ENDPOINTS.USERS.ME, token);
+      const profile = await apiService.get<any>(API_ENDPOINTS.USERS.ME, token, true);
       if (profile?.data) {
         const userData = profile.data;
 
@@ -205,8 +205,10 @@ async function refreshUserCacheIfPremium(): Promise<void> {
 
     for (const endpoint of endpointsToCache) {
       try {
-        await apiService.get(endpoint, token);
+        console.log(`[SyncService] Pre-caching ${endpoint}...`);
+        await apiService.get(endpoint, token, true); // Use forceRefresh to bypass cache and update it
       } catch (e) {
+        console.warn(`[SyncService] Failed to pre-cache ${endpoint}:`, e);
         // Non-critical, continue with other endpoints
       }
     }

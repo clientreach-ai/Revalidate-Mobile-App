@@ -38,33 +38,51 @@ export interface OfflineData {
   timestamp: number;
 }
 
-async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync(DB_NAME);
+let initPromise: Promise<any> | null = null;
 
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS offline_operations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        method TEXT NOT NULL,
-        endpoint TEXT NOT NULL,
-        data TEXT,
-        headers TEXT,
-        timestamp INTEGER NOT NULL,
-        retry_count INTEGER DEFAULT 0,
-        status TEXT DEFAULT 'pending'
-      );
-      
-      CREATE TABLE IF NOT EXISTS offline_data (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        timestamp INTEGER NOT NULL
-      );
-      
-      CREATE INDEX IF NOT EXISTS idx_operations_status ON offline_operations(status);
-      CREATE INDEX IF NOT EXISTS idx_operations_timestamp ON offline_operations(timestamp);
-    `);
+async function getDatabase(): Promise<any> {
+  if (db) return db;
+
+  if (!initPromise) {
+    initPromise = (async () => {
+      try {
+        console.log('[OfflineStorage] Initializing database...');
+        const database = await SQLite.openDatabaseAsync(DB_NAME);
+
+        await database.execAsync(`
+          CREATE TABLE IF NOT EXISTS offline_operations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            method TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            data TEXT,
+            headers TEXT,
+            timestamp INTEGER NOT NULL,
+            retry_count INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'pending'
+          );
+          
+          CREATE TABLE IF NOT EXISTS offline_data (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            timestamp INTEGER NOT NULL
+          );
+          
+          CREATE INDEX IF NOT EXISTS idx_operations_status ON offline_operations(status);
+          CREATE INDEX IF NOT EXISTS idx_operations_timestamp ON offline_operations(timestamp);
+        `);
+
+        db = database;
+        console.log('[OfflineStorage] Database initialized successfully');
+        return database;
+      } catch (error) {
+        console.error('[OfflineStorage] Database initialization failed:', error);
+        initPromise = null; // Allow retry on next call
+        throw error;
+      }
+    })();
   }
-  return db;
+
+  return initPromise;
 }
 
 export async function saveOfflineOperation(operation: Omit<OfflineOperation, 'id' | 'status'>): Promise<number> {
@@ -86,23 +104,14 @@ export async function saveOfflineOperation(operation: Omit<OfflineOperation, 'id
 
 export async function getPendingOperations(): Promise<OfflineOperation[]> {
   const database = await getDatabase();
-  const result = await database.getAllAsync<{
-    id: number;
-    method: string;
-    endpoint: string;
-    data: string | null;
-    headers: string | null;
-    timestamp: number;
-    retry_count: number;
-    status: string;
-  }>(
+  const result = await database.getAllAsync(
     `SELECT * FROM offline_operations 
      WHERE status = 'pending' OR status = 'failed'
      ORDER BY timestamp ASC
      LIMIT 50`
-  );
+  ) as any[];
 
-  return result.map(row => ({
+  return result.map((row: any) => ({
     id: row.id,
     method: row.method as any,
     endpoint: row.endpoint,
@@ -149,10 +158,10 @@ export async function saveOfflineData(key: string, value: any): Promise<void> {
 
 export async function getOfflineData<T>(key: string): Promise<T | null> {
   const database = await getDatabase();
-  const result = await database.getFirstAsync<{ value: string }>(
+  const result = await database.getFirstAsync(
     'SELECT value FROM offline_data WHERE key = ?',
     [key]
-  );
+  ) as { value: string } | null;
 
   if (!result) return null;
   return JSON.parse(result.value) as T;
@@ -173,9 +182,9 @@ export async function clearAllOfflineData(): Promise<void> {
 
 export async function getOperationCount(): Promise<number> {
   const database = await getDatabase();
-  const result = await database.getFirstAsync<{ count: number }>(
+  const result = await database.getFirstAsync(
     'SELECT COUNT(*) as count FROM offline_operations WHERE status = "pending" OR status = "failed"'
-  );
+  ) as { count: number } | null;
   return result?.count || 0;
 }
 

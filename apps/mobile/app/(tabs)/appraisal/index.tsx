@@ -85,13 +85,13 @@ export default function AppraisalScreen() {
     // Debounced hospital search
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (hospitalQuery.length > 2 && !selectedHospital) {
+            if (hospitalQuery.length >= 2 && !selectedHospital) {
                 searchHospitals(hospitalQuery);
-            } else if (hospitalQuery.length <= 2) {
+            } else if (hospitalQuery.length < 2) {
                 setHospitalResults([]);
                 setShowHospitalDropdown(false);
             }
-        }, 500);
+        }, 300);
         return () => clearTimeout(timer);
     }, [hospitalQuery]);
 
@@ -135,9 +135,13 @@ export default function AppraisalScreen() {
             setIsSearchingHospitals(true);
             const token = await AsyncStorage.getItem('authToken');
             if (!token) return;
-            const res = await apiService.get<{ data: Hospital[] }>(`${API_ENDPOINTS.HOSPITALS.LIST}?search=${encodeURIComponent(query)}`, token);
-            if (res?.data) {
+            const res = await apiService.get<{ success: boolean, data: Hospital[] }>(`${API_ENDPOINTS.HOSPITALS.LIST}?search=${encodeURIComponent(query)}`, token);
+            if (res?.success && res.data) {
                 setHospitalResults(res.data);
+                setShowHospitalDropdown(true);
+            } else if (Array.isArray(res)) {
+                // Handle case where API might return array directly
+                setHospitalResults(res);
                 setShowHospitalDropdown(true);
             }
         } catch (e) {

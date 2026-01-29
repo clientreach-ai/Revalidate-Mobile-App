@@ -20,6 +20,13 @@ export function useProfile() {
       setProfile(response.data);
     } catch (error: any) {
       console.error('Error fetching profile:', error);
+
+      // Suppress network error toasts for premium users (they have cache fallback)
+      if (error.message?.includes('INTERNET_REQUIRED') || error.message?.includes('Network request failed')) {
+        console.log('Skipping error toast for profile fetch - offline mode');
+        return;
+      }
+
       showToast.error(
         error.message || 'Failed to load profile',
         'Error'
@@ -44,6 +51,14 @@ export function useProfile() {
       return response.data;
     } catch (error: any) {
       console.error('Error updating profile:', error);
+
+      // Special handling for offline writes
+      if (error.message?.includes('INTERNET_REQUIRED')) {
+        // apiService usually handles this by queueing, but if it reaches here,
+        // it might be an online-only endpoint or free user.
+        return;
+      }
+
       showToast.error(
         error.message || 'Failed to update profile',
         'Error'

@@ -31,6 +31,13 @@ export function useCalendar() {
       setEvents(response.data);
     } catch (error: any) {
       console.error('Error fetching calendar events:', error);
+
+      // Suppress network error toasts for offline mode
+      if (error.message?.includes('INTERNET_REQUIRED') || error.message?.includes('Network request failed')) {
+        console.log('Skipping error toast for calendar fetch - offline mode');
+        return;
+      }
+
       showToast.error(
         error.message || 'Failed to load calendar events',
         'Error'

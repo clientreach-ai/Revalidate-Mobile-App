@@ -82,9 +82,17 @@ class ApiService {
   /**
    * Identifies endpoints that REQUIRE internet for all users.
    */
+  /**
+   * Identifies endpoints that REQUIRE internet for all users.
+   * Authentication and onboarding should typically be online-only.
+   */
   private isOnlineOnly(endpoint: string): boolean {
     const onlineOnlyPrefixes = [
-      '/api/v1/auth',
+      '/api/v1/auth/login',
+      '/api/v1/auth/register',
+      '/api/v1/auth/forgot-password',
+      '/api/v1/auth/reset-password',
+      '/api/v1/auth/verify-email',
       '/api/v1/users/onboarding'
     ];
     return onlineOnlyPrefixes.some(prefix => endpoint.startsWith(prefix));
@@ -184,7 +192,7 @@ class ApiService {
    * - Online-Only/Free: Forced network, failure = prompt user.
    * - Premium: Cache-First (instant UI) + Background Revalidate.
    */
-  async get<T>(endpoint: string, token?: string): Promise<T> {
+  async get<T>(endpoint: string, token?: string, forceRefresh = false): Promise<T> {
     const isOnlineMandatory = this.isOnlineOnly(endpoint);
     const { isFreeUser, canOffline } = this.getOfflineCapability();
 
@@ -218,7 +226,7 @@ class ApiService {
     }
 
     // PREMIUM USER: Cache-First strategy for speed
-    const cachedData = await this.getCache<T>(endpoint);
+    const cachedData = forceRefresh ? null : await this.getCache<T>(endpoint);
 
     // Always trigger background update if we have a token
     const fetchNewData = async () => {
@@ -252,8 +260,49 @@ class ApiService {
       // Premium user offline with no cache - return empty/fallback response
       const isConnected = await checkNetworkStatus();
       if (!isConnected && canOffline) {
-        // Return a graceful empty response for premium users offline
-        console.log('Premium user offline, returning empty data for:', endpoint);
+        console.log('Premium user offline, no cache for:', endpoint);
+
+        // Special handling for auth/me to avoid breaking UI that expects a user object
+        if (endpoint === API_ENDPOINTS.USERS.ME) {
+          return {
+            success: true,
+            data: { id: 'offline', email: '', subscriptionTier: 'premium', subscriptionStatus: 'active' },
+            message: 'Offline mode - no profile data'
+          } as unknown as T;
+        }
+
+        // Special handling for users/profile to avoid breaking UI that expects a user profile object
+        if (endpoint === API_ENDPOINTS.USERS.PROFILE || endpoint.includes('/users/profile')) {
+          // Try to use the secondary manual cache if available
+          try {
+            const manualCache = await getOfflineData<any>('user_profile');
+            if (manualCache) {
+              return {
+                success: true,
+                data: {
+                  id: manualCache.id,
+                  name: manualCache.firstName ? `${manualCache.firstName} ${manualCache.lastName || ''}`.trim() : 'User',
+                  email: manualCache.email,
+                  subscriptionTier: manualCache.subscriptionTier || 'premium',
+                  subscriptionStatus: manualCache.subscriptionStatus || 'active',
+                  professionalRole: manualCache.professionalRole,
+                  revalidationDate: null, // Minimal fallback
+                },
+                message: 'Offline mode - recovered from backup cache'
+              } as unknown as T;
+            }
+          } catch (e) {
+            // ignore manual cache error
+          }
+
+          // Return a minimal valid empty profile object instead of []
+          return {
+            success: true,
+            data: { id: 'offline', name: 'User', email: '', subscriptionTier: 'premium' },
+            message: 'Offline mode - no cached data'
+          } as unknown as T;
+        }
+
         return { success: true, data: [], message: 'Offline mode - no cached data available' } as unknown as T;
       }
 
