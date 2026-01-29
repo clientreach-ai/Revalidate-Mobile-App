@@ -1284,24 +1284,34 @@ export default function DashboardScreen() {
           )}
 
           <View
-            className={`p-2 rounded-2xl border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}
+            className={`rounded-2xl hidden border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}
             onLayout={(e) => setViewportWidth(e.nativeEvent.layout.width)}
           >
             {slides.length === 0 ? (
-              <View className="p-6 items-center">
+              <View className="p-6 items-center hidden">
                 <Text className="text-slate-400">No announcements</Text>
               </View>
             ) : (
-              <ScrollView ref={scrollRef as any} horizontal pagingEnabled>
+              <ScrollView
+                ref={scrollRef as any}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 8,
+                  display: 'none',
+                }}
+              >
                 {slides.map((s) => (
                   <View
                     key={s.id}
                     style={{
                       width: viewportWidth - 16,
                       height: 160,
-                      borderRadius: 16,
+                      borderRadius: 18,
                       overflow: 'hidden',
-                      marginHorizontal: 8,
+                      marginHorizontal: 0,
                     }}
                   >
                     <Image
@@ -1313,6 +1323,7 @@ export default function DashboardScreen() {
                       }}
                       className="w-full h-full"
                       resizeMode="cover"
+                      style={{ borderRadius: 18 }}
                     />
                   </View>
                 ))}
