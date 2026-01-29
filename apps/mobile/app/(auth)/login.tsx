@@ -114,6 +114,19 @@ export default function Login() {
                             // Check if onboarding is completed
                             if (profile.data.onboardingCompleted) {
                                 useAuthStore.getState().setOnboardingCompleted(true);
+
+                                // Persist this critical flag to AsyncStorage for offline/restore stability
+                                try {
+                                    const storedUserStr = await AsyncStorage.getItem('userData');
+                                    if (storedUserStr) {
+                                        const storedUser = JSON.parse(storedUserStr);
+                                        storedUser.onboardingCompleted = true;
+                                        await AsyncStorage.setItem('userData', JSON.stringify(storedUser));
+                                    }
+                                } catch (e) {
+                                    console.warn('Failed to update userData storage', e);
+                                }
+
                                 router.replace("/(tabs)/home");
                                 return;
                             }
@@ -183,8 +196,8 @@ export default function Login() {
             {/* Dark mode toggle */}
             <Pressable
                 className={`absolute top-10 right-4 p-3 rounded-full z-50 ${isDark
-                        ? "bg-slate-800/80 border border-slate-700"
-                        : "bg-white/80 border border-gray-200"
+                    ? "bg-slate-800/80 border border-slate-700"
+                    : "bg-white/80 border border-gray-200"
                     } shadow-lg`}
                 onPress={toggleTheme}
             >
@@ -245,8 +258,8 @@ export default function Login() {
                                         </View>
                                         <TextInput
                                             className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
-                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
-                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                                ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                : "bg-white text-gray-900 border border-gray-200 shadow-sm"
                                                 } ${errors.email ? "border-red-500" : ""}`}
                                             style={{
                                                 shadowColor: isDark ? "#000" : "#000",
@@ -302,8 +315,8 @@ export default function Login() {
                                         </View>
                                         <TextInput
                                             className={`w-full pl-12 pr-12 py-4 rounded-2xl ${isDark
-                                                    ? "bg-slate-800/90 text-white border border-slate-700/50"
-                                                    : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                                                ? "bg-slate-800/90 text-white border border-slate-700/50"
+                                                : "bg-white text-gray-900 border border-gray-200 shadow-sm"
                                                 } ${errors.password ? "border-red-500" : ""}`}
                                             style={{
                                                 shadowColor: isDark ? "#000" : "#000",

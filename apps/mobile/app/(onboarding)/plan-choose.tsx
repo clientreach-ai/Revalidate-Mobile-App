@@ -212,6 +212,17 @@ export default function PlanChoose() {
                     );
                     // Mark onboarding as completed
                     useAuthStore.getState().setOnboardingCompleted(true);
+
+                    // Persist for backup recovery
+                    try {
+                        const storedUserStr = await AsyncStorage.getItem('userData');
+                        if (storedUserStr) {
+                            const storedUser = JSON.parse(storedUserStr);
+                            storedUser.onboardingCompleted = true;
+                            await AsyncStorage.setItem('userData', JSON.stringify(storedUser));
+                        }
+                    } catch (e) { console.warn('Failed to save userData updates', e); }
+
                     router.replace("/(tabs)/home");
                     return;
                 }
@@ -325,6 +336,17 @@ export default function PlanChoose() {
             showToast.success("Payment successful! Premium plan activated.", "Success");
             // Mark onboarding as completed
             useAuthStore.getState().setOnboardingCompleted(true);
+
+            // Persist for backup recovery
+            try {
+                const storedUserStr = await AsyncStorage.getItem('userData');
+                if (storedUserStr) {
+                    const storedUser = JSON.parse(storedUserStr);
+                    storedUser.onboardingCompleted = true;
+                    await AsyncStorage.setItem('userData', JSON.stringify(storedUser));
+                }
+            } catch (e) { console.warn('Failed to save userData updates', e); }
+
             router.replace("/(tabs)/home");
         } catch (error: unknown) {
             const errorMessage = error instanceof Error

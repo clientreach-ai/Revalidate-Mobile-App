@@ -511,20 +511,7 @@ export default function GalleryScreen() {
             </Pressable>
           </View>
 
-          <View className="relative">
-            <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
-              <MaterialIcons name="search" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
-            </View>
-            <TextInput
-              className={`w-full pl-11 pr-12 py-3.5 border-none rounded-2xl shadow-sm text-sm ${isDark ? "bg-slate-800 text-white" : "bg-white text-slate-800"
-                }`}
-              placeholder="Search documents, tags, or dates..."
-              placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
-            />
-            <View className="absolute inset-y-0 right-0 pr-4 items-center justify-center z-10">
-              <MaterialIcons name="tune" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
-            </View>
-          </View>
+
         </View>
 
         {loading && !refreshing && (
@@ -581,59 +568,7 @@ export default function GalleryScreen() {
           </View>
         )}
 
-        {!loading && (
-          <View className="px-6 mt-8">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className={`font-bold text-lg ${isDark ? "text-white" : "text-slate-800"}`}>
-                Recent Files
-              </Text>
-              {recentFiles.length > 0 && (
-                <Pressable>
-                  <Text className="text-[#2B5F9E] text-sm font-semibold">View All</Text>
-                </Pressable>
-              )}
-            </View>
-            {recentFiles.length > 0 ? (
-              <View style={{ gap: 12 }}>
-                {recentFiles.map((file) => (
-                  <View
-                    key={file.id}
-                    className={`p-3 rounded-2xl border flex-row items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                      }`}
-                    style={{ gap: 12 }}
-                  >
-                    <View className={`w-10 h-10 ${file.iconBgColor} rounded-xl items-center justify-center`}>
-                      <MaterialIcons
-                        name={file.icon}
-                        size={20}
-                        color={file.iconColor}
-                      />
-                    </View>
-                    <View className="flex-1 min-w-0">
-                      <Text className={`text-sm font-semibold ${isDark ? "text-white" : "text-slate-800"}`} numberOfLines={1}>
-                        {file.name}
-                      </Text>
-                      <Text className={`text-[11px] mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
-                        {file.category} • {file.size}
-                      </Text>
-                    </View>
-                    <Pressable>
-                      <MaterialIcons name="more-vert" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View className={`p-6 rounded-2xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                }`}>
-                <MaterialIcons name="folder-open" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
-                <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
-                  No recent files
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+
       </ScrollView>
 
       <View

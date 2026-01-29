@@ -115,6 +115,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="workinghours/[id]" options={{ href: null }} />
       <Tabs.Screen name="cpdhourstracking/index" options={{ href: null }} />
       <Tabs.Screen name="feedback/index" options={{ href: null }} />
+      <Tabs.Screen name="feedback/[id]" options={{ href: null }} />
       <Tabs.Screen name="earings/index" options={{ href: null }} />
       <Tabs.Screen name="reflections/index" options={{ href: null }} />
       <Tabs.Screen name="profile/account-settings" options={{ href: null }} />

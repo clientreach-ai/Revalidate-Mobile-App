@@ -151,7 +151,7 @@ export default function FeedbackScreen() {
             title,
             source,
             method,
-            date: f.feedbackDate || (f.createdAt || '').split('T')[0],
+            date: f.feedbackDate || (f.createdAt || '').split('T')[0] || '',
             rating,
             feedback: content.trim(),
             type: f.feedbackType,
@@ -359,7 +359,8 @@ export default function FeedbackScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadFeedback(); }} />}>
         <View style={{ gap: 16 }}>
           {filtered.map(item => (
-            <View key={item.id} className={`p-4 rounded-xl border shadow-sm ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
+            <Pressable key={item.id} onPress={() => router.push(`/(tabs)/feedback/${item.id}` as any)}
+              className={`p-4 rounded-xl border shadow-sm ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
               <View className="flex-row justify-between mb-2">
                 <Text className={`text-base font-bold flex-1 ${isDark ? "text-white" : "text-slate-800"}`} numberOfLines={1}>{item.title}</Text>
                 <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-500"}`}>{item.date}</Text>
@@ -388,7 +389,7 @@ export default function FeedbackScreen() {
                   <MaterialIcons key={s} name={s <= item.rating ? 'star' : 'star-border'} size={16} color={s <= item.rating ? '#FBBF24' : '#9CA3AF'} />
                 ))}
               </View>
-            </View>
+            </Pressable>
           ))}
           {filtered.length === 0 && !loading && (
             <Text className={`text-center mt-10 ${isDark ? "text-gray-500" : "text-gray-400"}`}>No feedback found.</Text>

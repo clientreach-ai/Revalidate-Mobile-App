@@ -56,6 +56,12 @@ export default function SplashScreen() {
                                 firstName: user.firstName,
                                 lastName: user.lastName,
                             });
+
+                            // Restore onboarding status from backup if available
+                            if (user.onboardingCompleted) {
+                                useAuthStore.getState().setOnboardingCompleted(true);
+                                onboardingCompleted = true;
+                            }
                         }
                     }
                 }

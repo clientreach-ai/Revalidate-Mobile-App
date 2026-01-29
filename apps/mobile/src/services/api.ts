@@ -38,6 +38,10 @@ class ApiService {
     }
   }
 
+  get baseUrl(): string {
+    return this.baseURL;
+  }
+
   private async detectLocalBackend(): Promise<void> {
     // Skip if not in development mode
     if (__DEV__ !== true) return;

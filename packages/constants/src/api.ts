@@ -57,6 +57,9 @@ export const API_ENDPOINTS = {
   DOCUMENTS: {
     UPLOAD: '/api/v1/documents/upload',
     LIST: '/api/v1/documents',
+    GET_BY_ID: '/api/v1/documents',
+    UPDATE: '/api/v1/documents',
+    DELETE: '/api/v1/documents',
   },
   PAYMENT: {
     CREATE_INTENT: '/api/v1/payment/create-intent',
