@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
+import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
+import { downloadAndShareFile, isImageFile } from '@/utils/document';
 import '../../global.css';
 
 interface ApiDocument {
@@ -15,6 +17,7 @@ interface ApiDocument {
     category?: string;
     size?: string;
     type?: string;
+    document?: string; // The Actual file URL
     created_at: string;
     updated_at: string;
 }
@@ -25,10 +28,45 @@ export default function GeneralGalleryScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [documents, setDocuments] = useState<any[]>([]);
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
     useEffect(() => {
         loadDocuments();
     }, []);
+
+    const normalize = (v?: string | number | null) => {
+        if (v === null || v === undefined) return '';
+        return String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
+    };
+
+    const categoryMap: Record<string, string> = {
+        'cpd': 'CPD Hours',
+        'cpdhours': 'CPD Hours',
+        'working': 'Working Hours',
+        'work': 'Working Hours',
+        'workinghours': 'Working Hours',
+        'feedback': 'Feedback Log',
+        'feedbacklog': 'Feedback Log',
+        'reflection': 'Reflective Accounts',
+        'reflections': 'Reflective Accounts',
+        'reflective': 'Reflective Accounts',
+        'appraisal': 'Appraisal',
+        'gallery': 'General Gallery',
+        'personal': 'General Gallery',
+        'general': 'General Gallery',
+        'uncategorized': 'General Gallery',
+        'profilepicture': 'General Gallery',
+        'discussion': 'Feedback Log',
+    };
+
+    const otherCategoryNames = [
+        'Working Hours',
+        'CPD Hours',
+        'Feedback Log',
+        'Reflective Accounts',
+        'Appraisal'
+    ].map(n => normalize(n));
 
     const loadDocuments = async () => {
         try {
@@ -39,29 +77,35 @@ export default function GeneralGalleryScreen() {
                 return;
             }
 
-            // Fetch 'general' category or all and filter?
-            // Controller supports `?category=general`
+            // Fetch ALL documents and filter locally to match Gallery index logic
             const response = await apiService.get<{
                 success: boolean;
                 data: ApiDocument[];
-            }>(`${API_ENDPOINTS.DOCUMENTS.LIST}?category=general`, token);
+            }>(`${API_ENDPOINTS.DOCUMENTS.LIST}?limit=1000`, token);
 
             if (response.success && response.data) {
-                const mapped = response.data.map((apiDoc) => {
-                    let fileSize = 0;
-                    if (apiDoc.size) {
-                        const sizeMatch = apiDoc.size.match(/([\d.]+)\s*(KB|MB|GB)/i);
-                        if (sizeMatch && sizeMatch[1]) {
-                            // rough parse
-                        }
-                    }
-                    const isPdf = (apiDoc.type === 'file' || apiDoc.name.endsWith('.pdf'));
+                const filtered = response.data.filter((apiDoc) => {
+                    const docCat = apiDoc.category || '';
+                    const normCat = normalize(docCat);
+                    const mappedTitleToken = categoryMap[normCat] || docCat;
+                    const normMapped = normalize(mappedTitleToken);
+
+                    // Check if it belongs to any other specific category
+                    const matchesAnyOther = otherCategoryNames.some(otherNorm => normMapped === otherNorm);
+
+                    // If it doesn't match any other, or has no category, it's "General"
+                    return !matchesAnyOther || normCat === '' || normMapped === normalize('General Gallery');
+                });
+
+                const mapped = filtered.map((apiDoc) => {
+                    const isPdf = (apiDoc.type === 'file' || apiDoc.name.toLowerCase().endsWith('.pdf'));
 
                     return {
                         id: String(apiDoc.id),
                         name: apiDoc.name,
                         category: apiDoc.category || 'General',
-                        size: apiDoc.size || 'Unknown',
+                        size: apiDoc.size || '0.0 MB',
+                        document: apiDoc.document,
                         icon: (isPdf ? 'picture-as-pdf' : 'image') as keyof typeof MaterialIcons.glyphMap,
                         iconBgColor: isPdf ? 'bg-red-100' : 'bg-blue-100',
                         iconColor: isPdf ? '#DC2626' : '#2563EB',
@@ -76,6 +120,43 @@ export default function GeneralGalleryScreen() {
         } finally {
             setLoading(false);
             setRefreshing(false);
+        }
+    };
+
+    const handleViewDocument = async (file: any) => {
+        try {
+            let url = file.document;
+            if (!url) {
+                // Fetch full detail if URL missing
+                const token = await AsyncStorage.getItem('authToken');
+                const res = await apiService.get<{ data: { document: string } }>(`${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${file.id}`, token || '');
+                url = res?.data?.document;
+            }
+
+            if (url) {
+                let fullUrl = url;
+
+                if (!fullUrl.startsWith('http') || fullUrl.includes('localhost') || fullUrl.includes('127.0.0.1')) {
+                    const pathPart = fullUrl.startsWith('http')
+                        ? fullUrl.replace(/^https?:\/\/[^\/]+/, '')
+                        : fullUrl;
+
+                    const apiBase = apiService.baseUrl;
+                    fullUrl = `${apiBase}${pathPart.startsWith('/') ? '' : '/'}${pathPart}`;
+                }
+
+                if (isImageFile(fullUrl)) {
+                    setViewerUrl(fullUrl);
+                    setViewerVisible(true);
+                } else {
+                    await downloadAndShareFile(fullUrl, file.name || 'document');
+                }
+            } else {
+                showToast.error('Document URL not found', 'Error');
+            }
+        } catch (e) {
+            console.error('Error opening document:', e);
+            showToast.error('Failed to open document', 'Error');
         }
     };
 
@@ -123,9 +204,10 @@ export default function GeneralGalleryScreen() {
                         {documents.length > 0 ? (
                             <View style={{ gap: 12 }}>
                                 {documents.map((file) => (
-                                    <View
+                                    <Pressable
                                         key={file.id}
-                                        className={`p-3 rounded-2xl border flex-row items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                                        onPress={() => handleViewDocument(file)}
+                                        className={`p-3 rounded-2xl border flex-row items-center active:opacity-70 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
                                             }`}
                                         style={{ gap: 12 }}
                                     >
@@ -147,7 +229,7 @@ export default function GeneralGalleryScreen() {
                                         <Pressable>
                                             <MaterialIcons name="more-vert" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
                                         </Pressable>
-                                    </View>
+                                    </Pressable>
                                 ))}
                             </View>
                         ) : (
@@ -162,6 +244,11 @@ export default function GeneralGalleryScreen() {
                     </View>
                 )}
             </ScrollView>
+            <ImageViewerModal
+                isVisible={viewerVisible}
+                imageUrl={viewerUrl}
+                onClose={() => setViewerVisible(false)}
+            />
         </SafeAreaView>
     );
 }

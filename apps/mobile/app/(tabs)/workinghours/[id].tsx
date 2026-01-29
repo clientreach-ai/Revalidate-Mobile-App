@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput, Linking, Image, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput, Image, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -9,6 +9,8 @@ import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
+import { downloadAndShareFile, isImageFile } from '@/utils/document';
 import '../../global.css';
 
 interface WorkSession {
@@ -51,6 +53,8 @@ export default function WorkHistoryDetailScreen() {
   const [attachment, setAttachment] = useState<{ name: string, type: string } | null>(null);
   const [hasExistingAttachment, setHasExistingAttachment] = useState(false);
   const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -226,21 +230,38 @@ export default function WorkHistoryDetailScreen() {
   };
 
   const handleViewDocument = async () => {
-    if (attachmentUrl) {
-      const canOpen = await Linking.canOpenURL(attachmentUrl);
-      if (canOpen) {
-        await Linking.openURL(attachmentUrl);
-      } else {
-        showToast.error('Cannot open document', 'Error');
+    try {
+      let url = attachmentUrl;
+      if (!url && session?.documentIds && session.documentIds.length > 0) {
+        const token = await AsyncStorage.getItem('authToken');
+        const res = await apiService.get<{ data: { document: string } }>(`${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${session.documentIds[0]}`, token || '');
+        url = res?.data?.document;
       }
-      return;
-    }
 
-    if (session?.documentIds && session.documentIds.length > 0) {
-      checkAttachment(session.documentIds[0]);
-      showToast.info('Loading document...', 'Please wait');
-    } else {
-      showToast.error('No document attached', 'Error');
+      if (url) {
+        let fullUrl = url;
+
+        if (!fullUrl.startsWith('http') || fullUrl.includes('localhost') || fullUrl.includes('127.0.0.1')) {
+          const pathPart = fullUrl.startsWith('http')
+            ? fullUrl.replace(/^https?:\/\/[^\/]+/, '')
+            : fullUrl;
+
+          const apiBase = apiService.baseUrl;
+          fullUrl = `${apiBase}${pathPart.startsWith('/') ? '' : '/'}${pathPart}`;
+        }
+
+        if (isImageFile(fullUrl)) {
+          setViewerUrl(fullUrl);
+          setViewerVisible(true);
+        } else {
+          await downloadAndShareFile(fullUrl, session?.id ? `work-session-${session.id}` : 'document');
+        }
+      } else {
+        showToast.error('Document URL not found', 'Error');
+      }
+    } catch (e) {
+      console.error('Error opening document:', e);
+      showToast.error('Failed to open document', 'Error');
     }
   };
 
@@ -665,6 +686,11 @@ export default function WorkHistoryDetailScreen() {
           </View>
         </View>
       </Modal>
+      <ImageViewerModal
+        isVisible={viewerVisible}
+        imageUrl={viewerUrl}
+        onClose={() => setViewerVisible(false)}
+      />
     </SafeAreaView>
   );
 }

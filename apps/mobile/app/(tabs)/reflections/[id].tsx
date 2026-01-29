@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput, Linking, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -10,6 +10,8 @@ import { showToast } from '@/utils/toast';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
+import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
+import { downloadAndShareFile, isImageFile } from '@/utils/document';
 import '../../global.css';
 
 interface ReflectionDetail {
@@ -54,6 +56,8 @@ export default function ReflectionDetailScreen() {
     const [fileUri, setFileUri] = useState<string | null>(null);
     const [attachment, setAttachment] = useState<{ name: string, type: string } | null>(null);
     const [hasExistingAttachment, setHasExistingAttachment] = useState(false);
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (id) loadReflectionDetail();
@@ -61,7 +65,7 @@ export default function ReflectionDetailScreen() {
 
     useEffect(() => {
         if (reflection?.documentIds && reflection.documentIds.length > 0) {
-            checkAttachment(reflection.documentIds[0]);
+            checkAttachment(reflection.documentIds[0] as number);
         }
     }, [reflection]);
 
@@ -121,14 +125,38 @@ export default function ReflectionDetailScreen() {
     const isImage = (url: string) => /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(url);
 
     const handleViewDocument = async (docId: number) => {
-        if (attachmentUrl) {
-            const canOpen = await Linking.canOpenURL(attachmentUrl);
-            if (canOpen) await Linking.openURL(attachmentUrl);
-            else showToast.error('Cannot open document', 'Error');
-            return;
+        try {
+            let url = attachmentUrl;
+            if (!url) {
+                const token = await AsyncStorage.getItem('authToken');
+                const res = await apiService.get<{ data: { document: string } }>(`${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${docId}`, token || '');
+                url = res?.data?.document;
+            }
+
+            if (url) {
+                let fullUrl = url;
+                if (!fullUrl.startsWith('http') || fullUrl.includes('localhost') || fullUrl.includes('127.0.0.1')) {
+                    const pathPart = fullUrl.startsWith('http')
+                        ? fullUrl.replace(/^https?:\/\/[^\/]+/, '')
+                        : fullUrl;
+
+                    const apiBase = apiService.baseUrl;
+                    fullUrl = `${apiBase}${pathPart.startsWith('/') ? '' : '/'}${pathPart}`;
+                }
+
+                if (isImageFile(fullUrl)) {
+                    setViewerUrl(fullUrl);
+                    setViewerVisible(true);
+                } else {
+                    await downloadAndShareFile(fullUrl, reflection?.id ? `reflection-${reflection.id}` : 'document');
+                }
+            } else {
+                showToast.error('Document URL not found', 'Error');
+            }
+        } catch (e) {
+            console.error('Error opening document:', e);
+            showToast.error('Failed to open document', 'Error');
         }
-        // Fallback fetch if url missing triggers checkAttachment logic again usually
-        if (reflection?.documentIds[0]) checkAttachment(reflection.documentIds[0]);
     };
 
     const handleEditOpen = () => {
@@ -280,7 +308,7 @@ export default function ReflectionDetailScreen() {
                             </View>
                         )}
 
-                        <Pressable onPress={() => handleViewDocument(reflection.documentIds[0])} className={`bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-600 flex-row items-center active:opacity-70`}>
+                        <Pressable onPress={() => handleViewDocument(reflection.documentIds[0] as number)} className={`bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-600 flex-row items-center active:opacity-70`}>
                             <MaterialIcons name="description" size={24} color="#2B5E9C" />
                             <View className="ml-3">
                                 <Text className={`font-medium ${isDark ? "text-gray-200" : "text-gray-700"}`}>Attached Document</Text>
@@ -372,6 +400,11 @@ export default function ReflectionDetailScreen() {
                     </View>
                 </View>
             </Modal>
+            <ImageViewerModal
+                isVisible={viewerVisible}
+                imageUrl={viewerUrl}
+                onClose={() => setViewerVisible(false)}
+            />
         </SafeAreaView>
     );
 }
