@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { showToast } from '@/utils/toast';
 import '../../global.css';
 
@@ -61,6 +62,7 @@ function SettingItem({
 export default function SettingsScreen() {
   const router = useRouter();
   const { isDark, toggleTheme } = useThemeStore();
+  const { isPremium } = usePremium();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -155,54 +157,56 @@ export default function SettingsScreen() {
           </View>
 
           {/* Notifications */}
-          <View>
-            <Text className={`text-sm font-semibold mb-3 uppercase tracking-wider ${isDark ? "text-gray-400" : "text-slate-500"
-              }`}>
-              Notifications
-            </Text>
-            <View style={{ gap: 12 }}>
-              <View className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
+          {isPremium && (
+            <View>
+              <Text className={`text-sm font-semibold mb-3 uppercase tracking-wider ${isDark ? "text-gray-400" : "text-slate-500"
                 }`}>
-                <View className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center mr-4">
-                  <MaterialIcons name="notifications" size={20} color="#2563EB" />
+                Notifications
+              </Text>
+              <View style={{ gap: 12 }}>
+                <View className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
+                  }`}>
+                  <View className="w-10 h-10 rounded-xl bg-blue-50 items-center justify-center mr-4">
+                    <MaterialIcons name="notifications" size={20} color="#2563EB" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+                      Push Notifications
+                    </Text>
+                    <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                      Receive app notifications
+                    </Text>
+                  </View>
+                  <Switch
+                    value={notificationsEnabled}
+                    onValueChange={setNotificationsEnabled}
+                    trackColor={{ false: '#E5E7EB', true: '#2563EB' }}
+                    thumbColor="#FFFFFF"
+                  />
                 </View>
-                <View className="flex-1">
-                  <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
-                    Push Notifications
-                  </Text>
-                  <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-400"}`}>
-                    Receive app notifications
-                  </Text>
+                <View className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
+                  }`}>
+                  <View className="w-10 h-10 rounded-xl bg-green-50 items-center justify-center mr-4">
+                    <MaterialIcons name="email" size={20} color="#10B981" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+                      Email Notifications
+                    </Text>
+                    <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                      Receive email updates
+                    </Text>
+                  </View>
+                  <Switch
+                    value={emailNotifications}
+                    onValueChange={setEmailNotifications}
+                    trackColor={{ false: '#E5E7EB', true: '#2563EB' }}
+                    thumbColor="#FFFFFF"
+                  />
                 </View>
-                <Switch
-                  value={notificationsEnabled}
-                  onValueChange={setNotificationsEnabled}
-                  trackColor={{ false: '#E5E7EB', true: '#2563EB' }}
-                  thumbColor="#FFFFFF"
-                />
-              </View>
-              <View className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
-                }`}>
-                <View className="w-10 h-10 rounded-xl bg-green-50 items-center justify-center mr-4">
-                  <MaterialIcons name="email" size={20} color="#10B981" />
-                </View>
-                <View className="flex-1">
-                  <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
-                    Email Notifications
-                  </Text>
-                  <Text className={`text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-slate-400"}`}>
-                    Receive email updates
-                  </Text>
-                </View>
-                <Switch
-                  value={emailNotifications}
-                  onValueChange={setEmailNotifications}
-                  trackColor={{ false: '#E5E7EB', true: '#2563EB' }}
-                  thumbColor="#FFFFFF"
-                />
               </View>
             </View>
-          </View>
+          )}
 
           {/* Appearance */}
           <View>

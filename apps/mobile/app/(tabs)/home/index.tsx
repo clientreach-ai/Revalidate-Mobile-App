@@ -878,7 +878,7 @@ export default function DashboardScreen() {
     }
   };
 
-  const PulsingDot = ({ isDark }: { isDark: boolean }) => {
+  const PulsingDot = () => {
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
@@ -930,6 +930,7 @@ export default function DashboardScreen() {
         bgColor: 'bg-green-50',
         iconColor: '#10B981',
         route: '/(tabs)/earings',
+        isPremiumOnly: true,
       },
       {
         icon: 'school' as const,
@@ -949,15 +950,17 @@ export default function DashboardScreen() {
       },
     ];
 
+    const visibleStats = isPremium ? baseStats : baseStats.filter(s => !s.isPremiumOnly);
+
     if (isPremium) {
-      return baseStats.map(stat => ({
+      return visibleStats.map(stat => ({
         ...stat,
         bgColor: 'bg-[#FFD700]/20',
         iconColor: '#D4AF37',
       }));
     }
 
-    return baseStats;
+    return visibleStats;
   };
 
   const statsList = getStats();
@@ -1068,21 +1071,23 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            <Pressable
-              onPress={() => router.push('/(tabs)/notifications')}
-              className="relative"
-            >
-              <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
-                <MaterialIcons name="notifications-active" size={22} color="#FFFFFF" />
-              </View>
-              {unreadNotifications > 0 && (
-                <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-[#2B5F9E] items-center justify-center">
-                  <Text className="text-white text-[10px] font-bold" style={{ lineHeight: 12 }}>
-                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                  </Text>
+            {isPremium && (
+              <Pressable
+                onPress={() => router.push('/(tabs)/notifications')}
+                className="relative"
+              >
+                <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
+                  <MaterialIcons name="notifications-active" size={22} color="#FFFFFF" />
                 </View>
-              )}
-            </Pressable>
+                {unreadNotifications > 0 && (
+                  <View className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-[#2B5F9E] items-center justify-center">
+                    <Text className="text-white text-[10px] font-bold" style={{ lineHeight: 12 }}>
+                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+            )}
           </View>
 
           {revalidationDays !== null && (
@@ -1131,7 +1136,7 @@ export default function DashboardScreen() {
               }`}>
               <View className="flex-row justify-between items-center mb-4">
                 <View className="flex-row items-center gap-2">
-                  {!isPaused && <PulsingDot isDark={isDark} />}
+                  {!isPaused && <PulsingDot />}
                   {isPaused && (
                     <View className="w-2 h-2 rounded-full bg-yellow-500" />
                   )}

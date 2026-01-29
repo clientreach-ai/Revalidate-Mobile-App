@@ -1,15 +1,16 @@
 import { View, Text, ScrollView, Pressable, Modal, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { getProfile } from '@/features/profile/profile.api';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useCalendar } from '@/hooks/useCalendar';
 import { searchUsers } from '@/features/users/users.api';
 import { getCalendarEventById, respondToInvite as apiRespondToInvite } from '@/features/calendar/calendar.api';
-import { CreateCalendarEvent, UpdateCalendarEvent } from '@/features/calendar/calendar.types';
+import { CalendarEvent, CreateCalendarEvent, UpdateCalendarEvent } from '@/features/calendar/calendar.types';
 import '../../global.css';
 import { useRouter } from 'expo-router';
+import { usePremium } from '@/hooks/usePremium';
 
 type EventType = 'all' | 'official' | 'personal';
 
@@ -17,6 +18,7 @@ export default function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
   const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, inviteAttendees } = useCalendar();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [showInvitesModal, setShowInvitesModal] = useState(false);
@@ -185,7 +187,7 @@ export default function CalendarScreen() {
         for (const m of matches) {
           try {
             const res = await getCalendarEventById(String(m.id));
-            const ev = res.data;
+            const ev = res.data as CalendarEvent;
             // find attendee record for this user
             const attendee = (ev.attendees || []).find((a: any) => {
               if (!a) return false;
@@ -400,17 +402,19 @@ export default function CalendarScreen() {
             >
               <MaterialIcons name="add" size={24} color={isDark ? "#D4AF37" : "#2B5F9E"} />
             </Pressable>
-            <Pressable
-              onPress={() => router.push('/(tabs)/notifications')}
-              className={`relative w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                }`}
-            >
-              <MaterialIcons name="notifications" size={20} color="#2B5F9E" />
-              {/* Notification Badge */}
-              <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white items-center justify-center">
-                <Text className="text-white text-[8px] font-bold" style={{ lineHeight: 10 }}>2</Text>
-              </View>
-            </Pressable>
+            {isPremium && (
+              <Pressable
+                onPress={() => router.push('/(tabs)/notifications')}
+                className={`relative w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
+                  }`}
+              >
+                <MaterialIcons name="notifications" size={20} color="#2B5F9E" />
+                {/* Notification Badge */}
+                <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white items-center justify-center">
+                  <Text className="text-white text-[8px] font-bold" style={{ lineHeight: 10 }}>2</Text>
+                </View>
+              </Pressable>
+            )}
             <Pressable
               onPress={() => setShowInvitesModal(true)}
               className={`relative w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
@@ -940,10 +944,10 @@ export default function CalendarScreen() {
                       Date
                     </Text>
                     <Pressable
-                        onPress={() => {
-                          setCurrentDate(eventForm.date);
-                          setShowDatePicker(true);
-                        }}
+                      onPress={() => {
+                        setCurrentDate(eventForm.date);
+                        setShowDatePicker(true);
+                      }}
                       className={`border rounded-2xl px-4 py-4 flex-row items-center justify-between ${isDark
                         ? "bg-slate-700 border-slate-600 active:bg-slate-600"
                         : "bg-white border-slate-200 active:bg-slate-50"

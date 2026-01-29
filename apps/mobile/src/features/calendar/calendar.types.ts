@@ -1,3 +1,12 @@
+export interface CalendarAttendee {
+  id: string;
+  userId?: string;
+  email: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CalendarEvent {
   id: string;
   type: 'official' | 'personal';
@@ -9,6 +18,7 @@ export interface CalendarEvent {
   endTime: string; // HH:MM
   location: string;
   invite: string;
+  attendees?: CalendarAttendee[];
   createdAt: string;
   updatedAt: string;
 }

@@ -50,8 +50,6 @@ export default function EarningsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState<EarningsEntry[]>([]);
-  const [totalEarnings, setTotalEarnings] = useState(0);
-  const [percentageChange, setPercentageChange] = useState(0);
   const [hourlyRate, setHourlyRate] = useState(35); // Default hourly rate
   const [isRateModalVisible, setIsRateModalVisible] = useState(false);
   const [isUpdatingRate, setIsUpdatingRate] = useState(false);
@@ -147,52 +145,11 @@ export default function EarningsScreen() {
         );
 
         setEarnings(earningsEntries);
-
-        // Calculate total earnings
-        const total = earningsEntries.reduce((sum, entry) => {
-          const amount = parseFloat(entry.amount.replace('£', '').replace(',', ''));
-          return sum + amount;
-        }, 0);
-        setTotalEarnings(total);
-
-        // Calculate percentage change (compare last month to previous month)
-        const now = new Date();
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-
-        const lastMonthEarnings = earningsEntries
-          .filter(e => {
-            const entryDate = new Date(e.startTime);
-            return entryDate >= lastMonth && entryDate < now;
-          })
-          .reduce((sum, entry) => {
-            const amount = parseFloat(entry.amount.replace('£', '').replace(',', ''));
-            return sum + amount;
-          }, 0);
-
-        const previousMonthEarnings = earningsEntries
-          .filter(e => {
-            const entryDate = new Date(e.startTime);
-            return entryDate >= twoMonthsAgo && entryDate < lastMonth;
-          })
-          .reduce((sum, entry) => {
-            const amount = parseFloat(entry.amount.replace('£', '').replace(',', ''));
-            return sum + amount;
-          }, 0);
-
-        if (previousMonthEarnings > 0) {
-          const change = ((lastMonthEarnings - previousMonthEarnings) / previousMonthEarnings) * 100;
-          setPercentageChange(Math.round(change));
-        } else {
-          setPercentageChange(0);
-        }
       }
     } catch (error: any) {
       console.error('Error loading earnings:', error);
       showToast.error(error.message || 'Failed to load earnings', 'Error');
       setEarnings([]);
-      setTotalEarnings(0);
-      setPercentageChange(0);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -331,52 +288,6 @@ export default function EarningsScreen() {
     return months.indexOf(b.month) - months.indexOf(a.month);
   });
 
-  // Calculate monthly performance data for bar chart (last 6 months)
-  const calculateMonthlyData = () => {
-    const now = new Date();
-    const months = [];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    // Get last 6 months
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthIndex = date.getMonth();
-      const monthName = monthNames[monthIndex] || 'Unknown';
-
-      // Calculate earnings for this month
-      const monthEarnings = earnings
-        .filter(e => {
-          const entryDate = new Date(e.startTime);
-          return entryDate.getMonth() === date.getMonth() &&
-            entryDate.getFullYear() === date.getFullYear();
-        })
-        .reduce((sum, entry) => {
-          const amount = parseFloat(entry.amount.replace('£', '').replace(',', ''));
-          return sum + amount;
-        }, 0);
-
-      months.push({
-        month: monthName,
-        earnings: monthEarnings,
-        isCurrent: i === 0,
-      });
-    }
-
-    // Find max earnings for scaling
-    const maxEarnings = Math.max(...months.map(m => m.earnings), 1);
-
-    // Calculate heights as percentages
-    return months.map(m => ({
-      month: m.month,
-      height: maxEarnings > 0 ? (m.earnings / maxEarnings) * 100 : 0,
-      isCurrent: m.isCurrent,
-      earnings: m.earnings,
-    }));
-  };
-
-  const monthlyData = calculateMonthlyData();
-
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       {/* Header */}
@@ -407,74 +318,6 @@ export default function EarningsScreen() {
           />
         }
       >
-        {/* Total Earnings Card */}
-        <View className="p-4">
-          <View className={`flex-col gap-2 rounded-xl p-6 shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-zinc-100"
-            }`}>
-            <Text className={`text-sm font-medium uppercase tracking-wider ${isDark ? "text-gray-400" : "text-[#687482]"
-              }`}>
-              Total Earnings
-            </Text>
-            <View className="flex-row items-baseline" style={{ gap: 8 }}>
-              <Text className="text-[#00C853] tracking-tight text-3xl font-bold">
-                £{totalEarnings.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </Text>
-              {percentageChange !== 0 && (
-                <View className={`flex-row items-center px-2 py-0.5 rounded-full ${percentageChange > 0 ? 'bg-[#00C853]/10' : 'bg-red-500/10'
-                  }`}>
-                  <MaterialIcons
-                    name={percentageChange > 0 ? "trending-up" : "trending-down"}
-                    size={14}
-                    color={percentageChange > 0 ? "#00C853" : "#EF4444"}
-                  />
-                  <Text className={`text-xs font-bold ml-1 ${percentageChange > 0 ? "text-[#00C853]" : "text-red-500"
-                    }`}>
-                    {percentageChange > 0 ? '+' : ''}{percentageChange}%
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-[#687482]"}`}>
-              {loading ? 'Loading...' : `Updated ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`}
-            </Text>
-          </View>
-        </View>
-
-        {/* Monthly Performance Card */}
-        <View className="px-4 py-2">
-          <View className={`flex-col gap-4 rounded-xl p-6 shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-zinc-100"
-            }`}>
-            <View className="flex-row justify-between items-center">
-              <View>
-                <Text className={`text-base font-bold ${isDark ? "text-white" : "text-[#121417]"}`}>
-                  Monthly Performance
-                </Text>
-                <Text className={`text-sm font-normal mt-0.5 ${isDark ? "text-gray-400" : "text-[#687482]"}`}>
-                  Last 6 Months
-                </Text>
-              </View>
-              <MaterialIcons name="info" size={20} color={isDark ? "#9CA3AF" : "#687482"} />
-            </View>
-
-            {/* Bar Chart */}
-            <View className="h-40 flex-row items-end justify-center" style={{ gap: 12 }}>
-              {monthlyData.map((data, index) => (
-                <View key={index} className="flex-1 flex-col justify-end items-center" style={{ gap: 4 }}>
-                  <View
-                    className={`w-full rounded-t-sm ${data.isCurrent ? 'bg-[#2B5E9C]' : 'bg-[#2B5E9C]/20'
-                      }`}
-                    style={{ height: `${data.height}%` }}
-                  />
-                  <Text className={`text-[11px] font-bold text-center ${data.isCurrent ? 'text-[#2B5E9C]' : (isDark ? 'text-gray-400' : 'text-[#687482]')
-                    }`}>
-                    {data.month}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
         {/* Action Buttons */}
         <View className="flex-row gap-3 px-4 pt-6 pb-2">
           <Pressable
