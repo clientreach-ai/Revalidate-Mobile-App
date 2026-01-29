@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeStore } from '@/features/theme/theme.store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCalendarEventById } from '@/features/calendar/calendar.api';
 import { searchUsers } from '@/features/users/users.api';
 import { useCalendar } from '@/hooks/useCalendar';
+import { showToast } from '@/utils/toast';
 import '../../global.css';
 
 export default function EventDetail() {
@@ -20,6 +22,10 @@ export default function EventDetail() {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<Array<{ id: string; name?: string; email?: string }>>([]);
   const [isInviting, setIsInviting] = useState(false);
+  const [isResponding, setIsResponding] = useState(false);
+  const [currentAttendee, setCurrentAttendee] = useState<any>(null);
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [addToCpd, setAddToCpd] = useState(true);
 
   const { inviteAttendees } = useCalendar();
 
@@ -32,7 +38,24 @@ export default function EventDetail() {
       setLoading(true);
       try {
         const res = await getCalendarEventById(String(id));
-        if (mounted) setEvent(res.data);
+        if (mounted) {
+          setEvent(res.data);
+
+          // Find if current user is an attendee
+          const userDataStr = await AsyncStorage.getItem('userData');
+          if (userDataStr) {
+            const userData = JSON.parse(userDataStr);
+            const attendee = res.data.attendees?.find((a: any) =>
+              String(a.userId) === String(userData.id) || a.email === userData.email
+            );
+            setCurrentAttendee(attendee);
+
+            // Auto open modal if user is pending and coming from notification
+            if (params.showAcceptModal === 'true' && attendee?.status === 'pending') {
+              setShowAcceptModal(true);
+            }
+          }
+        }
       } catch (e: any) {
         console.error('Failed to load event', e);
         if (mounted) setError(e.message || 'Failed to load event');
@@ -41,7 +64,7 @@ export default function EventDetail() {
       }
     })();
     return () => { mounted = false; };
-  }, [id]);
+  }, [id, params.showAcceptModal]);
 
   // Debounced user search
   useEffect(() => {
@@ -70,6 +93,73 @@ export default function EventDetail() {
       clearTimeout(timer);
     };
   }, [searchQuery]);
+
+  const handleResponse = async (status: 'accepted' | 'declined') => {
+    if (!currentAttendee || !id) return;
+    setIsResponding(true);
+    try {
+      const { respondToInvite: respondApi } = await import('@/features/calendar/calendar.api');
+      const token = await AsyncStorage.getItem('authToken');
+
+      await respondApi(String(id), String(currentAttendee.id), status);
+
+      // Handle CPD Recording
+      if (status === 'accepted' && addToCpd && event && token) {
+        try {
+          const { apiService: api } = await import('@/services/api');
+          // Estimate duration from start/end time if possible, else default to 60m
+          // Simple duration calculation if format is "HH:MM"
+          let duration = 60;
+          if (event.startTime && event.endTime) {
+            const [sh, sm] = event.startTime.split(':').map(Number);
+            const [eh, em] = event.endTime.split(':').map(Number);
+            if (!isNaN(sh) && !isNaN(eh)) {
+              duration = (eh * 60 + em) - (sh * 60 + sm);
+              if (duration <= 0) duration = 60;
+            }
+          }
+
+          await api.post('/api/v1/cpd-hours', {
+            training_name: event.title,
+            activity_date: event.date,
+            duration_minutes: duration,
+            activity_type: 'participatory',
+            learning_method: 'course attendance',
+            cpd_learning_type: 'formal and educational',
+          }, token);
+          console.log('Automatically recorded CPD for event');
+        } catch (cpdErr) {
+          console.warn('Failed to auto-record CPD:', cpdErr);
+        }
+      }
+
+      // Refresh event
+      const res = await getCalendarEventById(String(id));
+      setEvent(res.data);
+
+      // Update current attendee status
+      const userDataStr = await AsyncStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        const attendee = res.data.attendees?.find((a: any) =>
+          String(a.userId) === String(userData.id) || a.email === userData.email
+        );
+        setCurrentAttendee(attendee);
+      }
+
+      const msg = status === 'accepted'
+        ? (addToCpd ? 'Accepted and added to CPD portfolio.' : 'Invitation accepted.')
+        : 'You have declined this invitation.';
+
+      showToast.success(msg, 'Response Sent');
+      setShowAcceptModal(false);
+    } catch (e: any) {
+      console.error('Failed to respond to invite', e);
+      showToast.error(e.message || 'Failed to update response', 'Error');
+    } finally {
+      setIsResponding(false);
+    }
+  };
 
   if (!id) {
     return (
@@ -103,11 +193,94 @@ export default function EventDetail() {
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background-light'}`}>
+      <Modal
+        visible={showAcceptModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAcceptModal(false)}
+      >
+        <View className="flex-1 bg-black/60 items-center justify-center p-6">
+          <View className={`w-full max-w-sm rounded-[32px] p-8 ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white'}`}>
+            <View className="w-16 h-16 rounded-full bg-blue-100 items-center justify-center mb-6 mx-auto">
+              <Text style={{ fontSize: 32 }}>📅</Text>
+            </View>
+            <Text className={`text-xl font-bold text-center mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Event Invitation</Text>
+            <Text className={`text-center mb-8 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+              You have been invited to "{event.title}". Would you like to attend?
+            </Text>
+            <View className="mb-8 p-4 rounded-2xl bg-slate-50 flex-row items-center" style={{ gap: 12 }}>
+              <Pressable
+                onPress={() => setAddToCpd(!addToCpd)}
+                className={`w-6 h-6 rounded border items-center justify-center ${addToCpd ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}
+              >
+                {addToCpd && <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>✓</Text>}
+              </Pressable>
+              <View className="flex-1">
+                <Text className="text-slate-700 font-bold text-sm">Add to CPD Portfolio</Text>
+                <Text className="text-slate-500 text-[10px]">Track hours automatically for revalidation</Text>
+              </View>
+            </View>
+
+            <View className="gap-3">
+              <Pressable
+                onPress={() => handleResponse('accepted')}
+                disabled={isResponding}
+                className="w-full py-4 rounded-2xl bg-blue-600 items-center justify-center active:opacity-90"
+              >
+                {isResponding ? <ActivityIndicator size="small" color="white" /> : <Text className="text-white font-bold text-base">Accept Invitation</Text>}
+              </Pressable>
+
+              <Pressable
+                onPress={() => handleResponse('declined')}
+                disabled={isResponding}
+                className={`w-full py-4 rounded-2xl items-center justify-center active:bg-slate-100 ${isDark ? 'border border-slate-700' : 'bg-slate-50'}`}
+              >
+                <Text className={`font-semibold ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>Decline</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setShowAcceptModal(false)}
+                className="mt-2 items-center"
+              >
+                <Text className="text-slate-400 text-sm">Decide Later</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <View className="mb-4">
           <Text className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{event.title}</Text>
           <Text className={`mt-1 ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>{event.date} {event.startTime ? `• ${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}` : ''}</Text>
         </View>
+
+        {currentAttendee && currentAttendee.status === 'pending' && !showAcceptModal && (
+          <Pressable
+            onPress={() => setShowAcceptModal(true)}
+            className={`mb-6 p-4 rounded-3xl border flex-row items-center justify-between ${isDark ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-100'}`}
+          >
+            <View className="flex-1">
+              <Text className={`font-bold ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>Invitation Pending</Text>
+              <Text className={`text-xs ${isDark ? 'text-blue-200/80' : 'text-blue-600'}`}>Tap to respond to this invite</Text>
+            </View>
+            <View className="bg-blue-600 px-4 py-2 rounded-xl">
+              <Text className="text-white text-xs font-bold">Review</Text>
+            </View>
+          </Pressable>
+        )}
+
+        {currentAttendee && currentAttendee.status === 'accepted' && (
+          <View className="mb-6 flex-row items-center p-3 rounded-2xl bg-green-50 border border-green-100" style={{ gap: 10 }}>
+            <View className="w-6 h-6 rounded-full bg-green-500 items-center justify-center">
+              <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✓</Text>
+            </View>
+            <Text className="text-green-700 font-medium">You are attending this event</Text>
+            <Pressable onPress={() => handleResponse('declined')} className="ml-auto">
+              <Text className="text-slate-400 text-xs">Leave</Text>
+            </Pressable>
+          </View>
+        )}
 
         <View className="mb-4">
           <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Location</Text>
@@ -124,7 +297,6 @@ export default function EventDetail() {
           <Text className={`${isDark ? 'text-white' : 'text-slate-800'}`}>{event.invite || '—'}</Text>
         </View>
 
-        {/* Invite Users */}
         <View className="mb-6">
           <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Invite Users</Text>
           <TextInput
@@ -166,7 +338,7 @@ export default function EventDetail() {
                       setSearchQuery('');
                       setSearchResults([]);
                     }}
-                    className={`p-3 ${idx < searchResults.slice(0,6).length - 1 ? 'border-b' : ''} ${isDark ? 'border-slate-700' : 'border-slate-100'}`}
+                    className={`p-3 ${idx < searchResults.slice(0, 6).length - 1 ? 'border-b' : ''} ${isDark ? 'border-slate-700' : 'border-slate-100'}`}
                   >
                     <Text className={isDark ? 'text-white' : 'text-slate-800'}>{u.name} {u.email ? `· ${u.email}` : ''}</Text>
                   </Pressable>
@@ -182,7 +354,6 @@ export default function EventDetail() {
               try {
                 const attendees = selectedUsers.map(u => ({ userId: u.id }));
                 await inviteAttendees(event.id, attendees);
-                // Refresh event
                 const res = await getCalendarEventById(String(event.id));
                 setEvent(res.data);
                 setSelectedUsers([]);
@@ -203,9 +374,16 @@ export default function EventDetail() {
           <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Attendees</Text>
           {event.attendees && event.attendees.length > 0 ? (
             event.attendees.map((a: any) => (
-              <View key={a.id} className="p-3 rounded-lg mb-2 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}">
+              <View key={a.id} className={`p-3 rounded-lg mb-2 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
                 <Text className={`${isDark ? 'text-white' : 'text-slate-800'}`}>{a.name || a.email}</Text>
-                {a.status && <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>{a.status}</Text>}
+                {a.status && (
+                  <Text className={`text-xs ${a.status === 'accepted' ? 'text-green-500' :
+                    a.status === 'declined' ? 'text-red-400' :
+                      isDark ? 'text-gray-400' : 'text-slate-500'
+                    }`}>
+                    {a.status}
+                  </Text>
+                )}
               </View>
             ))
           ) : (

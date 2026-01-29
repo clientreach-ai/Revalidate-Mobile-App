@@ -91,7 +91,7 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="gallery/index"
+        name="gallery"
         options={{
           title: 'Gallery',
           tabBarIcon: ({ focused, color }) => (
@@ -132,7 +132,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="notifications/index" options={{ href: null }} />
       <Tabs.Screen name="calendar/all-events" options={{ href: null }} />
       <Tabs.Screen name="calendar/[id]" options={{ href: null }} />
-      <Tabs.Screen name="gallery/general" options={{ href: null }} />
       <Tabs.Screen name="appraisal/index" options={{ href: null }} />
       <Tabs.Screen name="appraisal/[id]" options={{ href: null }} />
     </Tabs>

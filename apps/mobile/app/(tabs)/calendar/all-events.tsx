@@ -287,7 +287,7 @@ export default function AllEventsScreen() {
             {filteredEvents.map((event) => (
               <Pressable
                 key={event.id}
-                onPress={() => router.push({ pathname: '/(tabs)/calendar/[id]', params: { id: String(event.id) } })}
+                onPress={() => router.push({ pathname: '/calendar/[id]', params: { id: String(event.id) } })}
                 className={`p-4 rounded-2xl border shadow-sm ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
                   }`}
                 style={{ gap: 16 }}

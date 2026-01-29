@@ -22,6 +22,20 @@ if (Constants.appOwnership !== 'expo') {
             shouldShowList: true,
         }),
     });
+
+    // Register notification categories for interactive actions
+    Notifications.setNotificationCategoryAsync('calendar_invite', [
+        {
+            identifier: 'accept',
+            buttonTitle: 'Accept',
+            options: { opensAppToForeground: false },
+        },
+        {
+            identifier: 'decline',
+            buttonTitle: 'Decline',
+            options: { opensAppToForeground: false },
+        },
+    ]);
 }
 
 /**

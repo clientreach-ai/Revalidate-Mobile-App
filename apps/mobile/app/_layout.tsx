@@ -1,17 +1,18 @@
 import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, Platform } from 'react-native';
 import { ThemeProvider } from '@/features/theme/ThemeProvider';
 import { useThemeStore } from '@/features/theme/theme.store';
 import Toast from 'react-native-toast-message';
 import { initializeSyncService, cleanupSyncService } from '@/services/sync-service';
+import { addNotificationResponseReceivedListener } from '@/features/notifications/notifications.service';
 import "./global.css";
 
 // ErrorUtils is available globally in React Native
 declare const ErrorUtils: {
-    getGlobalHandler: () => ((error: Error, isFatal?: boolean) => void) | null;
-    setGlobalHandler: (handler: (error: Error, isFatal?: boolean) => void) => void;
+  getGlobalHandler: () => ((error: Error, isFatal?: boolean) => void) | null;
+  setGlobalHandler: (handler: (error: Error, isFatal?: boolean) => void) => void;
 };
 
 // Safe Stripe import - only load native Stripe on native platforms
@@ -34,7 +35,7 @@ if (Platform.OS !== 'web') {
     }
   } catch (error: any) {
     // Provide a fallback component that just passes children through
-    StripeProvider = ({ children, publishableKey }: any) => <>{children}</>;
+    StripeProvider = ({ children }: any) => <>{children}</>;
   }
 } else {
   // Web fallback: no native Stripe available
@@ -206,51 +207,72 @@ const toastConfig = {
 };
 
 function StatusBarWrapper() {
-    const { isDark } = useThemeStore();
-    
-    return <StatusBar style={isDark ? "light" : "dark"} />;
+  const { isDark } = useThemeStore();
+
+  return <StatusBar style={isDark ? "light" : "dark"} />;
 }
 
 export default function RootLayout() {
-    useEffect(() => {
-        // Handle unhandled promise rejections (suppress non-critical keep-awake errors)
-        const originalErrorHandler = ErrorUtils.getGlobalHandler();
-        
-        ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-            const errorMessage = error?.message || error?.toString() || '';
-            if (errorMessage.includes('Unable to activate keep awake')) {
-                // Suppress this non-critical Expo development tool error
-                // This error occurs when Expo tries to keep the screen awake during development
-                // but the native module isn't available or properly configured
-                return;
-            }
-            // Call original error handler for other errors
-            if (originalErrorHandler) {
-                originalErrorHandler(error, isFatal);
-            }
-        });
+  const router = useRouter();
+  useEffect(() => {
+    // Handle unhandled promise rejections (suppress non-critical keep-awake errors)
+    const originalErrorHandler = ErrorUtils.getGlobalHandler();
 
-        initializeSyncService();
-        
-        return () => {
-            ErrorUtils.setGlobalHandler(originalErrorHandler);
-            cleanupSyncService();
-        };
-    }, []);
+    ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+      const errorMessage = error?.message || error?.toString() || '';
+      if (errorMessage.includes('Unable to activate keep awake')) {
+        // Suppress this non-critical Expo development tool error
+        return;
+      }
+      // Call original error handler for other errors
+      if (originalErrorHandler) {
+        originalErrorHandler(error, isFatal);
+      }
+    });
 
-    return (
-        <StripeProvider 
-            publishableKey={isStripeAvailable ? STRIPE_PUBLISHABLE_KEY : ''}
-        >
-            <ThemeProvider>
-                <StatusBarWrapper />
-                <Stack
-                    screenOptions={{
-                        headerShown: false,
-                    }}
-                />
-                <Toast config={toastConfig} />
-            </ThemeProvider>
-        </StripeProvider>
-    );
+    // Listen for notification interactions (taps)
+    // This handles navigation when user taps a notification while app is foreground/background
+    const subscription = addNotificationResponseReceivedListener(response => {
+      try {
+        const data = response.notification.request.content.data;
+        // Check if this is a calendar invitation
+        if (data?.type === 'calendar_invite' && data?.eventId) {
+          console.log('Received calendar invite notification, navigating to event:', data.eventId);
+          // Navigate to event details and trigger accept/decline modal
+          router.push({
+            pathname: '/calendar/[id]',
+            params: { id: String(data.eventId), showAcceptModal: 'true' }
+          } as any);
+        }
+      } catch (err) {
+        console.error('Error handling notification response:', err);
+      }
+    });
+
+    initializeSyncService();
+
+    return () => {
+      if (originalErrorHandler) {
+        ErrorUtils.setGlobalHandler(originalErrorHandler);
+      }
+      cleanupSyncService();
+      subscription.remove();
+    };
+  }, []);
+
+  return (
+    <StripeProvider
+      publishableKey={isStripeAvailable ? STRIPE_PUBLISHABLE_KEY : ''}
+    >
+      <ThemeProvider>
+        <StatusBarWrapper />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        />
+        <Toast config={toastConfig} />
+      </ThemeProvider>
+    </StripeProvider>
+  );
 }

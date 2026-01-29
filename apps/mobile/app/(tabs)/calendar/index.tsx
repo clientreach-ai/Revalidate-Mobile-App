@@ -565,7 +565,7 @@ export default function CalendarScreen() {
             filteredEvents.map((event) => (
               <Pressable
                 key={event.id}
-                onPress={() => router.push({ pathname: '/(tabs)/calendar/[id]', params: { id: String(event.id) } })}
+                onPress={() => router.push({ pathname: '/calendar/[id]', params: { id: String(event.id), from: '/calendar' } })}
                 className={`p-4 rounded-2xl border shadow-sm flex-row items-start ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
                   }`}
                 style={{ gap: 16 }}
@@ -656,7 +656,7 @@ export default function CalendarScreen() {
                 className={`p-5 rounded-2xl border shadow-sm ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
                   }`}
                 onPress={() => {
-                  router.push('/(tabs)/calendar/all-events');
+                  router.push('/calendar/all-events');
                 }}
               >
                 <View className="flex-row items-center justify-between">
@@ -769,7 +769,7 @@ export default function CalendarScreen() {
                         <Pressable
                           onPress={() => {
                             setShowInvitesModal(false);
-                            router.push({ pathname: '/(tabs)/calendar/[id]', params: { id: String(ev.id) } });
+                            router.push({ pathname: '/calendar/[id]', params: { id: String(ev.id), from: '/calendar' } });
                           }}
                           className="px-4 py-2 rounded-lg border"
                         >

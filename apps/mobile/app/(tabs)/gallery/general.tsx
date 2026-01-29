@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,12 @@ import { showToast } from '@/utils/toast';
 import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
 import { downloadAndShareFile, isImageFile } from '@/utils/document';
 import '../../global.css';
+
+const { width } = Dimensions.get('window');
+const COLUMN_COUNT = 3;
+const CONTAINER_PADDING = 24;
+const GAP = 12;
+const ITEM_WIDTH = (width - (CONTAINER_PADDING * 2) - (GAP * (COLUMN_COUNT - 1))) / COLUMN_COUNT;
 
 interface ApiDocument {
     id: number;
@@ -68,6 +74,18 @@ export default function GeneralGalleryScreen() {
         'Appraisal'
     ].map(n => normalize(n));
 
+    const getFullUrl = (url: string) => {
+        if (!url) return '';
+        if (url.startsWith('http') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+            return url;
+        }
+        const pathPart = url.startsWith('http')
+            ? url.replace(/^https?:\/\/[^\/]+/, '')
+            : url;
+        const apiBase = apiService.baseUrl;
+        return `${apiBase}${pathPart.startsWith('/') ? '' : '/'}${pathPart}`;
+    };
+
     const loadDocuments = async () => {
         try {
             setLoading(true);
@@ -77,28 +95,24 @@ export default function GeneralGalleryScreen() {
                 return;
             }
 
-            // Fetch ALL documents and filter locally to match Gallery index logic
             const response = await apiService.get<{
                 success: boolean;
                 data: ApiDocument[];
             }>(`${API_ENDPOINTS.DOCUMENTS.LIST}?limit=1000`, token);
 
             if (response.success && response.data) {
-                const filtered = response.data.filter((apiDoc) => {
+                const mapped = response.data.map((apiDoc) => {
+                    const fullUrl = apiDoc.document ? getFullUrl(apiDoc.document) : '';
+                    const isImg = isImageFile(fullUrl || apiDoc.name) ||
+                        apiDoc.type === 'image' ||
+                        apiDoc.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i) !== null;
+                    const isPdf = (apiDoc.type === 'file' || apiDoc.name.toLowerCase().endsWith('.pdf'));
+
                     const docCat = apiDoc.category || '';
                     const normCat = normalize(docCat);
                     const mappedTitleToken = categoryMap[normCat] || docCat;
                     const normMapped = normalize(mappedTitleToken);
-
-                    // Check if it belongs to any other specific category
-                    const matchesAnyOther = otherCategoryNames.some(otherNorm => normMapped === otherNorm);
-
-                    // If it doesn't match any other, or has no category, it's "General"
-                    return !matchesAnyOther || normCat === '' || normMapped === normalize('General Gallery');
-                });
-
-                const mapped = filtered.map((apiDoc) => {
-                    const isPdf = (apiDoc.type === 'file' || apiDoc.name.toLowerCase().endsWith('.pdf'));
+                    const isGeneral = normCat === '' || normMapped === normalize('General Gallery');
 
                     return {
                         id: String(apiDoc.id),
@@ -106,13 +120,21 @@ export default function GeneralGalleryScreen() {
                         category: apiDoc.category || 'General',
                         size: apiDoc.size || '0.0 MB',
                         document: apiDoc.document,
-                        icon: (isPdf ? 'picture-as-pdf' : 'image') as keyof typeof MaterialIcons.glyphMap,
-                        iconBgColor: isPdf ? 'bg-red-100' : 'bg-blue-100',
-                        iconColor: isPdf ? '#DC2626' : '#2563EB',
+                        fullUrl: fullUrl,
+                        isImage: isImg,
+                        isGeneral: isGeneral,
+                        icon: (isPdf ? 'picture-as-pdf' : 'insert-drive-file') as keyof typeof MaterialIcons.glyphMap,
                         created_at: apiDoc.created_at
                     };
                 });
-                setDocuments(mapped);
+
+                // FILTER: Show if it's an image OR it's specifically "General" content
+                const filtered = mapped.filter(doc => doc.isImage || doc.isGeneral);
+
+                // Sort by date newest first
+                filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+                setDocuments(filtered);
             }
         } catch (error: any) {
             console.error('Error loading documents:', error);
@@ -125,31 +147,13 @@ export default function GeneralGalleryScreen() {
 
     const handleViewDocument = async (file: any) => {
         try {
-            let url = file.document;
-            if (!url) {
-                // Fetch full detail if URL missing
-                const token = await AsyncStorage.getItem('authToken');
-                const res = await apiService.get<{ data: { document: string } }>(`${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${file.id}`, token || '');
-                url = res?.data?.document;
-            }
-
+            const url = file.fullUrl;
             if (url) {
-                let fullUrl = url;
-
-                if (!fullUrl.startsWith('http') || fullUrl.includes('localhost') || fullUrl.includes('127.0.0.1')) {
-                    const pathPart = fullUrl.startsWith('http')
-                        ? fullUrl.replace(/^https?:\/\/[^\/]+/, '')
-                        : fullUrl;
-
-                    const apiBase = apiService.baseUrl;
-                    fullUrl = `${apiBase}${pathPart.startsWith('/') ? '' : '/'}${pathPart}`;
-                }
-
-                if (isImageFile(fullUrl)) {
-                    setViewerUrl(fullUrl);
+                if (file.isImage) {
+                    setViewerUrl(url);
                     setViewerVisible(true);
                 } else {
-                    await downloadAndShareFile(fullUrl, file.name || 'document');
+                    await downloadAndShareFile(url, file.name || 'document');
                 }
             } else {
                 showToast.error('Document URL not found', 'Error');
@@ -167,9 +171,22 @@ export default function GeneralGalleryScreen() {
 
     return (
         <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
+            <View className="flex-row items-center justify-between px-6 pt-4 mb-2">
+                <Pressable
+                    onPress={() => router.back()}
+                    className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${isDark ? "bg-slate-800" : "bg-white"}`}
+                >
+                    <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#1F2937"} />
+                </Pressable>
+                <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
+                    General Gallery
+                </Text>
+                <View className="w-10" />
+            </View>
+
             <ScrollView
                 className="flex-1"
-                contentContainerStyle={{ paddingBottom: 100 }}
+                contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: CONTAINER_PADDING }}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
@@ -180,64 +197,48 @@ export default function GeneralGalleryScreen() {
                     />
                 }
             >
-                {/* Header */}
-                <View className="flex-row items-center justify-between mb-6 px-6 pt-4">
-                    <Pressable
-                        onPress={() => router.back()}
-                        className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
-                            }`}
-                    >
-                        <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#1F2937"} />
-                    </Pressable>
-                    <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
-                        General Gallery
-                    </Text>
-                    <View className="w-10" />
-                </View>
-
                 {loading && !refreshing ? (
                     <View className="flex-1 items-center justify-center py-20">
                         <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
                     </View>
                 ) : (
-                    <View className="px-6 pb-4">
+                    <View className="flex-row flex-wrap" style={{ gap: GAP, marginTop: 16 }}>
                         {documents.length > 0 ? (
-                            <View style={{ gap: 12 }}>
-                                {documents.map((file) => (
-                                    <Pressable
-                                        key={file.id}
-                                        onPress={() => handleViewDocument(file)}
-                                        className={`p-3 rounded-2xl border flex-row items-center active:opacity-70 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                                            }`}
-                                        style={{ gap: 12 }}
-                                    >
-                                        <View className={`w-10 h-10 ${file.iconBgColor} rounded-xl items-center justify-center`}>
+                            documents.map((file) => (
+                                <Pressable
+                                    key={file.id}
+                                    onPress={() => handleViewDocument(file)}
+                                    style={{ width: ITEM_WIDTH, height: ITEM_WIDTH }}
+                                    className={`rounded-2xl overflow-hidden border shadow-sm active:opacity-80 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}
+                                >
+                                    {file.isImage && file.fullUrl ? (
+                                        <Image
+                                            source={{ uri: file.fullUrl }}
+                                            className="w-full h-full"
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View className="flex-1 items-center justify-center p-4">
                                             <MaterialIcons
                                                 name={file.icon}
-                                                size={20}
-                                                color={file.iconColor}
+                                                size={32}
+                                                color={file.icon === 'picture-as-pdf' ? '#EF4444' : (isDark ? '#6B7280' : '#94A3B8')}
                                             />
-                                        </View>
-                                        <View className="flex-1 min-w-0">
-                                            <Text className={`text-sm font-semibold ${isDark ? "text-white" : "text-slate-800"}`} numberOfLines={1}>
+                                            <Text
+                                                className={`text-[9px] mt-2 text-center font-medium ${isDark ? 'text-gray-400' : 'text-slate-500'}`}
+                                                numberOfLines={2}
+                                            >
                                                 {file.name}
                                             </Text>
-                                            <Text className={`text-[11px] mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
-                                                {file.category} • {file.size}
-                                            </Text>
                                         </View>
-                                        <Pressable>
-                                            <MaterialIcons name="more-vert" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
-                                        </Pressable>
-                                    </Pressable>
-                                ))}
-                            </View>
+                                    )}
+                                </Pressable>
+                            ))
                         ) : (
-                            <View className={`p-6 rounded-2xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                                }`}>
-                                <MaterialIcons name="folder-open" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
-                                <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
-                                    No general documents found
+                            <View className={`w-full py-20 rounded-3xl border items-center ${isDark ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"}`}>
+                                <MaterialIcons name="photo-library" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
+                                <Text className={`mt-4 text-center font-medium ${isDark ? "text-gray-400" : "text-slate-400"}`}>
+                                    No photos or documents found
                                 </Text>
                             </View>
                         )}
