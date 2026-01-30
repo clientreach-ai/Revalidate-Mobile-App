@@ -18,12 +18,18 @@ export const listNotifications = asyncHandler(async (req: Request, res: Response
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
 
     const [rows] = await pool.execute(
-      'SELECT id, title, message, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+      'SELECT id, title, message, type, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
       [userId, limit]
     ) as any;
 
     const data = Array.isArray(rows)
-      ? rows.map((r: any) => ({ id: r.id, title: r.title, body: r.message, createdAt: r.created_at }))
+      ? rows.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        body: r.message,
+        type: r.type,
+        createdAt: r.created_at
+      }))
       : [];
 
     return res.json({ success: true, data });

@@ -116,7 +116,22 @@ export async function getCpdHoursById(
     return null;
   }
 
-  return results[0] as CpdHours;
+  const row = results[0];
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    activity_date: row.date,
+    duration_minutes: row.duration_minutes,
+    training_name: row.topic,
+    activity_type: parseInt(row.participatory_hours) > 0 ? 'participatory' : 'non-participatory',
+    learning_method: row.method,
+    cpd_learning_type: row.learning_type,
+    link_to_standard: row.link_code,
+    link_to_standard_proficiency: row.standards_proficiency,
+    document_ids: row.document,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  } as CpdHours;
 }
 
 /**

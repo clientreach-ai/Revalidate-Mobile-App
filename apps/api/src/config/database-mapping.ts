@@ -22,6 +22,8 @@ export const USER_COLUMN_MAPPING = {
   subscription_status: 'subscription_status',
   trial_ends_at: 'trial_ends_at',
   hourly_rate: 'hourly_rate',
+  discovery_source: 'discovery_source',
+  onboarding_status: 'onboarding_status',
   created_at: 'created_at',
   updated_at: 'updated_at',
 } as const;
@@ -63,6 +65,8 @@ export function mapUserRow(dbRow: any): any {
     subscription_status: dbRow.subscription_status || 'active',
     trial_ends_at: dbRow.trial_ends_at,
     hourly_rate: dbRow.hourly_rate || 0,
+    discovery_source: dbRow.discovery_source,
+    onboarding_status: dbRow.onboarding_status || 0,
     created_at: dbRow.created_at,
     updated_at: dbRow.updated_at,
   };

@@ -20,6 +20,9 @@ export interface WorkHours {
   scope_of_practice?: string;
   document_ids?: string; // JSON array of document IDs
   is_active: boolean;
+  is_paused?: boolean;
+  paused_at?: string;
+  total_paused_ms?: number;
   created_at: string;
   updated_at: string;
 }
@@ -69,18 +72,31 @@ export async function createWorkHours(
     duration = Math.round((end.getTime() - start.getTime()) / 1000 / 60);
   }
 
+  // Calculate earnings if duration and rate are available
+  let earnings = data.total_earnings;
+  if (earnings === undefined && duration && data.hourly_rate) {
+    earnings = (duration / 60) * data.hourly_rate;
+  }
+
   const [result] = await pool.execute(
     `INSERT INTO work_hours (
       user_id, start_time, end_time, duration_minutes, 
-      work_description,
+      work_description, location, shift_type, hourly_rate,
+      total_earnings, work_setting, scope_of_practice,
       document_ids, is_active, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       userId,
       data.start_time,
       data.end_time || null,
       duration || null,
       data.work_description || null,
+      data.location || null,
+      data.shift_type || null,
+      data.hourly_rate || null,
+      earnings || null,
+      data.work_setting || null,
+      data.scope_of_practice || null,
       data.document_ids ? JSON.stringify(data.document_ids) : null,
       !data.end_time, // Active if no end time
     ]
@@ -237,13 +253,30 @@ export async function updateWorkHours(
     fields.push('work_description = ?');
     values.push(updates.work_description || null);
   }
-  // Missing columns excluded as per user request
-  // if (updates.location !== undefined) { ... }
-  // if (updates.shift_type !== undefined) { ... }
-  // if (updates.hourly_rate !== undefined) { ... }
-  // if (updates.total_earnings !== undefined) { ... }
-  // if (updates.work_setting !== undefined) { ... }
-  // if (updates.scope_of_practice !== undefined) { ... }
+  if (updates.location !== undefined) {
+    fields.push('location = ?');
+    values.push(updates.location || null);
+  }
+  if (updates.shift_type !== undefined) {
+    fields.push('shift_type = ?');
+    values.push(updates.shift_type || null);
+  }
+  if (updates.hourly_rate !== undefined) {
+    fields.push('hourly_rate = ?');
+    values.push(updates.hourly_rate || null);
+  }
+  if (updates.total_earnings !== undefined) {
+    fields.push('total_earnings = ?');
+    values.push(updates.total_earnings || null);
+  }
+  if (updates.work_setting !== undefined) {
+    fields.push('work_setting = ?');
+    values.push(updates.work_setting || null);
+  }
+  if (updates.scope_of_practice !== undefined) {
+    fields.push('scope_of_practice = ?');
+    values.push(updates.scope_of_practice || null);
+  }
 
   if (updates.document_ids !== undefined) {
     fields.push('document_ids = ?');
@@ -296,11 +329,13 @@ export async function getTotalWorkHours(
   userId: string,
   startDate?: string,
   endDate?: string
-): Promise<number> {
+): Promise<{ totalHours: number; totalEarnings: number }> {
   const pool = getMySQLPool();
 
   let query = `
-    SELECT COALESCE(SUM(duration_minutes), 0) as total_minutes 
+    SELECT 
+      COALESCE(SUM(duration_minutes), 0) as total_minutes,
+      COALESCE(SUM(total_earnings), 0) as total_earnings
     FROM work_hours 
     WHERE user_id = ? AND is_active = 0
   `;
@@ -316,5 +351,62 @@ export async function getTotalWorkHours(
   }
 
   const [results] = await pool.execute(query, params) as any[];
-  return Math.round(results[0].total_minutes / 60); // Convert to hours
+  return {
+    totalHours: Math.round(results[0].total_minutes / 60),
+    totalEarnings: parseFloat(results[0].total_earnings || 0),
+  };
+}
+
+/**
+ * Pause an active work session
+ */
+export async function pauseWorkSession(userId: string, sessionId: string): Promise<WorkHours> {
+  const pool = getMySQLPool();
+  await pool.execute(
+    'UPDATE work_hours SET is_paused = 1, paused_at = NOW(), updated_at = NOW() WHERE id = ? AND user_id = ? AND is_active = 1',
+    [sessionId, userId]
+  );
+  const updated = await getWorkHoursById(sessionId, userId);
+  if (!updated) throw new ApiError(404, 'Active work session not found');
+  return updated;
+}
+
+/**
+ * Resume a paused work session
+ */
+export async function resumeWorkSession(userId: string, sessionId: string): Promise<WorkHours> {
+  const pool = getMySQLPool();
+  const existing = await getWorkHoursById(sessionId, userId);
+  if (!existing || !existing.is_active) throw new ApiError(404, 'Active work session not found');
+
+  if (existing.is_paused && existing.paused_at) {
+    // Add time spent in pause to total_paused_ms
+    await pool.execute(
+      `UPDATE work_hours 
+       SET is_paused = 0, 
+           total_paused_ms = COALESCE(total_paused_ms, 0) + (TIMESTAMPDIFF(SECOND, paused_at, NOW()) * 1000),
+           paused_at = NULL, 
+           updated_at = NOW() 
+       WHERE id = ? AND user_id = ?`,
+      [sessionId, userId]
+    );
+  }
+
+  const updated = await getWorkHoursById(sessionId, userId);
+  if (!updated) throw new ApiError(404, 'Work session not found after update');
+  return updated;
+}
+
+/**
+ * Restart a work session
+ */
+export async function restartWorkSession(userId: string, sessionId: string): Promise<WorkHours> {
+  const pool = getMySQLPool();
+  await pool.execute(
+    'UPDATE work_hours SET start_time = NOW(), is_paused = 0, paused_at = NULL, total_paused_ms = 0, updated_at = NOW() WHERE id = ? AND user_id = ? AND is_active = 1',
+    [sessionId, userId]
+  );
+  const updated = await getWorkHoursById(sessionId, userId);
+  if (!updated) throw new ApiError(404, 'Active work session not found');
+  return updated;
 }

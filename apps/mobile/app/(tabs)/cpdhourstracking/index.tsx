@@ -33,7 +33,6 @@ export default function CPDHoursTrackingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
-  const [activeFilter, setActiveFilter] = useState<'all' | 'participatory' | 'non-participatory'>('all');
   const [refreshing, setRefreshing] = useState(false);
 
   // CPD Data (fetched from API)
@@ -198,17 +197,8 @@ export default function CPDHoursTrackingScreen() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
-  // initial activities are empty; will be loaded from API
-
-  // Filter activities based on active filter
-  const getFilteredActivities = () => {
-    if (activeFilter === 'all') {
-      return allActivities;
-    }
-    return allActivities.filter((activity) => activity.type === activeFilter);
-  };
-
-  const filteredActivities = getFilteredActivities();
+  // Filter activities based on active filter - using all for summary view
+  const displayActivities = allActivities.slice(0, 5); // Show recent 5
 
   useEffect(() => {
     loadCpdActivities();
@@ -239,6 +229,9 @@ export default function CPDHoursTrackingScreen() {
         iconColor: (it.activityType || it.activity_type) === 'participatory' ? '#2563EB' : '#F59E0B',
         hasCertificate: (it.documentIds && it.documentIds.length > 0) || (it.document_ids && it.document_ids.length > 0),
       }));
+
+      // Sort by date desc if not already
+      mapped.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       setAllActivities(mapped);
 
@@ -298,48 +291,6 @@ export default function CPDHoursTrackingScreen() {
         <View className="px-6 mb-6">
           <View className={`rounded-3xl p-6 shadow-sm border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
             }`}>
-            {/* Circular Progress */}
-            <View className="relative items-center justify-center mb-6">
-              <Svg width={192} height={192} viewBox="0 0 192 192">
-                {/* Background Circle */}
-                <Circle
-                  cx="96"
-                  cy="96"
-                  r={radius}
-                  stroke="#E2E8F0"
-                  strokeWidth="12"
-                  fill="transparent"
-                />
-                {/* Progress Circle */}
-                <Circle
-                  cx="96"
-                  cy="96"
-                  r={radius}
-                  stroke="#2563EB"
-                  strokeWidth="12"
-                  fill="transparent"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  strokeLinecap="round"
-                  transform={`rotate(-90 96 96)`}
-                />
-              </Svg>
-              <View className="absolute inset-0 items-center justify-center">
-                <Text className={`text-4xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                  {totalHours} / {targetHours}
-                </Text>
-                <Text className={`text-sm font-medium mt-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
-                  Total Hours
-                </Text>
-                {progress >= 100 && (
-                  <View className="mt-2 px-3 py-1 bg-green-100 rounded-full">
-                    <Text className="text-green-600 text-[10px] font-bold uppercase tracking-wider">
-                      Target Met
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
 
             {/* Breakdown Cards */}
             <View className="w-full flex-row" style={{ gap: 16 }}>
@@ -389,23 +340,19 @@ export default function CPDHoursTrackingScreen() {
             <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
               Activities
             </Text>
-            {filteredActivities.length > 0 && (
-              <Pressable onPress={() => setActiveFilter('all')}>
+            {allActivities.length > 5 && (
+              <Pressable onPress={() => router.push('/(tabs)/cpdhourstracking/all-logs')}>
                 <Text className="text-[#2563EB] text-sm font-semibold">View All</Text>
               </Pressable>
             )}
           </View>
 
           <View style={{ gap: 12 }}>
-            {filteredActivities.length > 0 ? (
-              filteredActivities.map((activity) => (
+            {displayActivities.length > 0 ? (
+              displayActivities.map((activity) => (
                 <Pressable
                   key={activity.id}
-                  onPress={() => {
-                    // Navigate to activity details or edit screen
-                    // For now, we'll keep it as a placeholder
-                    console.log('View activity:', activity.id);
-                  }}
+                  onPress={() => router.push(`/(tabs)/cpdhourstracking/${activity.id}`)}
                   className={`p-4 rounded-2xl border shadow-sm flex-row items-center ${isDark
                     ? "bg-slate-800 border-slate-700 active:bg-slate-700"
                     : "bg-white border-slate-100 active:bg-slate-50"
@@ -451,7 +398,7 @@ export default function CPDHoursTrackingScreen() {
                 }`}>
                 <MaterialIcons name="inbox" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
                 <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
-                  No {activeFilter === 'all' ? '' : activeFilter === 'participatory' ? 'participatory' : 'non-participatory'} activities found
+                  No activities found. Add your first CPD activity!
                 </Text>
               </View>
             )}

@@ -98,15 +98,15 @@ export default function PersonalDetails() {
             );
 
             // Navigate to next step
-        router.push({
-            pathname: "/(onboarding)/professional-details",
-            params: { role, ...data },
-        });
+            router.push({
+                pathname: "/(onboarding)/professional-details",
+                params: { role, ...data },
+            });
         } catch (error: unknown) {
-            const errorMessage = error instanceof Error 
-                ? error.message 
+            const errorMessage = error instanceof Error
+                ? error.message
                 : "Failed to save personal details. Please try again.";
-            
+
             showToast.error(errorMessage, "Error");
         } finally {
             setIsLoading(false);
@@ -173,11 +173,10 @@ export default function PersonalDetails() {
                                             />
                                         </View>
                                         <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                     ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                     : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.name ? "border-red-500" : ""}`}
+                                                } ${errors.name ? "border-red-500" : ""}`}
                                             style={{
                                                 shadowColor: isDark ? "#000" : "#000",
                                                 shadowOffset: { width: 0, height: 2 },
@@ -226,11 +225,10 @@ export default function PersonalDetails() {
                                             />
                                         </View>
                                         <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                     ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                     : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.email ? "border-red-500" : ""}`}
+                                                } ${errors.email ? "border-red-500" : ""}`}
                                             style={{
                                                 shadowColor: isDark ? "#000" : "#000",
                                                 shadowOffset: { width: 0, height: 2 },
@@ -259,11 +257,14 @@ export default function PersonalDetails() {
 
                         {/* Phone */}
                         <View>
-                            <Text
-                                className={`text-sm font-semibold mb-3 ${isDark ? "text-gray-300" : "text-gray-700"}`}
-                            >
-                                Phone
-                            </Text>
+                            <View className="flex-row items-center mb-3">
+                                <Text
+                                    className={`text-sm font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}
+                                >
+                                    Phone
+                                </Text>
+                                <Text className="text-red-500 ml-1">*</Text>
+                            </View>
                             <Controller
                                 control={control}
                                 name="phone"
@@ -277,11 +278,10 @@ export default function PersonalDetails() {
                                             />
                                         </View>
                                         <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                     ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                     : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.phone ? "border-red-500" : ""}`}
+                                                } ${errors.phone ? "border-red-500" : ""}`}
                                             style={{
                                                 shadowColor: isDark ? "#000" : "#000",
                                                 shadowOffset: { width: 0, height: 2 },
@@ -315,9 +315,8 @@ export default function PersonalDetails() {
                 <Pressable
                     onPress={onFormSubmit}
                     disabled={isLoading}
-                    className={`w-full py-4 rounded-2xl flex-row items-center justify-center active:opacity-90 ${
-                        isLoading ? "bg-primary/50" : "bg-primary"
-                    }`}
+                    className={`w-full py-4 rounded-2xl flex-row items-center justify-center active:opacity-90 ${isLoading ? "bg-primary/50" : "bg-primary"
+                        }`}
                     style={{
                         shadowColor: "#1E5AF3",
                         shadowOffset: { width: 0, height: 8 },
@@ -330,8 +329,8 @@ export default function PersonalDetails() {
                         <Text className="text-white font-semibold text-base">Saving...</Text>
                     ) : (
                         <>
-                    <Text className="text-white font-semibold text-base">Continue</Text>
-                    <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
+                            <Text className="text-white font-semibold text-base">Continue</Text>
+                            <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
                         </>
                     )}
                 </Pressable>

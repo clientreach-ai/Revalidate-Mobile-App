@@ -8,6 +8,7 @@ import { ApiError } from '../../common/middleware/error-handler';
 export interface AppraisalRecord {
   id: number;
   user_id: number;
+  appraisal_type: string;
   appraisal_date: string;
   discussion_with?: string;
   hospital_id?: number;
@@ -18,6 +19,7 @@ export interface AppraisalRecord {
 }
 
 export interface CreateAppraisalRecord {
+  appraisal_type?: string;
   appraisal_date: string;
   discussion_with?: string;
   hospital_id?: number;
@@ -41,11 +43,12 @@ export async function createAppraisalRecord(
 
   const [result] = await pool.execute(
     `INSERT INTO appraisal_records (
-      user_id, appraisal_date, discussion_with, hospital_id, notes, document_ids, 
+      user_id, appraisal_type, appraisal_date, discussion_with, hospital_id, notes, document_ids, 
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       userId,
+      data.appraisal_type || 'Annual Appraisal',
       data.appraisal_date,
       data.discussion_with || null,
       data.hospital_id || null,
@@ -65,14 +68,17 @@ export async function createAppraisalRecord(
 export async function getAppraisalRecordById(
   appraisalId: string,
   userId: string
-): Promise<AppraisalRecord | null> {
+): Promise<(AppraisalRecord & { hospital_name?: string }) | null> {
   const pool = getMySQLPool();
   const [results] = await pool.execute(
-    'SELECT * FROM appraisal_records WHERE id = ? AND user_id = ?',
+    `SELECT ar.*, h.name as hospital_name 
+     FROM appraisal_records ar 
+     LEFT JOIN hospitals h ON ar.hospital_id = h.id 
+     WHERE ar.id = ? AND ar.user_id = ?`,
     [appraisalId, userId]
   ) as any[];
 
-  return results.length > 0 ? results[0] as AppraisalRecord : null;
+  return results.length > 0 ? results[0] as (AppraisalRecord & { hospital_name?: string }) : null;
 }
 
 export async function getUserAppraisalRecords(

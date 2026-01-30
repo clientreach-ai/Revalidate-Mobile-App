@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, TextInput, Modal, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -133,9 +133,11 @@ export default function GalleryScreen() {
     },
   ];
 
-  useEffect(() => {
-    loadDocuments();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadDocuments();
+    }, [])
+  );
 
   const loadDocuments = async () => {
     try {
@@ -195,15 +197,22 @@ export default function GalleryScreen() {
         const categoryMap: Record<string, string> = {
           'cpd': 'CPD Hours',
           'cpdhours': 'CPD Hours',
+          'cpd_hours': 'CPD Hours',
           'working': 'Working Hours',
           'work': 'Working Hours',
+          'workhours': 'Working Hours',
           'workinghours': 'Working Hours',
+          'work_hours': 'Working Hours',
           'feedback': 'Feedback Log',
           'feedbacklog': 'Feedback Log',
+          'feedback_log': 'Feedback Log',
           'reflection': 'Reflective Accounts',
           'reflections': 'Reflective Accounts',
           'reflective': 'Reflective Accounts',
+          'reflectiveaccounts': 'Reflective Accounts',
+          'reflective_accounts': 'Reflective Accounts',
           'appraisal': 'Appraisal',
+          'appraisals': 'Appraisal',
           'gallery': 'General Gallery',
           'personal': 'General Gallery',
           'general': 'General Gallery',
@@ -548,20 +557,8 @@ export default function GalleryScreen() {
                   <Text className={`font-bold text-base leading-tight ${isDark ? "text-white" : "text-slate-800"}`}>
                     {category.title}
                   </Text>
-                  <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
-                    {category.documentCount}
-                  </Text>
-                  <View className={`mt-4 pt-4 border-t flex-row items-center ${isDark ? "border-slate-700" : "border-slate-50"
-                    }`} style={{ gap: 6 }}>
-                    <View
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: category.dotColor }}
-                    />
-                    <Text className={`text-[10px] font-medium uppercase tracking-wider ${isDark ? "text-gray-500" : "text-slate-400"
-                      }`}>
-                      {category.updated}
-                    </Text>
-                  </View>
+
+
                 </Pressable>
               ))}
             </View>

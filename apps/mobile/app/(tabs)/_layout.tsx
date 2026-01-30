@@ -32,9 +32,9 @@ export default function TabsLayout() {
         style={
           focused
             ? {
-                transform: [{ translateY: -0.5 }],
-                backgroundColor: isPremium ? '#D4AF3714' : '#2B5F9E14',
-              }
+              transform: [{ translateY: -0.5 }],
+              backgroundColor: isPremium ? '#D4AF3714' : '#2B5F9E14',
+            }
             : {}
         }
       >
@@ -56,7 +56,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,
         tabBarStyle: {
-          backgroundColor: isDark ? '#0B1220F2' : '#FFFFFFF2',
+          backgroundColor: isDark ? '#0B1220' : '#FFFFFF',
           borderTopWidth: 0,
           height: tabBarHeight,
           paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 8) : 8,
@@ -70,7 +70,7 @@ export default function TabsLayout() {
           elevation: Platform.OS === 'ios' ? 0 : 12,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: isDark ? 0.25 : 0.12,
+          shadowOpacity: isDark ? 0.6 : 0.12,
           shadowRadius: 18,
         },
         tabBarLabelStyle: {
@@ -123,6 +123,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="workinghours/index" options={{ href: null }} />
       <Tabs.Screen name="workinghours/[id]" options={{ href: null }} />
       <Tabs.Screen name="cpdhourstracking/index" options={{ href: null }} />
+      <Tabs.Screen name="cpdhourstracking/all-logs" options={{ href: null }} />
+      <Tabs.Screen name="cpdhourstracking/[id]" options={{ href: null }} />
       <Tabs.Screen name="feedback/index" options={{ href: null }} />
       <Tabs.Screen name="feedback/[id]" options={{ href: null }} />
       <Tabs.Screen name="earings/index" options={{ href: null }} />

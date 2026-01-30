@@ -6,6 +6,9 @@
 app = 'revalidate-api'
 primary_region = 'iad'
 
+[deploy]
+  release_command = "npx prisma db push --accept-data-loss"
+
 [build]
   dockerfile = 'apps/api/Dockerfile'
   build_context = '.'
@@ -33,3 +36,7 @@ primary_region = 'iad'
   memory = '512mb'
   cpus = 1
   memory_mb = 512
+
+[mounts]
+  source = "uploads_data"
+  destination = "/app/apps/api/uploads"

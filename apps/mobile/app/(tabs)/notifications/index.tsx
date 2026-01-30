@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
+import { showToast } from '@/utils/toast';
 import '../../global.css';
 
 interface Notification {
@@ -19,6 +20,7 @@ interface Notification {
   isRead: boolean;
   section: 'today' | 'yesterday' | 'earlier';
   createdAt: Date;
+  type?: string;
 }
 
 interface ApiNotification {
@@ -26,6 +28,7 @@ interface ApiNotification {
   title: string;
   body: string;
   data?: any;
+  type?: string;
   createdAt: string;
 }
 
@@ -36,6 +39,14 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(new Set());
+
+  // Modal states for calendar invites
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [isResponding, setIsResponding] = useState(false);
+  const [addToCpd, setAddToCpd] = useState(true);
+  const [currentAttendeeId, setCurrentAttendeeId] = useState<string | null>(null);
+  const [isModalFetching, setIsModalFetching] = useState(false);
 
   useEffect(() => {
     loadNotifications();
@@ -95,7 +106,7 @@ export default function NotificationsScreen() {
           const time = formatTimeDisplay(createdAt, section);
 
           // Determine icon based on title or data
-          const iconInfo = getIconForNotification(n.title, n.data);
+          const iconInfo = getIconForNotification(n.title, n.type);
 
           return {
             id: String(n.id),
@@ -108,6 +119,7 @@ export default function NotificationsScreen() {
             isRead: readNotificationIds.has(String(n.id)),
             section,
             createdAt,
+            type: n.type,
           };
         });
 
@@ -144,9 +156,16 @@ export default function NotificationsScreen() {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   };
 
-  const getIconForNotification = (title: string, _data?: any): { icon: keyof typeof MaterialIcons.glyphMap; color: string; bgColor: string } => {
+  const getIconForNotification = (title: string, type?: string): { icon: keyof typeof MaterialIcons.glyphMap; color: string; bgColor: string } => {
     const titleLower = title?.toLowerCase() || '';
+    const typeLower = type?.toLowerCase() || '';
 
+    if (typeLower.startsWith('calendar_invite') || titleLower.includes('invited') || titleLower.includes('calendar')) {
+      return { icon: 'event-available', color: '#2B5F9E', bgColor: 'bg-blue-50' };
+    }
+    if (typeLower.startsWith('calendar_response')) {
+      return { icon: 'event-note', color: '#10B981', bgColor: 'bg-green-50' };
+    }
     if (titleLower.includes('appraisal') || titleLower.includes('meeting')) {
       return { icon: 'event', color: '#2563EB', bgColor: 'bg-blue-50' };
     }
@@ -191,6 +210,118 @@ export default function NotificationsScreen() {
     await saveReadState(newReadIds);
   };
 
+  const handleResponse = async (status: 'accepted' | 'declined') => {
+    if (!selectedEvent || !currentAttendeeId) return;
+    setIsResponding(true);
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      await apiService.post(
+        `${API_ENDPOINTS.CALENDAR.EVENTS}/${selectedEvent.id}/respond`,
+        { attendeeId: currentAttendeeId, status },
+        token
+      );
+
+      // Handle CPD Recording if accepted
+      if (status === 'accepted' && addToCpd) {
+        try {
+          let duration = 60;
+          if (selectedEvent.startTime && selectedEvent.endTime) {
+            const [sh, sm] = selectedEvent.startTime.split(':').map(Number);
+            const [eh, em] = selectedEvent.endTime.split(':').map(Number);
+            if (!isNaN(sh) && !isNaN(eh)) {
+              duration = (eh * 60 + em) - (sh * 60 + sm);
+              if (duration <= 0) duration = 60;
+            }
+          }
+
+          await apiService.post('/api/v1/cpd-hours', {
+            training_name: selectedEvent.title,
+            activity_date: selectedEvent.date,
+            duration_minutes: duration,
+            activity_type: 'participatory',
+            learning_method: 'course attendance',
+            cpd_learning_type: 'formal and educational',
+          }, token);
+        } catch (cpdErr) {
+          console.warn('Failed to auto-record CPD:', cpdErr);
+        }
+      }
+
+      showToast.success(
+        status === 'accepted' ? 'Invitation accepted' : 'Invitation declined',
+        'Success'
+      );
+      setShowAcceptModal(false);
+      setSelectedEvent(null);
+    } catch (error: any) {
+      console.error('Failed to respond to invite:', error);
+      showToast.error(error?.message || 'Failed to update response');
+    } finally {
+      setIsResponding(false);
+    }
+  };
+
+  const handleNotificationPress = async (notification: Notification) => {
+    await markAsRead(notification.id);
+
+    // Handle calendar invites directly with a modal
+    if (notification.type && (notification.type.startsWith('calendar_invite:') || notification.type === 'calendar_invite')) {
+      const parts = notification.type.split(':');
+      const eventId = parts.length > 1 ? parts[1] : null;
+
+      if (eventId) {
+        try {
+          setIsModalFetching(true);
+          const token = await AsyncStorage.getItem('authToken');
+          if (!token) return;
+
+          const response = await apiService.get<any>(
+            `${API_ENDPOINTS.CALENDAR.GET_BY_ID}/${eventId}`,
+            token
+          );
+
+          if (response?.data) {
+            const userDataStr = await AsyncStorage.getItem('userData');
+            if (userDataStr) {
+              const userData = JSON.parse(userDataStr);
+              // Find attendee by userId or email with robust matching
+              const attendee = response.data.attendees?.find((a: any) =>
+                (a.userId && userData.id && String(a.userId) === String(userData.id)) ||
+                (a.email && userData.email && String(a.email).toLowerCase() === String(userData.email).toLowerCase())
+              );
+
+              if (attendee && (attendee.status === 'pending' || attendee.status === 'invited')) {
+                setSelectedEvent(response.data);
+                setCurrentAttendeeId(attendee.id.toString());
+                setShowAcceptModal(true);
+              } else {
+                // Already responded or not an attendee, just navigate to see details
+                router.push(`/calendar/${eventId}` as any);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching event for modal:', error);
+          // Fallback to navigation if modal fails
+          router.push(`/calendar/${eventId}` as any);
+        } finally {
+          setIsModalFetching(false);
+        }
+      } else {
+        // No event ID found in type, just navigate to calendar
+        router.push('/calendar' as any);
+      }
+    } else if (notification.type && notification.type.startsWith('calendar_response:')) {
+      const parts = notification.type.split(':');
+      const eventId = parts.length > 1 ? parts[1] : null;
+      if (eventId) {
+        router.push(`/calendar/${eventId}` as any);
+      }
+    }
+  };
+
   const todayNotifications = notifications.filter(n => n.section === 'today');
   const yesterdayNotifications = notifications.filter(n => n.section === 'yesterday');
   const earlierNotifications = notifications.filter(n => n.section === 'earlier');
@@ -212,7 +343,7 @@ export default function NotificationsScreen() {
         {items.map((notification) => (
           <Pressable
             key={notification.id}
-            onPress={() => markAsRead(notification.id)}
+            onPress={() => handleNotificationPress(notification)}
             className={`flex-row items-center gap-4 px-4 py-4 border-b ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
               } ${!notification.isRead ? 'opacity-100' : 'opacity-80'}`}
           >
@@ -341,6 +472,78 @@ export default function NotificationsScreen() {
             </View>
           )}
         </ScrollView>
+      )}
+
+      {/* Fetching Event Spinner Overaly */}
+      {isModalFetching && (
+        <View className="absolute inset-0 bg-black/5 items-center justify-center pointer-events-none">
+          <View className={`px-6 py-4 rounded-2xl ${isDark ? 'bg-slate-700' : 'bg-white'} shadow-xl items-center`}>
+            <ActivityIndicator size="small" color="#2563EB" />
+            <Text className={`text-xs mt-2 font-medium ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+              Fetching event...
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Invitation Acceptance Modal */}
+      {selectedEvent && (
+        <Modal
+          visible={showAcceptModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowAcceptModal(false)}
+        >
+          <View className="flex-1 bg-black/60 items-center justify-center p-6">
+            <View className={`w-full max-w-sm rounded-[32px] p-8 ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white'}`}>
+              <View className="w-16 h-16 rounded-full bg-blue-100 items-center justify-center mb-6 mx-auto">
+                <Text style={{ fontSize: 32 }}>📅</Text>
+              </View>
+              <Text className={`text-xl font-bold text-center mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Event Invitation</Text>
+              <Text className={`text-center mb-8 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
+                You have been invited to "{selectedEvent.title}". Would you like to attend?
+              </Text>
+
+              <View className="mb-8 p-4 rounded-2xl bg-slate-50 flex-row items-center" style={{ gap: 12 }}>
+                <Pressable
+                  onPress={() => setAddToCpd(!addToCpd)}
+                  className={`w-6 h-6 rounded border items-center justify-center ${addToCpd ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}
+                >
+                  {addToCpd && <MaterialIcons name="check" size={16} color="white" />}
+                </Pressable>
+                <View className="flex-1">
+                  <Text className="text-slate-700 font-bold text-sm">Add to CPD Portfolio</Text>
+                  <Text className="text-slate-500 text-[10px]">Track hours automatically for revalidation</Text>
+                </View>
+              </View>
+
+              <View className="gap-3">
+                <Pressable
+                  onPress={() => handleResponse('accepted')}
+                  disabled={isResponding}
+                  className="w-full py-4 rounded-2xl bg-blue-600 items-center justify-center active:opacity-90"
+                >
+                  {isResponding ? <ActivityIndicator size="small" color="white" /> : <Text className="text-white font-bold text-base">Accept Invitation</Text>}
+                </Pressable>
+
+                <Pressable
+                  onPress={() => handleResponse('declined')}
+                  disabled={isResponding}
+                  className={`w-full py-4 rounded-2xl items-center justify-center active:bg-slate-100 ${isDark ? 'border border-slate-700' : 'bg-slate-50'}`}
+                >
+                  <Text className={`font-semibold ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>Decline</Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setShowAcceptModal(false)}
+                  className="mt-2 items-center"
+                >
+                  <Text className="text-slate-400 text-sm">Decide Later</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       )}
     </SafeAreaView>
   );

@@ -10,29 +10,10 @@ import { showToast } from '@/utils/toast';
 import { setSubscriptionInfo } from '@/utils/subscription';
 import '../../global.css';
 
-// Safe Stripe import - only load on native platforms
-let useStripe: any;
-let isStripeAvailable = false;
+import { useStripe } from '@/services/stripe';
 
-if (Platform.OS !== 'web') {
-  try {
-    const stripeModule = require("@stripe/stripe-react-native");
-    if (stripeModule && stripeModule.useStripe) {
-      useStripe = stripeModule.useStripe;
-      isStripeAvailable = true;
-    }
-  } catch (error: any) {
-    useStripe = () => ({
-      initPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
-      presentPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
-    });
-  }
-} else {
-  useStripe = () => ({
-    initPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
-    presentPaymentSheet: async () => ({ error: { message: "Stripe not available" } }),
-  });
-}
+// Safe Stripe import handled by platform-specific files in @/services/stripe
+let isStripeAvailable = Platform.OS !== 'web';
 
 export default function SubscriptionScreen() {
   const router = useRouter();
@@ -45,6 +26,12 @@ export default function SubscriptionScreen() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<{
+    brand: string;
+    last4: string;
+    expMonth: number;
+    expYear: number;
+  } | null>(null);
 
   const stripe = useStripe();
   const initPaymentSheet = stripe?.initPaymentSheet || (async () => ({ error: { message: "Stripe not available" } }));
@@ -61,6 +48,36 @@ export default function SubscriptionScreen() {
       initializePaymentSheet();
     }
   }, [clientSecret]);
+
+  // Use effect to load payment method if premium
+  useEffect(() => {
+    if (isPremium) {
+      loadPaymentMethod();
+    }
+  }, [isPremium]);
+
+  const loadPaymentMethod = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await apiService.get<{
+        success: boolean;
+        data: {
+          brand: string;
+          last4: string;
+          expMonth: number;
+          expYear: number;
+        } | null;
+      }>(API_ENDPOINTS.PAYMENT.METHODS, token);
+
+      if (response?.data) {
+        setPaymentMethod(response.data);
+      }
+    } catch (error) {
+      console.log('Error fetching payment method:', error);
+    }
+  };
 
   const loadSubscriptionStatus = async () => {
     try {
@@ -419,6 +436,10 @@ export default function SubscriptionScreen() {
                   'CPD Hours Logging',
                   'Basic Statistics',
                   'Document Gallery',
+                  'Calendar Events',
+                  'Manual Data Entry',
+                  'Reflective Accounts',
+                  'Feedback Logging',
                 ].map((feature, index) => (
                   <View key={index} className="flex-row items-center gap-2">
                     <MaterialIcons name="check-circle" size={20} color="#10B981" />
@@ -448,8 +469,8 @@ export default function SubscriptionScreen() {
                 <View className="flex-row items-center gap-2 mb-1">
                   <Text
                     className={`text-xl font-bold ${isPremium
-                        ? (isDark ? "text-[#FFD700]" : "text-[#D4AF37]")
-                        : (isDark ? "text-white" : "text-slate-800")
+                      ? (isDark ? "text-[#FFD700]" : "text-[#D4AF37]")
+                      : (isDark ? "text-white" : "text-slate-800")
                       }`}
                     style={!isPremium ? {
                       textShadowColor: 'rgba(212, 175, 55, 0.3)',
@@ -476,8 +497,8 @@ export default function SubscriptionScreen() {
                 </View>
                 <Text
                   className={`text-3xl font-bold ${isPremium
-                      ? (isDark ? "text-[#FFD700]" : "text-[#D4AF37]")
-                      : (isDark ? "text-white" : "text-slate-800")
+                    ? (isDark ? "text-[#FFD700]" : "text-[#D4AF37]")
+                    : (isDark ? "text-white" : "text-slate-800")
                     }`}
                   style={!isPremium ? {
                     textShadowColor: 'rgba(212, 175, 55, 0.2)',
@@ -492,8 +513,8 @@ export default function SubscriptionScreen() {
               </View>
               <View
                 className={`w-6 h-6 rounded-full border-2 items-center justify-center ${isPremium
-                    ? 'bg-[#D4AF37] border-[#D4AF37]'
-                    : (isDark ? 'border-[#D4AF37]/60 bg-[#D4AF37]/20' : 'border-[#D4AF37] bg-[#FFD700]/20')
+                  ? 'bg-[#D4AF37] border-[#D4AF37]'
+                  : (isDark ? 'border-[#D4AF37]/60 bg-[#D4AF37]/20' : 'border-[#D4AF37] bg-[#FFD700]/20')
                   }`}
                 style={!isPremium ? {
                   shadowColor: '#D4AF37',
@@ -510,12 +531,14 @@ export default function SubscriptionScreen() {
             </View>
             <View className="gap-2 mb-4">
               {[
-                'Everything in Free',
-                'Advanced Analytics',
-                'PDF Export',
-                'Push Notifications',
-                'Offline Mode',
-                'Premium Support',
+                'Everything in Free Plan',
+                'Advanced Analytics & Charts',
+                'PDF Export & Reports',
+                'Calendar Sync & Invites',
+                'Offline Mode & Sync',
+                'Priority Support',
+                'Multi-device Sync',
+                'No Advertisements',
               ].map((feature, index) => (
                 <View key={index} className="flex-row items-center gap-2">
                   <MaterialIcons
@@ -567,8 +590,8 @@ export default function SubscriptionScreen() {
                   }}
                   disabled={isProcessingPayment || !isStripeAvailable}
                   className={`rounded-xl p-4 items-center mt-3 flex-row justify-center border-2 ${isProcessingPayment || !isStripeAvailable
-                      ? "border-[#D4AF37]/30 bg-transparent"
-                      : "border-[#D4AF37] bg-[#D4AF37]/10"
+                    ? "border-[#D4AF37]/30 bg-transparent"
+                    : "border-[#D4AF37] bg-[#D4AF37]/10"
                     }`}
                 >
                   <View className="items-center">
@@ -611,18 +634,33 @@ export default function SubscriptionScreen() {
                 Manage Subscription
               </Text>
               <View className="gap-3">
-                <Pressable className={`flex-row items-center justify-between p-4 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-50"
-                  }`}>
+                <Pressable
+                  onPress={() => showToast.info("Feature to update payment method coming soon", "Coming Soon")}
+                  className={`flex-row items-center justify-between p-4 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-50"
+                    }`}
+                >
                   <View className="flex-row items-center gap-3">
-                    <MaterialIcons name="credit-card" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
-                    <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
-                      Payment Method
-                    </Text>
+                    <View className={`w-10 h-6 rounded border items-center justify-center ${isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300'}`}>
+                      <MaterialIcons name="credit-card" size={16} color={isDark ? "#9CA3AF" : "#64748B"} />
+                    </View>
+                    <View>
+                      <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>
+                        {paymentMethod ? `${paymentMethod.brand.toUpperCase()} •••• ${paymentMethod.last4}` : 'Payment Method'}
+                      </Text>
+                      {paymentMethod && (
+                        <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+                          Expires {paymentMethod.expMonth}/{paymentMethod.expYear}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                   <MaterialIcons name="chevron-right" size={20} color={isDark ? "#64748B" : "#94A3B8"} />
                 </Pressable>
-                <Pressable className={`flex-row items-center justify-between p-4 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-50"
-                  }`}>
+                <Pressable
+                  onPress={() => showToast.info("Billing history coming soon", "Coming Soon")}
+                  className={`flex-row items-center justify-between p-4 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-50"
+                    }`}
+                >
                   <View className="flex-row items-center gap-3">
                     <MaterialIcons name="receipt" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
                     <Text className={`font-medium ${isDark ? "text-white" : "text-slate-800"}`}>

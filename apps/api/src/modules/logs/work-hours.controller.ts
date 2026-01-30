@@ -9,8 +9,12 @@ import {
   updateWorkHours,
   deleteWorkHours,
   getTotalWorkHours,
+  pauseWorkSession,
+  resumeWorkSession,
+  restartWorkSession,
   CreateWorkHours,
   UpdateWorkHours,
+  WorkHours,
 } from './work-hours.model';
 import { z } from 'zod';
 
@@ -40,6 +44,93 @@ const updateWorkHoursSchema = z.object({
   work_setting: z.string().optional(),
   scope_of_practice: z.string().optional(),
   document_ids: z.array(z.number()).optional(),
+});
+
+const formatWorkHoursResponse = (wh: WorkHours) => ({
+  id: wh.id,
+  startTime: wh.start_time,
+  endTime: wh.end_time,
+  durationMinutes: wh.duration_minutes,
+  workDescription: wh.work_description,
+  location: wh.location,
+  shiftType: wh.shift_type,
+  hourlyRate: wh.hourly_rate ? parseFloat(wh.hourly_rate.toString()) : null,
+  totalEarnings: wh.total_earnings ? parseFloat(wh.total_earnings.toString()) : null,
+  workSetting: wh.work_setting,
+  scopeOfPractice: wh.scope_of_practice,
+  documentIds: wh.document_ids ? JSON.parse(wh.document_ids) : [],
+  isActive: Boolean(wh.is_active),
+  isPaused: Boolean(wh.is_paused),
+  pausedAt: wh.paused_at,
+  totalPausedMs: wh.total_paused_ms || 0,
+  createdAt: wh.created_at,
+  updatedAt: wh.updated_at,
+});
+
+/**
+ * Pause active work session
+ * POST /api/v1/work-hours/active/pause
+ */
+export const pause = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const active = await getActiveWorkSession(req.user.userId);
+  if (!active) {
+    throw new ApiError(404, 'No active work session to pause');
+  }
+
+  const paused = await pauseWorkSession(req.user.userId, active.id.toString());
+
+  res.json({
+    success: true,
+    data: formatWorkHoursResponse(paused),
+  });
+});
+
+/**
+ * Resume active work session
+ * POST /api/v1/work-hours/active/resume
+ */
+export const resume = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const active = await getActiveWorkSession(req.user.userId);
+  if (!active) {
+    throw new ApiError(404, 'No active work session to resume');
+  }
+
+  const resumed = await resumeWorkSession(req.user.userId, active.id.toString());
+
+  res.json({
+    success: true,
+    data: formatWorkHoursResponse(resumed),
+  });
+});
+
+/**
+ * Restart active work session
+ * POST /api/v1/work-hours/active/restart
+ */
+export const restart = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const active = await getActiveWorkSession(req.user.userId);
+  if (!active) {
+    throw new ApiError(404, 'No active work session to restart');
+  }
+
+  const restarted = await restartWorkSession(req.user.userId, active.id.toString());
+
+  res.json({
+    success: true,
+    data: formatWorkHoursResponse(restarted),
+  });
 });
 
 /**
@@ -265,12 +356,13 @@ export const getTotal = asyncHandler(async (req: Request, res: Response) => {
   const startDate = req.query.startDate as string | undefined;
   const endDate = req.query.endDate as string | undefined;
 
-  const totalHours = await getTotalWorkHours(req.user.userId, startDate, endDate);
+  const { totalHours, totalEarnings } = await getTotalWorkHours(req.user.userId, startDate, endDate);
 
   res.json({
     success: true,
     data: {
       totalHours,
+      totalEarnings,
       startDate,
       endDate,
     },

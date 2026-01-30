@@ -581,6 +581,12 @@ class ApiService {
   ): Promise<any> {
     const formData = new FormData();
 
+    if (additionalData) {
+      Object.entries(additionalData).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+    }
+
     if (Platform.OS === 'web' && (file.uri.startsWith('blob:') || file.uri.startsWith('data:') || file.uri.startsWith('http'))) {
       // On Web, we might need to convert URI to Blob for fetch to handle it correctly as a file
       try {
@@ -598,12 +604,6 @@ class ApiService {
         type: file.type,
         name: file.name,
       } as any);
-    }
-
-    if (additionalData) {
-      Object.entries(additionalData).forEach(([key, value]) => {
-        formData.append(key, value);
-      });
     }
 
     const headers: Record<string, string> = {

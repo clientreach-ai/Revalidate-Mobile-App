@@ -19,6 +19,7 @@ interface Appraisal {
     hospitalName?: string;
     hasDocuments?: boolean;
     createdAt: string;
+    type?: string;
 }
 
 interface ApiAppraisal {
@@ -58,14 +59,28 @@ export default function AppraisalScreen() {
     // Form State
     const [showAddModal, setShowAddModal] = useState(false);
     const [newAppraisal, setNewAppraisal] = useState({
+        type: 'Annual Appraisal', // Default type
         date: new Date().toISOString().split('T')[0],
         notes: '',
         discussionWith: '',
     });
 
+    const APPRAISAL_TYPES = [
+        'Annual Appraisal',
+        'Interim Review',
+        'Academic Appraisal',
+        'Clinical Supervisor Review',
+        'Educational Supervisor Review',
+        'Probationary Review',
+        'Return to Work',
+        'Other'
+    ];
+    const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+
     // Hospital Search State
     const [hospitalQuery, setHospitalQuery] = useState('');
     const [hospitalResults, setHospitalResults] = useState<Hospital[]>([]);
+    const [cachedHospitals, setCachedHospitals] = useState<Hospital[]>([]); // Store cached hospitals separately
     const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
     const [isSearchingHospitals, setIsSearchingHospitals] = useState(false);
     const [showHospitalDropdown, setShowHospitalDropdown] = useState(false);
@@ -80,7 +95,25 @@ export default function AppraisalScreen() {
 
     useEffect(() => {
         loadAppraisals();
+        loadCachedHospitals();
     }, []);
+
+    // Load cached hospitals for faster initial display
+    const loadCachedHospitals = async () => {
+        try {
+            const cached = await AsyncStorage.getItem('cached_hospitals');
+            if (cached) {
+                const hospitals = JSON.parse(cached);
+                if (Array.isArray(hospitals) && hospitals.length > 0) {
+                    const topHospitals = hospitals.slice(0, 10);
+                    setHospitalResults(topHospitals);
+                    setCachedHospitals(topHospitals); // Keep copy of cached
+                }
+            }
+        } catch (e) {
+            console.log('Error loading cached hospitals:', e);
+        }
+    };
 
     // Debounced hospital search
     useEffect(() => {
@@ -88,12 +121,13 @@ export default function AppraisalScreen() {
             if (hospitalQuery.length >= 2 && !selectedHospital) {
                 searchHospitals(hospitalQuery);
             } else if (hospitalQuery.length < 2) {
-                setHospitalResults([]);
-                setShowHospitalDropdown(false);
+                // Restore cached results if query is empty/short
+                setHospitalResults(cachedHospitals);
+                // Don't auto-close dropdown here, let user close it or select
             }
         }, 300);
         return () => clearTimeout(timer);
-    }, [hospitalQuery]);
+    }, [hospitalQuery, cachedHospitals]);
 
     const loadAppraisals = async () => {
         try {
@@ -113,6 +147,7 @@ export default function AppraisalScreen() {
                         id: String(a.id),
                         date: formatDate(a.appraisalDate),
                         notes: a.notes || 'No notes provided',
+                        type: (a as any).appraisalType || 'Annual Appraisal', // Use type from API or default
                         discussionWith: a.discussionWith,
                         hasDocuments: a.documentIds && a.documentIds.length > 0,
                         createdAt: a.createdAt,
@@ -139,6 +174,13 @@ export default function AppraisalScreen() {
             if (res?.success && res.data) {
                 setHospitalResults(res.data);
                 setShowHospitalDropdown(true);
+                // Cache hospital results for faster future access
+                try {
+                    const cached = await AsyncStorage.getItem('cached_hospitals');
+                    const existing = cached ? JSON.parse(cached) : [];
+                    const merged = [...res.data, ...existing.filter((h: Hospital) => !res.data.some((r: Hospital) => r.id === h.id))];
+                    await AsyncStorage.setItem('cached_hospitals', JSON.stringify(merged.slice(0, 100)));
+                } catch (e) { /* ignore cache errors */ }
             } else if (Array.isArray(res)) {
                 // Handle case where API might return array directly
                 setHospitalResults(res);
@@ -209,7 +251,7 @@ export default function AppraisalScreen() {
                         API_ENDPOINTS.DOCUMENTS.UPLOAD,
                         { uri: fileUri, type: attachment.type, name: attachment.name },
                         token,
-                        { title: 'Appraisal Evidence', category: 'appraisal' }
+                        { title: 'Appraisal Evidence', category: 'Appraisal' }
                     );
                     if (uploadRes?.data?.id) documentIds.push(uploadRes.data.id);
                 } catch (e) {
@@ -217,13 +259,29 @@ export default function AppraisalScreen() {
                 }
             }
 
-            await apiService.post(API_ENDPOINTS.APPRAISALS.CREATE, {
-                appraisal_date: newAppraisal.date,
+            // Prepare payload with proper types
+            const payload: any = {
+                appraisal_type: newAppraisal.type,
+                appraisal_date: newAppraisal.date, // Should be YYYY-MM-DD format
                 discussion_with: newAppraisal.discussionWith,
-                hospital_id: selectedHospital?.id,
-                notes: newAppraisal.notes,
-                document_ids: documentIds.length > 0 ? documentIds : undefined
-            }, token);
+                notes: newAppraisal.notes || undefined,
+            };
+
+            // Ensure hospital_id is an integer if present
+            if (selectedHospital?.id) {
+                payload.hospital_id = typeof selectedHospital.id === 'string'
+                    ? parseInt(selectedHospital.id, 10)
+                    : selectedHospital.id;
+            }
+
+            // Add document IDs if any
+            if (documentIds.length > 0) {
+                payload.document_ids = documentIds;
+            }
+
+            console.log('Creating appraisal with payload:', JSON.stringify(payload));
+
+            await apiService.post(API_ENDPOINTS.APPRAISALS.CREATE, payload, token);
 
             showToast.success('Appraisal record added', 'Success');
             resetForm();
@@ -238,13 +296,14 @@ export default function AppraisalScreen() {
 
     const resetForm = () => {
         setShowAddModal(false);
-        setNewAppraisal({ date: new Date().toISOString().split('T')[0], notes: '', discussionWith: '' });
+        setNewAppraisal({ type: 'Annual Appraisal', date: new Date().toISOString().split('T')[0], notes: '', discussionWith: '' });
         setHospitalQuery('');
         setSelectedHospital(null);
         setFileUri(null);
         setAttachment(null);
         setShowHospitalDropdown(false);
         setShowDiscussionDropdown(false);
+        setShowTypeDropdown(false);
     };
 
     return (
@@ -273,9 +332,9 @@ export default function AppraisalScreen() {
                                 <View key={appraisal.id} className={`rounded-xl shadow-sm border p-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
                                     <View className="flex-row justify-between items-start mb-2">
                                         <View className="flex-row items-center gap-2">
-                                            <MaterialIcons name="verified" size={20} color="#E11D48" />
+                                            <MaterialIcons name="verified" size={20} color={appraisal.type === 'Other' ? '#2B5E9C' : '#E11D48'} />
                                             <Text className={`font-bold text-base ${isDark ? "text-white" : "text-[#121417]"}`}>
-                                                Annual Appraisal
+                                                {appraisal.type || 'Annual Appraisal'}
                                             </Text>
                                         </View>
                                         <View className="flex-row items-center gap-2">
@@ -341,6 +400,24 @@ export default function AppraisalScreen() {
 
                         <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
 
+                            {/* Type Dropdown */}
+                            <View>
+                                <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Appraisal Type</Text>
+                                <Pressable onPress={() => setShowTypeDropdown(!showTypeDropdown)} className={`flex-row justify-between items-center p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                                    <Text className={isDark ? "text-white" : "text-slate-800"}>{newAppraisal.type}</Text>
+                                    <MaterialIcons name="arrow-drop-down" size={24} color={isDark ? "#ccc" : "#666"} />
+                                </Pressable>
+                                {showTypeDropdown && (
+                                    <View className={`mt-1 rounded-xl border overflow-hidden ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                                        {APPRAISAL_TYPES.map(type => (
+                                            <Pressable key={type} onPress={() => { setNewAppraisal({ ...newAppraisal, type }); setShowTypeDropdown(false); }} className={`p-3 border-b ${isDark ? "border-slate-600 active:bg-slate-600" : "border-gray-100 active:bg-gray-50"}`}>
+                                                <Text className={isDark ? "text-white" : "text-slate-800"}>{type}</Text>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+
                             {/* Discussion With - Dropdown */}
                             <View>
                                 <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Discussion With</Text>
@@ -359,41 +436,66 @@ export default function AppraisalScreen() {
                                 )}
                             </View>
 
-                            {/* Where - Hospital Search */}
+                            {/* Where - Hospital Selection (Optional) */}
                             <View className="z-20">
-                                <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Where (Hospital/Location)</Text>
-                                <View className={`flex-row items-center rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
-                                    <TextInput
-                                        value={selectedHospital ? selectedHospital.name : hospitalQuery}
-                                        onChangeText={(t) => {
-                                            setHospitalQuery(t);
-                                            setSelectedHospital(null);
-                                            setShowHospitalDropdown(true);
-                                        }}
-                                        className={`flex-1 p-3 ${isDark ? "text-white" : "text-slate-800"}`}
-                                        placeholder="Search hospital..."
-                                        placeholderTextColor={isDark ? "#9ca3af" : "#9ca3af"}
-                                    />
-                                    {isSearchingHospitals && <ActivityIndicator size="small" color="#2B5E9C" className="mr-3" />}
-                                    {selectedHospital && (
-                                        <Pressable onPress={() => { setSelectedHospital(null); setHospitalQuery(''); }} className="mr-3">
-                                            <MaterialIcons name="close" size={20} color="#EF4444" />
-                                        </Pressable>
-                                    )}
-                                </View>
-
-                                {showHospitalDropdown && hospitalResults.length > 0 && !selectedHospital && (
-                                    <View className={`mt-2 max-h-60 rounded-xl border overflow-hidden ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-gray-200"}`}>
-                                        {hospitalResults.map((item) => (
-                                            <Pressable
-                                                key={item.id}
-                                                onPress={() => { setSelectedHospital(item); setHospitalQuery(item.name); setShowHospitalDropdown(false); }}
-                                                className={`p-3 border-b ${isDark ? "border-slate-700 active:bg-slate-700" : "border-gray-100 active:bg-gray-100"}`}
-                                            >
-                                                <Text className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>{item.name}</Text>
-                                                <Text className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{item.town}, {item.postcode}</Text>
+                                <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Where (Hospital/Location) - Optional</Text>
+                                <Pressable
+                                    onPress={() => setShowHospitalDropdown(!showHospitalDropdown)}
+                                    className={`flex-row justify-between items-center p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}
+                                >
+                                    <Text className={selectedHospital ? (isDark ? "text-white" : "text-slate-800") : (isDark ? "text-gray-400" : "text-gray-500")}>
+                                        {selectedHospital ? selectedHospital.name : "Select hospital (optional)..."}
+                                    </Text>
+                                    <View className="flex-row items-center gap-2">
+                                        {selectedHospital && (
+                                            <Pressable onPress={() => { setSelectedHospital(null); setHospitalQuery(''); }}>
+                                                <MaterialIcons name="close" size={20} color="#EF4444" />
                                             </Pressable>
-                                        ))}
+                                        )}
+                                        <MaterialIcons name="arrow-drop-down" size={24} color={isDark ? "#ccc" : "#666"} />
+                                    </View>
+                                </Pressable>
+
+                                {showHospitalDropdown && (
+                                    <View className={`mt-2 rounded-xl border overflow-hidden ${isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-gray-200"}`}>
+                                        {/* Search Input */}
+                                        <View className={`flex-row items-center border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                                            <MaterialIcons name="search" size={20} color={isDark ? "#9ca3af" : "#9ca3af"} style={{ marginLeft: 12 }} />
+                                            <TextInput
+                                                value={hospitalQuery}
+                                                onChangeText={(t) => { setHospitalQuery(t); }}
+                                                className={`flex-1 p-3 ${isDark ? "text-white" : "text-slate-800"}`}
+                                                placeholder="Search hospitals..."
+                                                placeholderTextColor={isDark ? "#9ca3af" : "#9ca3af"}
+                                            />
+                                            {isSearchingHospitals && <ActivityIndicator size="small" color="#2B5E9C" className="mr-3" />}
+                                        </View>
+
+                                        {/* Hospital List */}
+                                        <View style={{ height: 200 }}>
+                                            <ScrollView
+                                                nestedScrollEnabled={true}
+                                                keyboardShouldPersistTaps="handled"
+                                                contentContainerStyle={{ flexGrow: 1 }}
+                                            >
+                                                {hospitalResults
+                                                    .filter(h => !hospitalQuery || h.name.toLowerCase().includes(hospitalQuery.toLowerCase()))
+                                                    .slice(0, 100)
+                                                    .map((item) => (
+                                                        <Pressable
+                                                            key={item.id}
+                                                            onPress={() => { setSelectedHospital(item); setHospitalQuery(''); setShowHospitalDropdown(false); }}
+                                                            className={`p-3 border-b ${isDark ? "border-slate-700 active:bg-slate-700" : "border-gray-100 active:bg-gray-100"}`}
+                                                        >
+                                                            <Text className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>{item.name}</Text>
+                                                            <Text className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>{item.town}, {item.postcode}</Text>
+                                                        </Pressable>
+                                                    ))}
+                                                {hospitalResults.length === 0 && (
+                                                    <Text className={`p-3 text-center ${isDark ? "text-gray-400" : "text-gray-500"}`}>No hospitals found</Text>
+                                                )}
+                                            </ScrollView>
+                                        </View>
                                     </View>
                                 )}
                             </View>
@@ -460,7 +562,7 @@ export default function AppraisalScreen() {
                         </ScrollView>
                     </View>
                 </View>
-            </Modal>
-        </SafeAreaView>
+            </Modal >
+        </SafeAreaView >
     );
 }

@@ -1,7 +1,8 @@
 import { View, Text, ScrollView, Pressable, Modal, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { getProfile } from '@/features/profile/profile.api';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useCalendar } from '@/hooks/useCalendar';
@@ -147,14 +148,19 @@ export default function CalendarScreen() {
       return true;
     });
 
-  // Load all events once on mount, then filter locally by month
-  // This allows users to navigate to past/future months and see events
-  useEffect(() => {
-    // Only fetch all events on initial load (no date filters)
-    if (events.length === 0 && !isLoading) {
-      refresh(); // Load all events without date filters
-    }
-  }, []); // Only run once on mount
+  // Refresh data when screen comes into focus (only on mount, not every time)
+  const hasRefreshedOnFocus = React.useRef(false);
+  useFocusEffect(
+    React.useCallback(() => {
+      // Skip first focus since useCalendar already fetches on mount
+      if (!hasRefreshedOnFocus.current) {
+        hasRefreshedOnFocus.current = true;
+        return;
+      }
+      // Only refresh on subsequent focuses (coming back from another screen)
+      refresh();
+    }, []) // Empty dependency array - refresh is stable from useCallback
+  );
 
   // Load current user's profile to find invites addressed to them
   useEffect(() => {
@@ -365,40 +371,7 @@ export default function CalendarScreen() {
             </Text>
           </View>
           <View className="flex-row items-center" style={{ gap: 12 }}>
-            <Pressable
-              onPress={() => {
-                setEditingEventId(null);
-                setEventForm({
-                  title: '',
-                  description: '',
-                  location: '',
-                  date: selectedDate,
-                  startTime: '',
-                  endTime: '',
-                  type: 'official',
-                });
-                setCurrentDate(selectedDate);
-                setFormErrors({});
-                setShowAddEventModal(true);
-              }}
-              className={`w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                }`}
-            >
-              <MaterialIcons name="add" size={24} color={isDark ? "#D4AF37" : "#2B5F9E"} />
-            </Pressable>
-            {isPremium && (
-              <Pressable
-                onPress={() => router.push('/(tabs)/notifications')}
-                className={`relative w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                  }`}
-              >
-                <MaterialIcons name="notifications" size={20} color="#2B5F9E" />
-                {/* Notification Badge */}
-                <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white items-center justify-center">
-                  <Text className="text-white text-[8px] font-bold" style={{ lineHeight: 10 }}>2</Text>
-                </View>
-              </Pressable>
-            )}
+
             <Pressable
               onPress={() => setShowInvitesModal(true)}
               className={`relative w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"

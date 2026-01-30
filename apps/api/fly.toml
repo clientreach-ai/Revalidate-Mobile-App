@@ -7,13 +7,17 @@ app = 'revalidate-api'
 primary_region = 'iad'
 
 [build]
-  # Use repo root as build context so Dockerfile can COPY monorepo files
-  context = '../..'
-  dockerfile = 'apps/api/Dockerfile'
+  context = '.'
+  dockerfile = 'Dockerfile'
 
 [env]
   NODE_ENV = 'production'
   PORT = '3000'
+  API_BASE_URL = 'https://revalidate-api.fly.dev'
+
+[mounts]
+  source = 'uploads_data'
+  destination = '/app/apps/api/uploads'
 
 [http_service]
   internal_port = 3000

@@ -2,7 +2,7 @@ export interface CalendarAttendee {
   id: string;
   userId?: string;
   email: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: 'pending' | 'invited' | 'accepted' | 'declined';
   createdAt: string;
   updatedAt: string;
 }

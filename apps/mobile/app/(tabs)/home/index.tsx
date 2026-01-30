@@ -25,6 +25,7 @@ import { API_CONFIG } from '@revalidation-tracker/constants';
 import { showToast } from '@/utils/toast';
 import { setSubscriptionInfo } from '@/utils/subscription';
 import { usePremium } from '@/hooks/usePremium';
+import { DiscoveryModal, useDiscoveryModal } from '@/features/auth/DiscoveryModal';
 import '../../global.css';
 
 interface UserData {
@@ -43,13 +44,22 @@ interface ActiveSession {
   durationMinutes: number | null;
   workDescription: string | null;
   isActive: boolean;
+  isPaused?: boolean;
+  pausedAt?: string | null;
+  totalPausedMs?: number;
 }
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
+  const { showModal, showDiscoveryModal, hideModal } = useDiscoveryModal();
   const isMounted = useRef(true);
+
+  useEffect(() => {
+    showDiscoveryModal();
+  }, []);
+
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(
     null
   );
@@ -76,6 +86,7 @@ export default function DashboardScreen() {
   });
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [localProfileImage, setLocalProfileImage] = useState<string | null>(null);
 
   // Work Session Form State
   const [showWorkForm, setShowWorkForm] = useState(false);
@@ -146,7 +157,7 @@ export default function DashboardScreen() {
             animated: true,
           });
           currentIndex = next;
-        } catch (e) {}
+        } catch (e) { }
       }
     }, 3500) as any;
   };
@@ -228,9 +239,6 @@ export default function DashboardScreen() {
     };
   }, [activeSession, isPaused, totalPausedTime, pausedAt, lastPausedTimer]);
 
-  useEffect(() => {
-    if (activeSession) savePauseState();
-  }, [isPaused, pausedAt, totalPausedTime, activeSession?.id]);
 
   const updateTimerFromSession = () => {
     if (!activeSession || !activeSession.isActive || isPaused) return;
@@ -255,48 +263,26 @@ export default function DashboardScreen() {
 
       if (response?.data && response.data.isActive) {
         if (!isMounted.current) return;
-        setActiveSession(response.data);
-        try {
-          const storedPauseState = await AsyncStorage.getItem(
-            'workSessionPauseState'
-          );
-          if (storedPauseState) {
-            const pauseState = JSON.parse(storedPauseState);
-            if (pauseState.sessionId === response.data.id) {
-              setIsPaused(pauseState.isPaused || false);
-              setTotalPausedTime(pauseState.totalPausedTime || 0);
-              if (pauseState.isPaused && pauseState.pausedAt) {
-                setPausedAt(new Date(pauseState.pausedAt));
-                if (pauseState.lastPausedTimer) {
-                  setLastPausedTimer(pauseState.lastPausedTimer);
-                  setTimer(pauseState.lastPausedTimer);
-                }
-              } else {
-                setPausedAt(null);
-                setLastPausedTimer(null);
-                updateTimerFromSession();
-              }
-            } else {
-              setIsPaused(false);
-              setPausedAt(null);
-              setTotalPausedTime(0);
-              setLastPausedTimer(null);
-              await AsyncStorage.removeItem('workSessionPauseState');
-              updateTimerFromSession();
-            }
-          } else {
-            setIsPaused(false);
-            setPausedAt(null);
-            setTotalPausedTime(0);
-            setLastPausedTimer(null);
-            updateTimerFromSession();
-          }
-        } catch (error) {
-          setIsPaused(false);
-          setPausedAt(null);
-          setTotalPausedTime(0);
+        const session = response.data;
+        setActiveSession(session);
+        setIsPaused(session.isPaused || false);
+        setTotalPausedTime(session.totalPausedMs || 0);
+        setPausedAt(session.pausedAt ? new Date(session.pausedAt) : null);
+
+        // If it's paused, we might want to calculate the timer at the moment of pause
+        if (session.isPaused && session.pausedAt) {
+          const startTime = new Date(session.startTime);
+          const pauseTime = new Date(session.pausedAt);
+          const diffMs = pauseTime.getTime() - startTime.getTime() - (session.totalPausedMs || 0);
+          const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+          const h = Math.floor(totalSeconds / 3600);
+          const m = Math.floor((totalSeconds % 3600) / 60);
+          const s = totalSeconds % 60;
+          setTimer({ hours: h, minutes: m, seconds: s });
+          setLastPausedTimer({ hours: h, minutes: m, seconds: s });
+        } else {
           setLastPausedTimer(null);
-          updateTimerFromSession();
+          // Initial timer update will happen in the useEffect
         }
       } else {
         setActiveSession(null);
@@ -316,25 +302,6 @@ export default function DashboardScreen() {
     }
   };
 
-  const savePauseState = async () => {
-    if (!activeSession) return;
-    try {
-      const pauseState = {
-        sessionId: activeSession.id,
-        isPaused,
-        pausedAt: pausedAt?.toISOString() || null,
-        totalPausedTime,
-        lastPausedTimer: isPaused ? timer : null,
-        lastUpdated: new Date().toISOString(),
-      };
-      await AsyncStorage.setItem(
-        'workSessionPauseState',
-        JSON.stringify(pauseState)
-      );
-    } catch (error) {
-      console.error('Error saving pause state:', error);
-    }
-  };
 
   const handleStartSession = async () => {
     try {
@@ -374,33 +341,57 @@ export default function DashboardScreen() {
 
   const handlePauseSession = async () => {
     if (!activeSession || isPaused) return;
-    setLastPausedTimer(timer);
-    const now = new Date();
-    setIsPaused(true);
-    setPausedAt(now);
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await apiService.post<{
+        success: boolean;
+        data: ActiveSession;
+      }>(API_ENDPOINTS.WORK_HOURS.PAUSE, {}, token);
+
+      if (response?.data) {
+        setActiveSession(response.data);
+        setIsPaused(true);
+        setPausedAt(new Date(response.data.pausedAt!));
+        setLastPausedTimer(timer);
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
+        showToast.info('Session paused', 'Paused');
+      }
+    } catch (error: any) {
+      showToast.error(error?.message || 'Failed to pause session');
     }
-    showToast.info('Session paused', 'Paused');
-    await savePauseState();
   };
 
   const handleResumeSession = async () => {
     if (!activeSession || !isPaused) return;
-    const now = new Date();
-    const pauseStartTime = pausedAt || now;
-    const pauseDuration = now.getTime() - pauseStartTime.getTime();
-    setTotalPausedTime((prev) => prev + pauseDuration);
-    setIsPaused(false);
-    setPausedAt(null);
-    setLastPausedTimer(null);
-    updateTimerFromSession();
-    timerIntervalRef.current = setInterval(() => {
-      updateTimerFromSession();
-    }, 1000) as any;
-    showToast.info('Session resumed', 'Resumed');
-    await savePauseState();
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await apiService.post<{
+        success: boolean;
+        data: ActiveSession;
+      }>(API_ENDPOINTS.WORK_HOURS.RESUME, {}, token);
+
+      if (response?.data) {
+        setActiveSession(response.data);
+        setIsPaused(false);
+        setPausedAt(null);
+        setTotalPausedTime(response.data.totalPausedMs || 0);
+        setLastPausedTimer(null);
+        updateTimerFromSession();
+        timerIntervalRef.current = setInterval(() => {
+          updateTimerFromSession();
+        }, 1000) as any;
+        showToast.info('Session resumed', 'Resumed');
+      }
+    } catch (error: any) {
+      showToast.error(error?.message || 'Failed to resume session');
+    }
   };
 
   const handleRestartSession = async () => {
@@ -419,31 +410,21 @@ export default function DashboardScreen() {
                 router.replace('/(auth)/login');
                 return;
               }
-              if (activeSession) {
-                const endTime = new Date().toISOString();
-                await apiService.put(
-                  `${API_ENDPOINTS.WORK_HOURS.UPDATE}/${activeSession.id}`,
-                  { end_time: endTime, work_description: '' },
-                  token
-                );
-              }
-              const startTime = new Date().toISOString();
+
               const response = await apiService.post<{
                 success: boolean;
                 data: ActiveSession;
-              }>(
-                API_ENDPOINTS.WORK_HOURS.CREATE,
-                { start_time: startTime, work_description: '' },
-                token
-              );
+              }>(API_ENDPOINTS.WORK_HOURS.RESTART, {}, token);
+
               if (response?.data) {
+                // Immediately reset local timer state to avoid showing stale data
+                setTimer({ hours: 0, minutes: 0, seconds: 0 });
                 setActiveSession(response.data);
                 setIsPaused(false);
                 setPausedAt(null);
                 setTotalPausedTime(0);
                 setLastPausedTimer(null);
                 await AsyncStorage.removeItem('workSessionPauseState');
-                updateTimerFromSession();
                 showToast.success('Session restarted', 'Success');
               }
             } catch (error: any) {
@@ -725,6 +706,16 @@ export default function DashboardScreen() {
             setRevalidationDays(null);
           }
         }
+        // Load local profile image from AsyncStorage
+        try {
+          const key = data.id ? `profile_image_uri_${data.id}` : 'profile_image_uri';
+          const localImg = await AsyncStorage.getItem(key);
+          if (localImg && isMounted.current) {
+            setLocalProfileImage(localImg);
+          }
+        } catch (e) {
+          console.log('Error loading local profile image:', e);
+        }
       }
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -881,7 +872,7 @@ export default function DashboardScreen() {
               totalEarnings =
                 onboarding.data.earned_current_financial_year || 0;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
       let cpdHours = 0;
       try {
@@ -890,7 +881,7 @@ export default function DashboardScreen() {
           data: { totalHours: number };
         }>('/api/v1/cpd-hours/stats/total', token);
         cpdHours = cpd?.data?.totalHours || 0;
-      } catch (e) {}
+      } catch (e) { }
       let reflectionsCount = 0;
       try {
         const ref = await apiService.get<{ pagination: { total: number } }>(
@@ -898,7 +889,7 @@ export default function DashboardScreen() {
           token
         );
         reflectionsCount = ref?.pagination?.total || 0;
-      } catch (e) {}
+      } catch (e) { }
       let appraisalsCount = 0;
       try {
         const appr = await apiService.get<{ pagination: { total: number } }>(
@@ -906,7 +897,7 @@ export default function DashboardScreen() {
           token
         );
         appraisalsCount = appr?.pagination?.total || 0;
-      } catch (e) {}
+      } catch (e) { }
 
       if (isMounted.current) {
         setStats({
@@ -936,7 +927,7 @@ export default function DashboardScreen() {
         ).length;
         if (isMounted.current) setUnreadNotifications(unread);
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const formatTimeAgo = (iso?: string) => {
@@ -967,7 +958,7 @@ export default function DashboardScreen() {
         }));
         if (isMounted.current) setRecentActivities(mapped);
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const loadSlides = async () => {
@@ -1017,11 +1008,11 @@ export default function DashboardScreen() {
                   JSON.stringify(cached)
                 );
               }
-            } catch (e) {}
+            } catch (e) { }
           }
-        } catch (e) {}
+        } catch (e) { }
       })();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const onRefresh = async () => {
@@ -1143,9 +1134,9 @@ export default function DashboardScreen() {
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
               <View className="w-12 h-12 rounded-full border-2 border-white/30 items-center justify-center bg-white/20 relative">
-                {userData?.image ? (
+                {(localProfileImage || userData?.image) ? (
                   <Image
-                    source={{ uri: userData.image }}
+                    source={{ uri: localProfileImage || userData?.image || '' }}
                     className="w-full h-full rounded-full"
                   />
                 ) : (
@@ -1876,6 +1867,8 @@ export default function DashboardScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <DiscoveryModal visible={showModal} onClose={hideModal} />
     </SafeAreaView>
   );
 }

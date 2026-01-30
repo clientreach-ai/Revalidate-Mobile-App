@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Image, Modal } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Image, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { useProfile } from '@/hooks/useProfile';
+import { usePremium } from '@/hooks/usePremium';
 import { showToast } from '@/utils/toast';
 import '../../global.css';
 
@@ -15,6 +16,7 @@ export default function AccountSettingsScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
   const { profile, refresh: refreshProfile } = useProfile();
+  const { isPremium } = usePremium();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -51,6 +53,7 @@ export default function AccountSettingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -267,6 +270,52 @@ export default function AccountSettingsScreen() {
     await refreshProfile();
   };
 
+  const RESET_SECTIONS = [
+    { id: 'work_hours', label: 'Work Hours', icon: 'schedule' },
+    { id: 'cpd_hours', label: 'CPD Hours', icon: 'school' },
+    { id: 'reflections', label: 'Reflections', icon: 'note' },
+    { id: 'feedback', label: 'Feedback', icon: 'feedback' },
+    { id: 'documents', label: 'Documents', icon: 'folder' },
+  ] as const;
+
+  const handleResetSection = (section: typeof RESET_SECTIONS[number]) => {
+    Alert.alert(
+      `Reset ${section.label}?`,
+      `This will permanently delete all your ${section.label.toLowerCase()} data. This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsResetting(true);
+              const token = await AsyncStorage.getItem('authToken');
+              if (!token) {
+                showToast.error('Please login again');
+                return;
+              }
+
+              await apiService.post(
+                API_ENDPOINTS.USERS.RESET_SECTION,
+                { section: section.id },
+                token
+              );
+
+              showToast.success(`${section.label} data has been reset`);
+              loadUserData();
+            } catch (error: any) {
+              console.error('Error resetting section:', error);
+              showToast.error(error?.message || 'Failed to reset data');
+            } finally {
+              setIsResetting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const formatDate = (date: Date | null): string => {
     if (!date) return 'Select date';
     return date.toLocaleDateString('en-GB', {
@@ -398,7 +447,7 @@ export default function AccountSettingsScreen() {
               <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
             </Pressable>
             <Text className={`text-lg font-bold flex-1 text-center ${isDark ? "text-white" : "text-[#121417]"}`}>
-              Account Settings
+              Account Sett ings
             </Text>
             <View className="w-12" />
           </View>
@@ -506,6 +555,54 @@ export default function AccountSettingsScreen() {
               <InputField label="Brief Description of Work" value={workDescription} onChangeText={setWorkDescription} placeholder="Describe your current role..." multiline />
               <InputField label="Notepad" value={notepad} onChangeText={setNotepad} placeholder="Personal notes..." multiline />
             </View>
+
+            {/* Reset Data Section - Premium Only */}
+            {isPremium && (
+              <View style={{ gap: 16 }}>
+                <SectionHeader icon="refresh" title="Reset Data" />
+                <View className={`rounded-2xl border p-4 ${isDark ? 'bg-red-900/10 border-red-900/30' : 'bg-red-50 border-red-200'}`}>
+                  <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
+                    <MaterialIcons name="warning" size={20} color={isDark ? '#FCA5A5' : '#EF4444'} />
+                    <Text className={`text-sm font-medium ${isDark ? 'text-red-300' : 'text-red-700'}`}>
+                      Danger Zone
+                    </Text>
+                  </View>
+                  <Text className={`text-sm mb-4 ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>
+                    Reset specific sections of your data. This action cannot be undone.
+                  </Text>
+                  <View style={{ gap: 8 }}>
+                    {RESET_SECTIONS.map((section) => (
+                      <Pressable
+                        key={section.id}
+                        onPress={() => handleResetSection(section)}
+                        disabled={isResetting}
+                        className={`flex-row items-center justify-between p-3 rounded-xl border ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'
+                          }`}
+                      >
+                        <View className="flex-row items-center" style={{ gap: 12 }}>
+                          <View className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-slate-100'
+                            }`}>
+                            <MaterialIcons
+                              name={section.icon as keyof typeof MaterialIcons.glyphMap}
+                              size={16}
+                              color={isDark ? '#9CA3AF' : '#64748B'}
+                            />
+                          </View>
+                          <Text className={`font-medium ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>
+                            {section.label}
+                          </Text>
+                        </View>
+                        {isResetting ? (
+                          <ActivityIndicator size="small" color={isDark ? '#9CA3AF' : '#64748B'} />
+                        ) : (
+                          <MaterialIcons name="delete-outline" size={20} color={isDark ? '#F87171' : '#EF4444'} />
+                        )}
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            )}
 
             {/* Save Button */}
             <Pressable

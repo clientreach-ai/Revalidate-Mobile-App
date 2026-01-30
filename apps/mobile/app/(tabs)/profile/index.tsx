@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useProfile } from '@/hooks/useProfile';
 import { usePremium } from '@/hooks/usePremium';
+import { apiService, API_ENDPOINTS } from '@/services/api';
 import { API_CONFIG } from '@revalidation-tracker/constants';
 import { showToast } from '@/utils/toast';
 import '../../global.css';
@@ -125,7 +126,18 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
+      // Try to pause active session if exists before logging out
+      const token = await AsyncStorage.getItem('authToken');
+      if (token) {
+        try {
+          await apiService.post(API_ENDPOINTS.WORK_HOURS.PAUSE, {}, token);
+        } catch (e) {
+          // Ignore error (no active session or network error)
+        }
+      }
+
       await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('userData');
       showToast.success('Logged out successfully', 'Success');
       router.replace('/(auth)/login');
     } catch (error) {

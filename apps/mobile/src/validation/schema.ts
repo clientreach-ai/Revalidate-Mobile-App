@@ -50,7 +50,7 @@ export type OnboardingRoleInput = z.infer<typeof onboardingRoleSchema>;
 export const onboardingPersonalDetailsSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name is too long'),
   email: emailSchema,
-  phone: z.string().optional(),
+  phone: z.string().min(1, 'Phone number is required').max(20, 'Phone number is too long'),
 });
 export type OnboardingPersonalDetailsInput = z.infer<typeof onboardingPersonalDetailsSchema>;
 
@@ -99,20 +99,20 @@ export const professionalRegistrationEnum = z.enum([
 export const onboardingProfessionalDetailsSchema = z.object({
   registrationNumber: registrationNumberSchema,
   // Accept backend-provided registration names (e.g. "GMC", "NMC") as strings
-  professionalRegistrations: z.array(z.string()).min(1, 'At least one professional registration is required'),
+  professionalRegistrations: z.array(z.string()).optional(),
   registrationPin: z.string().optional(),
   revalidationDate: z.date({
     required_error: 'Revalidation date is required',
     invalid_type_error: 'Please select a valid date',
   }),
   // Accept backend-provided names for work setting and scope (display names)
-  workSetting: z.string().min(1, 'Work setting is required'),
-  scope: z.string().min(1, 'Scope of practice is required'),
+  workSetting: z.string().optional(),
+  scope: z.string().optional(),
   hourlyRate: z.number().min(0, 'Hourly rate must be 0 or greater').default(0),
   workHoursCompleted: z.number().min(0, 'Work hours must be 0 or greater').default(0),
   trainingHoursCompleted: z.number().min(0, 'Training hours must be 0 or greater').default(0),
   earningsCurrentYear: z.number().min(0, 'Earnings must be 0 or greater').default(0),
-  workDescription: z.string().min(1, 'Work description is required').max(1000, 'Work description is too long'),
+  workDescription: z.string().optional(),
   notepad: z.string().optional(),
 });
 export type OnboardingProfessionalDetailsInput = z.infer<

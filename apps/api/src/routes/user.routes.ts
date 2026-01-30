@@ -12,6 +12,9 @@ import {
   onboardingStep4,
   getOnboardingProgress,
   getOnboardingDataEndpoint,
+  saveDiscoverySource,
+  getDiscoverySource,
+  resetSection,
 } from '../modules/users/user.controller';
 import { authenticateToken } from '../modules/auth/auth.middleware';
 import { registrationRateLimiter } from '../common/middleware/rate-limiter';
@@ -28,6 +31,13 @@ router.get('/search', searchUsers);
 router.put('/profile', updateProfile);
 router.delete('/profile', deleteAccount);
 
+// Discovery source (how user heard about the app)
+router.get('/discovery-source', getDiscoverySource);
+router.post('/discovery-source', saveDiscoverySource);
+
+// Reset section data (Premium only)
+router.post('/reset-section', resetSection);
+
 // Onboarding routes (multi-step registration)
 router.get('/onboarding/progress', getOnboardingProgress);
 router.get('/onboarding/data', getOnboardingDataEndpoint);
@@ -38,3 +48,4 @@ router.post('/onboarding/step-3', onboardingStep3);
 router.post('/onboarding/step-4', onboardingStep4);
 
 export default router;
+

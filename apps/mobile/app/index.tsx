@@ -58,7 +58,8 @@ export default function SplashScreen() {
                             });
 
                             // Restore onboarding status from backup if available
-                            if (user.onboardingCompleted) {
+                            // Treat having a professionalRole as being onboarded (migrated users)
+                            if (user.onboardingCompleted || user.professionalRole) {
                                 useAuthStore.getState().setOnboardingCompleted(true);
                                 onboardingCompleted = true;
                             }

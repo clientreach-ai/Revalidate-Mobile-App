@@ -39,7 +39,7 @@ app.use((req, _res, next) => {
 
 // Serve uploaded documents
 import path from 'path';
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 
 // Health check
 app.get('/health', (_req, res) => {

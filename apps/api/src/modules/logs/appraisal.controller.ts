@@ -13,6 +13,7 @@ import {
 import { z } from 'zod';
 
 const createAppraisalSchema = z.object({
+  appraisal_type: z.string().optional(),
   appraisal_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   discussion_with: z.string().optional(),
   hospital_id: z.number().int().optional(),
@@ -30,21 +31,33 @@ const updateAppraisalSchema = z.object({
 
 export const create = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) throw new ApiError(401, 'Authentication required');
-  const validated = createAppraisalSchema.parse(req.body) as CreateAppraisalRecord;
-  const appraisal = await createAppraisalRecord(req.user.userId, validated);
-  res.status(201).json({
-    success: true,
-    data: {
-      id: appraisal.id,
-      appraisalDate: appraisal.appraisal_date,
-      discussionWith: appraisal.discussion_with,
-      hospitalId: appraisal.hospital_id,
-      notes: appraisal.notes,
-      documentIds: appraisal.document_ids ? JSON.parse(appraisal.document_ids) : [],
-      createdAt: appraisal.created_at,
-      updatedAt: appraisal.updated_at,
-    },
-  });
+
+  try {
+    console.log('[Appraisal Create] Request body:', JSON.stringify(req.body));
+    const validated = createAppraisalSchema.parse(req.body) as CreateAppraisalRecord;
+    console.log('[Appraisal Create] Validated data:', JSON.stringify(validated));
+
+    const appraisal = await createAppraisalRecord(req.user.userId, validated);
+    console.log('[Appraisal Create] Success, ID:', appraisal.id);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: appraisal.id,
+        appraisalType: appraisal.appraisal_type,
+        appraisalDate: appraisal.appraisal_date,
+        discussionWith: appraisal.discussion_with,
+        hospitalId: appraisal.hospital_id,
+        notes: appraisal.notes,
+        documentIds: appraisal.document_ids ? JSON.parse(appraisal.document_ids) : [],
+        createdAt: appraisal.created_at,
+        updatedAt: appraisal.updated_at,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Appraisal Create] Error:', error.message, error.code, error.sqlMessage);
+    throw error;
+  }
 });
 
 export const list = asyncHandler(async (req: Request, res: Response) => {
@@ -60,6 +73,7 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
     success: true,
     data: appraisalRecords.map(a => ({
       id: a.id,
+      appraisalType: a.appraisal_type,
       appraisalDate: a.appraisal_date,
       discussionWith: a.discussion_with,
       hospitalId: a.hospital_id,
@@ -80,9 +94,11 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
     success: true,
     data: {
       id: appraisal.id,
+      appraisalType: appraisal.appraisal_type,
       appraisalDate: appraisal.appraisal_date,
       discussionWith: appraisal.discussion_with,
       hospitalId: appraisal.hospital_id,
+      hospitalName: appraisal.hospital_name,
       notes: appraisal.notes,
       documentIds: appraisal.document_ids ? JSON.parse(appraisal.document_ids) : [],
       createdAt: appraisal.created_at,

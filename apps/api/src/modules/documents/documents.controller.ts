@@ -16,11 +16,12 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import axios from 'axios';
+import { SERVER_CONFIG } from '../../config/env';
 
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.diskStorage({
-  destination: (_req, _file, cb) => {
+    destination: (_req, _file, cb) => {
       const uploadDir = path.join(process.cwd(), 'uploads', 'documents');
       // Create directory if it doesn't exist
       if (!fs.existsSync(uploadDir)) {
@@ -93,8 +94,8 @@ export const uploadDocument = [
 
     // Create file URL/path (in production, this would be S3 URL)
     const filePath = `/uploads/documents/${req.file.filename}`;
-    const fileUrl = process.env.API_BASE_URL
-      ? `${process.env.API_BASE_URL}${filePath}`
+    const fileUrl = SERVER_CONFIG.apiBaseUrl
+      ? `${SERVER_CONFIG.apiBaseUrl.replace(/\/$/, '')}${filePath}`
       : filePath;
 
     const documentData: CreateDocument = {
@@ -123,6 +124,7 @@ export const uploadDocument = [
         category: document.type,
         size: req.file.size ? `${(req.file.size / (1024 * 1024)).toFixed(2)} MB` : undefined,
         type: req.file.mimetype,
+        document: document.document,
         created_at: document.created_at,
         updated_at: document.updated_at,
       },
@@ -197,6 +199,7 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
       category: doc.type,
       size: sizeStr,
       type: doc.document?.split('.').pop()?.toLowerCase() || 'file',
+      document: doc.document,
       created_at: doc.created_at,
       updated_at: doc.updated_at,
     };

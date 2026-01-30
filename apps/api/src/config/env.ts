@@ -26,7 +26,7 @@ export const MYSQL_CONFIG = {
 
 // Prisma DATABASE_URL
 // Format: mysql://USER:PASSWORD@HOST:PORT/DATABASE
-export const DATABASE_URL = process.env.DATABASE_URL || 
+export const DATABASE_URL = process.env.DATABASE_URL ||
   `mysql://${MYSQL_CONFIG.user}:${MYSQL_CONFIG.password}@${MYSQL_CONFIG.host}:${MYSQL_CONFIG.port}/${MYSQL_CONFIG.database}${process.env.MYSQL_SSL === 'true' ? '?sslaccept=strict' : ''}`;
 
 // Validate MySQL configuration
@@ -47,6 +47,7 @@ export const SERVER_CONFIG = {
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.CORS_ORIGIN || '*',
+  apiBaseUrl: process.env.API_BASE_URL || '',
 };
 
 // Stripe Configuration

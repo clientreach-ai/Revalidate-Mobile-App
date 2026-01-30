@@ -154,7 +154,10 @@ export async function getCalendarEventById(
   const event = await prisma.user_calendars.findFirst({
     where: {
       id: BigInt(eventId),
-      user_id: BigInt(userId),
+      OR: [
+        { user_id: BigInt(userId) },
+        { attendees: { some: { user_id: BigInt(userId) } } },
+      ],
     },
     include: {
       attendees: {
@@ -200,29 +203,61 @@ export async function getUserCalendarEvents(
   options: GetCalendarEventsOptions = {}
 ): Promise<{ events: CalendarEvent[]; total: number }> {
   const where: any = {
-    user_id: BigInt(userId),
+    OR: [
+      { user_id: BigInt(userId) },
+      {
+        attendees: {
+          some: {
+            user_id: BigInt(userId),
+            status: 'accepted',
+          },
+        },
+      },
+    ],
   };
 
   if (options.startDate) {
-    where.date = { gte: new Date(options.startDate) };
+    // If we have a complex where clause, we wrap date filters
+    const dateCondition = { date: { gte: new Date(options.startDate) } };
+    if (options.endDate) {
+      (dateCondition.date as any).lte = new Date(options.endDate);
+    }
+
+    // Apply filters to each side of the OR or add as an AND condition
+    // In Prisma, we can use AND with OR
   }
 
-  if (options.endDate) {
-    where.date = { ...where.date, lte: new Date(options.endDate) };
+  // Refined where with filters
+  const finalWhere: any = {
+    AND: [
+      where,
+    ]
+  };
+
+  if (options.startDate || options.endDate) {
+    const dateFilter: any = { date: {} };
+    if (options.startDate) dateFilter.date.gte = new Date(options.startDate);
+    if (options.endDate) dateFilter.date.lte = new Date(options.endDate);
+    finalWhere.AND.push(dateFilter);
   }
 
   if (options.type) {
-    where.type = mapTypeToDb(options.type);
+    finalWhere.AND.push({ type: mapTypeToDb(options.type) });
   }
 
   const [events, total] = await Promise.all([
     prisma.user_calendars.findMany({
-      where,
+      where: finalWhere,
+      include: {
+        attendees: {
+          include: { users: { select: { id: true, name: true, email: true } } },
+        },
+      },
       orderBy: { date: 'asc' },
       take: options.limit,
       skip: options.offset,
     }),
-    prisma.user_calendars.count({ where }),
+    prisma.user_calendars.count({ where: finalWhere }),
   ]);
 
   return {
@@ -352,11 +387,16 @@ export async function inviteAttendees(
   organizerId: string,
   attendees: InviteInput[]
 ): Promise<any[]> {
-  const event = await prisma.user_calendars.findFirst({ where: { id: BigInt(eventId), user_id: BigInt(organizerId) } });
+  const event = await prisma.user_calendars.findFirst({
+    where: { id: BigInt(eventId), user_id: BigInt(organizerId) },
+    include: { users: { select: { name: true } } }
+  });
+
   if (!event) {
     throw new ApiError(404, 'Calendar event not found');
   }
 
+  const organizerName = event.users?.name || 'Someone';
   const created: any[] = [];
 
   for (const a of attendees) {
@@ -383,17 +423,33 @@ export async function inviteAttendees(
       },
     });
 
+    const notificationTitle = 'Event invitation';
+    const notificationMessage = `${organizerName} has invited you to join "${event.title}" on ${event.date.toISOString().split('T')[0]}`;
+
     // create an in-app notification for matched users
     try {
       if (user) {
         await prisma.notifications.create({
           data: {
             user_id: user.id,
-            title: 'Event invitation',
-            message: `You have been invited to ${event.title} on ${event.date.toISOString().split('T')[0]}`,
-            type: 'calendar',
+            title: notificationTitle,
+            message: notificationMessage,
+            type: `calendar_invite:${eventId}`,
           },
         });
+
+        // Send push notification to premium users
+        if (user.subscription_tier === 'premium' && user.device_token) {
+          const deviceToken = String(user.device_token);
+          if (isValidExpoPushToken(deviceToken)) {
+            await sendPushNotification(
+              deviceToken,
+              notificationTitle,
+              notificationMessage,
+              { type: 'calendar_invite', eventId: eventId }
+            );
+          }
+        }
       }
     } catch (err) {
       console.warn('Failed to create notification for invite', err);
@@ -471,7 +527,7 @@ export async function respondToInvite(
           user_id: organizer.id,
           title: notificationTitle,
           message: notificationMessage,
-          type: 'calendar_response',
+          type: `calendar_response:${eventId}`,
         },
       });
     } catch (err) {

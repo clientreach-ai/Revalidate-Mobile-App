@@ -15,32 +15,10 @@ declare const ErrorUtils: {
   setGlobalHandler: (handler: (error: Error, isFatal?: boolean) => void) => void;
 };
 
-// Safe Stripe import - only load native Stripe on native platforms
-let StripeProvider: any;
-let isStripeAvailable = false;
+import { StripeProvider } from '@/services/stripe';
 
-// Global flag to prevent repeated warnings
-declare global {
-  var __STRIPE_LAYOUT_WARNING_LOGGED__: boolean | undefined;
-}
-
-if (Platform.OS !== 'web') {
-  try {
-    const stripeModule = require("@stripe/stripe-react-native");
-    if (stripeModule && stripeModule.StripeProvider) {
-      StripeProvider = stripeModule.StripeProvider;
-      isStripeAvailable = true;
-    } else {
-      throw new Error("Stripe module not properly loaded");
-    }
-  } catch (error: any) {
-    // Provide a fallback component that just passes children through
-    StripeProvider = ({ children }: any) => <>{children}</>;
-  }
-} else {
-  // Web fallback: no native Stripe available
-  StripeProvider = ({ children }: any) => <>{children}</>;
-}
+// Safe Stripe import handled by platform-specific files in @/services/stripe
+const isStripeAvailable = Platform.OS !== 'web';
 
 // Stripe publishable key - must be set via environment variable
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';

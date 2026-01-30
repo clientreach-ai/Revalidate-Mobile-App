@@ -15,6 +15,8 @@ export interface User {
   subscription_status: 'active' | 'trial' | 'expired' | 'cancelled';
   trial_ends_at?: string;
   hourly_rate?: number;
+  discovery_source?: string;
+  onboarding_status: number; // 0: Incomplete, 1: Completed
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +36,7 @@ export interface UpdateUserProfile {
   brief_description_of_work?: string;
   notepad?: string;
   device_token?: string; // Expo push token for push notifications
+  discovery_source?: string; // How user heard about the app
 }
 
 

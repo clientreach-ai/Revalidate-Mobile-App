@@ -406,6 +406,7 @@ export async function updateOnboardingStep4(userId: string, data: OnboardingStep
   const updateData: any = {
     subscription_tier: data.subscription_tier,
     subscription_status: data.subscription_tier === 'premium' ? 'trial' : 'active',
+    onboarding_status: 1, // Mark onboarding as completed
     updated_at: new Date(),
   };
 
@@ -448,6 +449,7 @@ export async function getRegistrationProgress(userId: string): Promise<Registrat
       registration: true,
       due_date: true,
       subscription_tier: true,
+      onboarding_status: true,
     },
   });
 
@@ -475,11 +477,13 @@ export async function getRegistrationProgress(userId: string): Promise<Registrat
   // Check step 4: Plan selected
   const step4_plan = !!user.subscription_tier;
 
-  const completed = step1_role && step2_personal && step3_professional && step4_plan;
+  const completed = (step1_role && step2_personal && step3_professional && step4_plan) || user.onboarding_status === 1;
 
   // Determine current step
   let currentStep = 0;
   if (completed) {
+    currentStep = 0; // All done
+  } else if (!step1_role) {
     currentStep = 0; // All done
   } else if (!step1_role) {
     currentStep = 1;
@@ -579,6 +583,7 @@ export async function getOnboardingData(userId: string) {
     step4: {
       subscriptionTier: user.subscription_tier || null,
     },
+    onboardingStatus: user.onboarding_status || 0,
   };
 }
 

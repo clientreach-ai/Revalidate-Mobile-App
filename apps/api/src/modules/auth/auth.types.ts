@@ -23,6 +23,7 @@ export interface AuthResponse {
     email: string;
     professionalRole: string;
     revalidationDate: string;
+    onboardingCompleted?: boolean;
   };
   token: string; // Our JWT token for API requests
   refreshToken?: string;

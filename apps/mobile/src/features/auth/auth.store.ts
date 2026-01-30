@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { clearAllOfflineData } from '@/services/offline-storage';
+
 export interface AuthUser {
     id: string;
     email: string;
@@ -52,11 +54,22 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 set((state) => ({
                     user: state.user ? { ...state.user, ...userData } : null,
                 })),
-            logout: () =>
+            logout: () => {
+                // Clear SQLite cache
+                clearAllOfflineData().catch(err => {
+                    console.error('Failed to clear offline data on logout:', err);
+                });
+
+                // Clear AsyncStorage
+                AsyncStorage.multiRemove(['authToken', 'userData']).catch(err => {
+                    console.error('Failed to clear AsyncStorage on logout:', err);
+                });
+
                 set({
                     ...initialState,
                     _hasHydrated: true, // Keep hydration state on logout
-                }),
+                });
+            },
             setHasHydrated: (state) =>
                 set({
                     _hasHydrated: state,

@@ -41,17 +41,19 @@ export default function EventDetail() {
         if (mounted) {
           setEvent(res.data);
 
-          // Find if current user is an attendee
           const userDataStr = await AsyncStorage.getItem('userData');
           if (userDataStr) {
             const userData = JSON.parse(userDataStr);
+            // Find attendee by userId or email
             const attendee = res.data.attendees?.find((a: any) =>
-              String(a.userId) === String(userData.id) || a.email === userData.email
+              (a.userId && userData.id && String(a.userId) === String(userData.id)) ||
+              (a.email && userData.email && String(a.email).toLowerCase() === String(userData.email).toLowerCase())
             );
             setCurrentAttendee(attendee);
 
-            // Auto open modal if user is pending and coming from notification
-            if (params.showAcceptModal === 'true' && attendee?.status === 'pending') {
+            // Auto open modal if user is pending/invited and coming from notification
+            const shouldShowModal = params.showAcceptModal === 'true' || String(params.showAcceptModal) === 'true';
+            if (shouldShowModal && (!attendee || attendee.status === 'pending' || attendee.status === 'invited')) {
               setShowAcceptModal(true);
             }
           }
@@ -255,7 +257,7 @@ export default function EventDetail() {
           <Text className={`mt-1 ${isDark ? 'text-gray-300' : 'text-slate-600'}`}>{event.date} {event.startTime ? `• ${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}` : ''}</Text>
         </View>
 
-        {currentAttendee && currentAttendee.status === 'pending' && !showAcceptModal && (
+        {currentAttendee && (currentAttendee.status === 'pending' || currentAttendee.status === 'invited') && !showAcceptModal && (
           <Pressable
             onPress={() => setShowAcceptModal(true)}
             className={`mb-6 p-4 rounded-3xl border flex-row items-center justify-between ${isDark ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-100'}`}

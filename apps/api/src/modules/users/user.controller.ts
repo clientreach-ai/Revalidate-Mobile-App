@@ -549,3 +549,120 @@ export const searchUsers = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(500, 'Internal server error');
   }
 });
+
+/**
+ * Save discovery source (how user heard about the app)
+ * POST /api/v1/users/discovery-source
+ */
+const discoverySourceSchema = z.object({
+  source: z.enum([
+    'social_media',
+    'search_engine',
+    'word_of_mouth',
+    'professional_conference',
+    'nhs_colleagues',
+    'app_store',
+    'advertisement',
+    'other'
+  ]),
+});
+
+export const saveDiscoverySource = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const validated = discoverySourceSchema.parse(req.body);
+  const { prisma } = await import('../../lib/prisma');
+
+  await prisma.$executeRaw`
+    UPDATE users SET discovery_source = ${validated.source}, updated_at = ${new Date()} WHERE id = ${BigInt(req.user.userId)}
+  `;
+
+  res.json({
+    success: true,
+    message: 'Discovery source saved successfully',
+    data: { source: validated.source },
+  });
+});
+
+/**
+ * Get discovery source status (for checking if modal should be shown)
+ * GET /api/v1/users/discovery-source
+ */
+export const getDiscoverySource = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  const { prisma } = await import('../../lib/prisma');
+  const user = await prisma.$queryRaw<any[]>`
+    SELECT discovery_source FROM users WHERE id = ${BigInt(req.user.userId)} LIMIT 1
+  `;
+
+  const source = user?.[0]?.discovery_source || null;
+
+  res.json({
+    success: true,
+    data: {
+      source,
+      hasAnswered: !!source,
+    },
+  });
+});
+
+/**
+ * Reset section data (Premium only)
+ * POST /api/v1/users/reset-section
+ */
+const resetSectionSchema = z.object({
+  section: z.enum(['work_hours', 'cpd_hours', 'reflections', 'feedback', 'documents']),
+});
+
+export const resetSection = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  // Check if user is premium
+  const { prisma } = await import('../../lib/prisma');
+  const user = await prisma.users.findUnique({
+    where: { id: BigInt(req.user.userId) },
+    select: { subscription_tier: true },
+  });
+
+  if (user?.subscription_tier !== 'premium') {
+    throw new ApiError(403, 'This feature is only available for premium users');
+  }
+
+  const validated = resetSectionSchema.parse(req.body);
+  const userId = BigInt(req.user.userId);
+
+  // Delete data based on section
+  switch (validated.section) {
+    case 'work_hours':
+      await prisma.work_hours.deleteMany({ where: { user_id: userId } });
+      await prisma.working_hours.deleteMany({ where: { user_id: userId } });
+      break;
+    case 'cpd_hours':
+      await prisma.cpd_hours.deleteMany({ where: { user_id: userId } });
+      break;
+    case 'reflections':
+      await prisma.reflective_accounts.deleteMany({ where: { user_id: userId } });
+      await prisma.reflective_account_forms.deleteMany({ where: { user_id: userId } });
+      break;
+    case 'feedback':
+      await prisma.feedback_log.deleteMany({ where: { user_id: userId } });
+      await prisma.user_feedback_logs.deleteMany({ where: { user_id: userId } });
+      break;
+    case 'documents':
+      await prisma.personal_documents.deleteMany({ where: { user_id: userId } });
+      break;
+  }
+
+  res.json({
+    success: true,
+    message: `${validated.section.replace('_', ' ')} data has been reset successfully`,
+    data: { section: validated.section },
+  });
+});

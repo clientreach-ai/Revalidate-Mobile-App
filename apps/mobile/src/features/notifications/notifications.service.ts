@@ -1,18 +1,29 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import Constants from 'expo-constants';
 
 /**
- * Push Notification Registration Service
- *
- * Handles Expo push token registration and device token storage.
+ * Dynamic helper to get expo-notifications
+ * This prevents the package from being initialized at the top level,
+ * which causes errors in Expo Go SDK 53+.
  */
+const getNotifications = () => {
+    try {
+        // Skip entirely in Expo Go to avoid removal errors
+        if (Constants.appOwnership === 'expo') {
+            return null;
+        }
+        return require('expo-notifications');
+    } catch (e) {
+        return null;
+    }
+};
 
 // Configure notification handler
-// Only configure if NOT in Expo Go (or if strictly native)
-if (Constants.appOwnership !== 'expo') {
+const Notifications = getNotifications();
+
+if (Notifications) {
     Notifications.setNotificationHandler({
         handleNotification: async () => ({
             shouldShowAlert: true,
@@ -39,24 +50,35 @@ if (Constants.appOwnership !== 'expo') {
 }
 
 /**
- * Check if running on a physical device
+ * Check if running on a physical device or a standalone build
  */
 function isPhysicalDevice(): boolean {
-    // Check if running in Expo Go or on a physical device
-    // SDK 53+ removed remote notifications from Expo Go, so we must return false here to skip setup
+    // SDK 53+ removed remote notifications from Expo Go
     if (Constants.appOwnership === 'expo') {
         return false;
     }
-    return !__DEV__ || Platform.OS !== 'web';
+
+    // In standalone builds (APKs), we always want to try setting up notifications
+    // even in debug mode if it's a dev build.
+    if (Platform.OS === 'web') return false;
+
+    // Return true for real devices or standalone builds
+    return !__DEV__ || (Platform.OS === 'android' || Platform.OS === 'ios');
 }
 
 /**
  * Request permission and get Expo push token
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+    const Notifications = getNotifications();
+    if (!Notifications) {
+        console.log('Push notifications are not available in this environment (Expo Go)');
+        return null;
+    }
+
     let token: string | null = null;
 
-    // Only on physical devices
+    // Only on physical devices/standalone builds
     if (!isPhysicalDevice()) {
         console.log('Push notifications require a physical device');
         return null;
@@ -85,7 +107,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
         });
         token = tokenData.data;
     } catch (error) {
-        console.error('Failed to get Expo push token:', error);
+        console.error('Failed to get Expo push token. Note: Android requires google-services.json in the APK build.', error);
         return null;
     }
 
@@ -156,8 +178,10 @@ export async function getCachedPushToken(): Promise<string | null> {
  * Add notification listener
  */
 export function addNotificationReceivedListener(
-    callback: (notification: Notifications.Notification) => void
-): Notifications.Subscription {
+    callback: (notification: any) => void
+): any {
+    const Notifications = getNotifications();
+    if (!Notifications) return { remove: () => { } };
     return Notifications.addNotificationReceivedListener(callback);
 }
 
@@ -165,7 +189,9 @@ export function addNotificationReceivedListener(
  * Add notification response listener (when user taps notification)
  */
 export function addNotificationResponseReceivedListener(
-    callback: (response: Notifications.NotificationResponse) => void
-): Notifications.Subscription {
+    callback: (response: any) => void
+): any {
+    const Notifications = getNotifications();
+    if (!Notifications) return { remove: () => { } };
     return Notifications.addNotificationResponseReceivedListener(callback);
 }

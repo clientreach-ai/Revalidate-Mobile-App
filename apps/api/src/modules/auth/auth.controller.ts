@@ -22,6 +22,7 @@ import { mapUserRow } from '../../config/database-mapping';
 import { generateOTP, storeOTP, verifyOTP } from './otp.service';
 import { sendOTPEmail } from './email.service';
 import { getMySQLPool } from '../../config/database';
+import { getRegistrationProgress } from '../users/user.service';
 
 function serializeBigInt(obj: any): any {
   if (obj === null || obj === undefined) {
@@ -219,12 +220,15 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     email: user.email,
   });
 
+  const mobileProgress = await getRegistrationProgress(user.id.toString());
+
   const response: AuthResponse = {
     user: {
       id: user.id.toString(),
       email: user.email,
       professionalRole: user.professional_role,
       revalidationDate: user.revalidation_date,
+      onboardingCompleted: mobileProgress.completed,
     },
     token,
   };

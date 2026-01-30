@@ -19,6 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { showToast } from "@/utils/toast";
 import { setSubscriptionInfo } from "@/utils/subscription";
 import { setupPushNotifications } from "@/features/notifications/notifications.service";
+import { preCacheOfflineData } from "@/services/sync-service";
 import "../global.css";
 
 export default function Login() {
@@ -33,9 +34,30 @@ export default function Login() {
         const checkAuth = async () => {
             try {
                 const token = await AsyncStorage.getItem('authToken');
+                const userDataStr = await AsyncStorage.getItem('userData');
+
                 if (token) {
-                    // Always send logged-in users to onboarding
-                    router.replace("/(onboarding)/role-selection");
+                    // Check if user has already completed onboarding or has a role
+                    let shouldGoHome = false;
+
+                    if (userDataStr) {
+                        try {
+                            const user = JSON.parse(userDataStr);
+                            // If they have a role, they've done enough onboarding to use the app
+                            if (user.professionalRole || user.onboardingCompleted) {
+                                shouldGoHome = true;
+                            }
+                        } catch (e) {
+                            console.warn('Error parsing user data', e);
+                        }
+                    }
+
+                    if (shouldGoHome) {
+                        router.replace("/(tabs)/home");
+                    } else {
+                        // Only send to onboarding if they really need it
+                        router.replace("/(onboarding)/role-selection");
+                    }
                     return;
                 }
             } catch (error) {
@@ -69,6 +91,7 @@ export default function Login() {
                         email: string;
                         professionalRole?: string;
                         revalidationDate?: string;
+                        onboardingCompleted?: boolean;
                     };
                     token: string;
                 };
@@ -101,21 +124,25 @@ export default function Login() {
                     console.warn('Push notification setup failed:', err);
                 });
 
-                // Check if user has a professional role set - if so, they have completed onboarding step 1 at least
-                // We'll treat having a role as "onboarding started/completed" enough to go to home
-                // New users from signup won't have a role yet until they complete onboarding
-                const hasRole = !!user.professionalRole;
+                // Check onboarding status from backend response
+                const isOnboardingCompleted = user.onboardingCompleted === true;
 
-                if (hasRole) {
-                    // Existing user with role -> Go to Home
+                // Also update local store immediately
+                if (isOnboardingCompleted) {
+                    useAuthStore.getState().setOnboardingCompleted(true);
+                }
+
+                if (isOnboardingCompleted) {
+                    // Completed onboarding -> Go to Home
                     router.replace("/(tabs)/home");
                 } else {
-                    // New user or incomplete profile -> Go to Onboarding
+                    // Incomplete onboarding -> Go to Onboarding
+                    // Start at role selection if not completed
                     router.replace("/(onboarding)/role-selection");
                 }
 
-                // Fetch subscription info in background to ensure app state is correct
-                // We don't block navigation on this anymore
+
+                // After navigation and profile fetch
                 apiService.get<any>(API_ENDPOINTS.USERS.ME, token).then(profile => {
                     if (profile?.data) {
                         const tier = profile.data.subscriptionTier || 'free';
@@ -127,8 +154,15 @@ export default function Login() {
                             isPremium,
                             canUseOffline: isPremium,
                         });
+
+                        // Trigger pre-caching for premium users
+                        if (isPremium) {
+                            preCacheOfflineData().catch((err: any) => {
+                                console.warn('Pre-caching failed:', err);
+                            });
+                        }
                     }
-                }).catch(err => {
+                }).catch((err: any) => {
                     console.warn('Background profile fetch failed:', err);
                 });
             } else {

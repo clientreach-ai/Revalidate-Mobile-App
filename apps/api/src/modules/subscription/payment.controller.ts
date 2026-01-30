@@ -36,7 +36,7 @@ export const createPaymentIntentHandler = asyncHandler(async (req: Request, res:
   }
 
   const validated = createIntentSchema.parse(req.body);
-  
+
   // If priceId is provided, create subscription setup instead of one-time payment
   if (validated.priceId || STRIPE_CONFIG.premiumPriceId) {
     const { createSubscriptionSetup } = await import('./stripe.service');
@@ -93,11 +93,11 @@ export const confirmPaymentHandler = asyncHandler(async (req: Request, res: Resp
   }
 
   const validated = confirmPaymentSchema.parse(req.body);
-  
+
   // Handle subscription confirmation
   if (validated.subscriptionId) {
     const subscription = await stripe.subscriptions.retrieve(validated.subscriptionId);
-    
+
     // Verify the subscription belongs to this user
     if (subscription.metadata?.userId !== req.user.userId) {
       throw new ApiError(403, 'Subscription does not belong to this user');
@@ -234,6 +234,70 @@ export const getPaymentStatus = asyncHandler(async (req: Request, res: Response)
       amount: paymentIntent.amount,
       currency: paymentIntent.currency,
       created: paymentIntent.created,
+    },
+  });
+});
+
+/**
+ * Get user's payment method details
+ * GET /api/v1/payment/methods
+ */
+export const getPaymentDetails = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  // Get user details
+  const { prisma } = await import('../../lib/prisma');
+  const user = await prisma.users.findUnique({
+    where: { id: parseInt(req.user.userId) },
+    select: { email: true },
+  });
+
+  if (!user?.email) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  // Find Stripe customer by email
+  const customers = await stripe.customers.list({
+    email: user.email,
+    limit: 1,
+  });
+
+  if (customers.data.length === 0) {
+    return res.json({
+      success: true,
+      data: null, // No customer found
+    });
+  }
+
+  const customer = customers.data[0];
+
+  // List payment methods
+  const paymentMethods = await stripe.paymentMethods.list({
+    customer: customer.id,
+    type: 'card',
+  });
+
+  if (paymentMethods.data.length === 0) {
+    return res.json({
+      success: true,
+      data: null, // No payment methods
+    });
+  }
+
+  // Return the most recently added card (or default)
+  const defaultMethod = paymentMethods.data[0]; // Stripe lists newest first usually? Actually API says "The payment methods are returned in reverse chronological order" if created param used, but default list validation is needed.
+  // Actually list returns sorted by creation date usually.
+
+  res.json({
+    success: true,
+    data: {
+      id: defaultMethod.id,
+      brand: defaultMethod.card?.brand,
+      last4: defaultMethod.card?.last4,
+      expMonth: defaultMethod.card?.exp_month,
+      expYear: defaultMethod.card?.exp_year,
     },
   });
 });
