@@ -161,21 +161,28 @@ export const AddDocumentModal = ({ visible, onClose, categories, isDark, onSucce
                                 <View>
                                     <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>Category *</Text>
                                     <View className="flex-row flex-wrap" style={{ gap: 12 }}>
-                                        {categories.map((cat) => (
-                                            <Pressable
-                                                key={cat.id}
-                                                onPress={() => setDocumentForm({ ...documentForm, category: cat.title })}
-                                                className="px-4 py-3 rounded-2xl border-2 flex-row items-center"
-                                                style={{
-                                                    borderColor: documentForm.category === cat.title ? cat.iconColor : (isDark ? '#475569' : '#E2E8F0'),
-                                                    backgroundColor: documentForm.category === cat.title ? `${cat.iconColor}15` : (isDark ? '#1E293B' : '#FFFFFF'),
-                                                }}
-                                            >
-                                                <MaterialIcons name={cat.icon} size={18} color={cat.iconColor} style={{ marginRight: 8 }} />
-                                                <Text className={`text-sm font-medium ${documentForm.category === cat.title ? (isDark ? 'text-white' : 'text-slate-800') : (isDark ? 'text-gray-300' : 'text-slate-600')}`}>{cat.title}</Text>
-                                            </Pressable>
-                                        ))}
+                                        {categories.length > 0 ? (
+                                            categories.map((cat) => (
+                                                <Pressable
+                                                    key={cat.id}
+                                                    onPress={() => setDocumentForm({ ...documentForm, category: cat.title })}
+                                                    className="px-4 py-3 rounded-2xl border-2 flex-row items-center"
+                                                    style={{
+                                                        borderColor: documentForm.category === cat.title ? cat.iconColor : (isDark ? '#475569' : '#E2E8F0'),
+                                                        backgroundColor: documentForm.category === cat.title ? `${cat.iconColor}15` : (isDark ? '#1E293B' : '#FFFFFF'),
+                                                    }}
+                                                >
+                                                    <MaterialIcons name={cat.icon} size={18} color={cat.iconColor} style={{ marginRight: 8 }} />
+                                                    <Text className={`text-sm font-medium ${documentForm.category === cat.title ? (isDark ? 'text-white' : 'text-slate-800') : (isDark ? 'text-gray-300' : 'text-slate-600')}`}>{cat.title}</Text>
+                                                </Pressable>
+                                            ))
+                                        ) : (
+                                            <View className="py-2">
+                                                <Text className="text-gray-500 text-xs">Loading categories...</Text>
+                                            </View>
+                                        )}
                                     </View>
+                                    {formErrors.category && <Text className="text-red-500 text-xs mt-1">{formErrors.category}</Text>}
                                 </View>
 
                                 {/* File Upload Area */}
@@ -196,6 +203,7 @@ export const AddDocumentModal = ({ visible, onClose, categories, isDark, onSucce
                                         </View>
                                     )}
                                 </Pressable>
+                                {formErrors.file && <Text className="text-red-500 text-xs mt-1">{formErrors.file}</Text>}
 
                                 <Pressable
                                     onPress={handleUploadDocument}

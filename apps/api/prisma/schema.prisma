@@ -1081,6 +1081,8 @@ model work_hours {
   shift_type       String?   @db.VarChar(100)
   hourly_rate      Decimal?  @db.Decimal(10, 2)
   total_earnings   Decimal?  @db.Decimal(10, 2)
+  work_setting     String?   @db.VarChar(100)
+  scope_of_practice String?   @db.VarChar(255)
   document_ids     String?   @db.Text
   is_active        Boolean?  @default(false)
   is_paused        Boolean?  @default(false)

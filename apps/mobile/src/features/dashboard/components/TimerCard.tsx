@@ -59,6 +59,9 @@ export const TimerCard: React.FC<TimerCardProps> = ({
 }) => {
     if (!activeSession?.isActive) return null;
 
+    // Debug log to see what TimerCard receives
+    // console.log('TimerCard Render:', { timer, isPaused, sessionPaused: activeSession.isPaused });
+
     return (
         <View
             className={`p-6 rounded-[32px] shadow-2xl border ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-100'

@@ -111,11 +111,32 @@ export const useGeneralGalleryData = () => {
         await loadDocuments();
     }, [loadDocuments]);
 
+    const deleteDocument = useCallback(async (id: string) => {
+        try {
+            const token = await AsyncStorage.getItem('authToken');
+            if (!token) return;
+
+            const res = await apiService.delete<{ success: boolean; message: string }>(
+                `${API_ENDPOINTS.DOCUMENTS.DELETE}/${id}`,
+                token
+            );
+
+            if (res.success) {
+                showToast.success('Document deleted successfully');
+                await loadDocuments();
+            }
+        } catch (error: any) {
+            console.error('Error deleting document:', error);
+            showToast.error(error.message || 'Failed to delete document');
+        }
+    }, [loadDocuments]);
+
     return {
         loading,
         refreshing,
         documents,
         loadDocuments,
-        onRefresh
+        onRefresh,
+        deleteDocument
     };
 };

@@ -1,5 +1,5 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Image, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Image, Dimensions, Alert } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -10,6 +10,8 @@ import { showToast } from '@/utils/toast';
 import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
 import { downloadAndShareFile } from '@/utils/document';
 import { useGeneralGalleryData } from '@/features/gallery/hooks/useGeneralGalleryData';
+import { useGalleryData } from '@/features/gallery/hooks/useGalleryData';
+import { AddDocumentModal } from '@/features/gallery/components/AddDocumentModal';
 import '../../global.css';
 
 const { width } = Dimensions.get('window');
@@ -20,21 +22,30 @@ const ITEM_WIDTH = (width - (CONTAINER_PADDING * 2) - (GAP * (COLUMN_COUNT - 1))
 
 export default function GeneralGalleryScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+    const [showAddModal, setShowAddModal] = useState(false);
 
     const {
         loading,
         refreshing,
         documents,
         loadDocuments,
-        onRefresh
+        onRefresh,
+        deleteDocument
     } = useGeneralGalleryData();
+
+    const {
+        categories,
+        loadDocuments: loadGalleryMeta
+    } = useGalleryData();
 
     useEffect(() => {
         loadDocuments();
-    }, [loadDocuments]);
+        loadGalleryMeta();
+    }, [loadDocuments, loadGalleryMeta]);
 
     const getFullUrl = (url: string) => {
         if (!url) return '';
@@ -87,6 +98,21 @@ export default function GeneralGalleryScreen() {
         }
     };
 
+    const handleLongPress = (file: any) => {
+        Alert.alert(
+            "Delete Document",
+            `Are you sure you want to delete "${file.name}"? This action cannot be undone.`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => deleteDocument(file.id)
+                }
+            ]
+        );
+    };
+
     return (
         <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
             <View className="flex-row items-center justify-between px-6 pt-4 mb-2">
@@ -99,12 +125,17 @@ export default function GeneralGalleryScreen() {
                 <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
                     General Gallery
                 </Text>
-                <View className="w-10" />
+                <Pressable
+                    onPress={() => setShowAddModal(true)}
+                    className="w-10 h-10 rounded-full bg-[#2B5F9E]/10 items-center justify-center"
+                >
+                    <MaterialIcons name="cloud-upload" size={20} color="#2B5F9E" />
+                </Pressable>
             </View>
 
             <ScrollView
                 className="flex-1"
-                contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: CONTAINER_PADDING }}
+                contentContainerStyle={{ paddingBottom: 150, paddingHorizontal: CONTAINER_PADDING }}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
@@ -122,36 +153,39 @@ export default function GeneralGalleryScreen() {
                 ) : (
                     <View className="flex-row flex-wrap" style={{ gap: GAP, marginTop: 16 }}>
                         {documents.length > 0 ? (
-                            documents.map((file) => (
-                                <Pressable
-                                    key={file.id}
-                                    onPress={() => handleViewDocument(file)}
-                                    style={{ width: ITEM_WIDTH, height: ITEM_WIDTH }}
-                                    className={`rounded-2xl overflow-hidden border shadow-sm active:opacity-80 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}
-                                >
-                                    {file.isImage && file.fullUrl ? (
-                                        <Image
-                                            source={{ uri: file.fullUrl }}
-                                            className="w-full h-full"
-                                            resizeMode="cover"
-                                        />
-                                    ) : (
-                                        <View className="flex-1 items-center justify-center p-4">
-                                            <MaterialIcons
-                                                name={file.icon}
-                                                size={32}
-                                                color={file.icon === 'picture-as-pdf' ? '#EF4444' : (isDark ? '#6B7280' : '#94A3B8')}
+                            [...documents]
+                                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                                .map((file) => (
+                                    <Pressable
+                                        key={file.id}
+                                        onPress={() => handleViewDocument(file)}
+                                        onLongPress={() => handleLongPress(file)}
+                                        style={{ width: ITEM_WIDTH, height: ITEM_WIDTH }}
+                                        className={`rounded-2xl overflow-hidden border shadow-sm active:opacity-80 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}
+                                    >
+                                        {file.isImage && file.fullUrl ? (
+                                            <Image
+                                                source={{ uri: file.fullUrl }}
+                                                className="w-full h-full"
+                                                resizeMode="cover"
                                             />
-                                            <Text
-                                                className={`text-[9px] mt-2 text-center font-medium ${isDark ? 'text-gray-400' : 'text-slate-500'}`}
-                                                numberOfLines={2}
-                                            >
-                                                {file.name}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </Pressable>
-                            ))
+                                        ) : (
+                                            <View className="flex-1 items-center justify-center p-4">
+                                                <MaterialIcons
+                                                    name={file.icon}
+                                                    size={32}
+                                                    color={file.icon === 'picture-as-pdf' ? '#EF4444' : (isDark ? '#6B7280' : '#94A3B8')}
+                                                />
+                                                <Text
+                                                    className={`text-[9px] mt-2 text-center font-medium ${isDark ? 'text-gray-400' : 'text-slate-500'}`}
+                                                    numberOfLines={2}
+                                                >
+                                                    {file.name}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </Pressable>
+                                ))
                         ) : (
                             <View className={`w-full py-20 rounded-3xl border items-center ${isDark ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"}`}>
                                 <MaterialIcons name="photo-library" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
@@ -163,10 +197,31 @@ export default function GeneralGalleryScreen() {
                     </View>
                 )}
             </ScrollView>
+
+            <View
+                className="absolute left-0 right-0 items-center"
+                style={{ bottom: 80 + insets.bottom }}
+            >
+                <Pressable
+                    onPress={() => setShowAddModal(true)}
+                    className="w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center active:opacity-80"
+                >
+                    <MaterialIcons name="add" size={32} color="#FFFFFF" />
+                </Pressable>
+            </View>
+
             <ImageViewerModal
                 isVisible={viewerVisible}
                 imageUrl={viewerUrl}
                 onClose={() => setViewerVisible(false)}
+            />
+
+            <AddDocumentModal
+                visible={showAddModal}
+                onClose={() => setShowAddModal(false)}
+                categories={categories}
+                isDark={isDark}
+                onSuccess={loadDocuments}
             />
         </SafeAreaView>
     );

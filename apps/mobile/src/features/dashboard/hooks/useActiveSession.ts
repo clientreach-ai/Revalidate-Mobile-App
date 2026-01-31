@@ -33,6 +33,13 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
         seconds: number;
     } | null>(null);
 
+    // NEW: Stick to this value when the user manually pauses, ignoring background updates
+    const [stickyPausedTimer, setStickyPausedTimer] = useState<{
+        hours: number;
+        minutes: number;
+        seconds: number;
+    } | null>(null);
+
     useEffect(() => {
         isMounted.current = true;
         return () => {
@@ -85,11 +92,19 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                     const h = Math.floor(totalSeconds / 3600);
                     const m = Math.floor((totalSeconds % 3600) / 60);
                     const s = totalSeconds % 60;
-                    setTimer({ hours: h, minutes: m, seconds: s });
+
+                    // Only update if we don't have a sticky timer set by the user
+                    if (!stickyPausedTimer) {
+                        setTimer({ hours: h, minutes: m, seconds: s });
+                    }
+
                     setLastPausedTimer({ hours: h, minutes: m, seconds: s });
                 } else {
                     setLastPausedTimer(null);
-                    updateTimerFromSession(session, session.totalPausedMs || 0);
+                    // Also check here, though sticky should be null if running
+                    if (!stickyPausedTimer) {
+                        updateTimerFromSession(session, session.totalPausedMs || 0);
+                    }
                 }
             } else {
                 if (isMounted.current) {
@@ -109,7 +124,10 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
 
     useEffect(() => {
         if (activeSession && activeSession.isActive) {
-            if (isPaused) {
+            // Use activeSession.isPaused as source of truth to handle async state updates
+            const sessionIsPaused = isPaused || activeSession.isPaused;
+
+            if (sessionIsPaused) {
                 if (timerStore.status !== 'paused') setStatus('paused');
                 if (timerStore.accumulatedMs !== totalPausedTime) setAccumulatedMs(totalPausedTime);
                 persist();
@@ -117,6 +135,35 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 if (timerIntervalRef.current) {
                     clearInterval(timerIntervalRef.current);
                     timerIntervalRef.current = null;
+                }
+
+                // Priority 0: Sticky User Pause (Highest Priority)
+                if (stickyPausedTimer) {
+                    setTimer(stickyPausedTimer);
+                }
+                // Priority 1: Use explicitly saved paused timer
+                else if (lastPausedTimer && (lastPausedTimer.hours > 0 || lastPausedTimer.minutes > 0 || lastPausedTimer.seconds > 0)) {
+                    setTimer(lastPausedTimer);
+                }
+                // Priority 2: Calculate from pausedAt timestamp
+                else if (activeSession.pausedAt) {
+                    const startTime = new Date(activeSession.startTime);
+                    const pauseTime = new Date(activeSession.pausedAt);
+                    const pausedMs = activeSession.totalPausedMs || totalPausedTime || 0;
+
+                    // Validation
+                    if (!isNaN(startTime.getTime()) && !isNaN(pauseTime.getTime())) {
+                        const diffMs = pauseTime.getTime() - startTime.getTime() - pausedMs;
+                        const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+                        const h = Math.floor(totalSeconds / 3600);
+                        const m = Math.floor((totalSeconds % 3600) / 60);
+                        const s = totalSeconds % 60;
+
+                        const isNonZero = h > 0 || m > 0 || s > 0;
+                        if (isNonZero) {
+                            setTimer({ hours: h, minutes: m, seconds: s });
+                        }
+                    }
                 }
             } else {
                 if (timerStore.status !== 'running') setStatus('running');
@@ -188,6 +235,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                     setPausedAt(null);
                     setTotalPausedTime(0);
                     setLastPausedTimer(null);
+                    setStickyPausedTimer(null); // Clear sticky timer
                 }
                 await AsyncStorage.removeItem('workSessionPauseState');
                 updateTimerFromSession(response.data, 0);
@@ -212,10 +260,22 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
 
             if (response?.data) {
                 if (isMounted.current) {
+                    // Update timer state with calculated values to prevent 00:00:00 flash
+                    const startTime = new Date(activeSession.startTime);
+                    const now = new Date();
+                    const diffMs = now.getTime() - startTime.getTime() - totalPausedTime;
+                    const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+                    const h = Math.floor(totalSeconds / 3600);
+                    const m = Math.floor((totalSeconds % 3600) / 60);
+                    const s = totalSeconds % 60;
+                    const calculatedTimer = { hours: h, minutes: m, seconds: s };
+
                     setActiveSession(response.data);
                     setIsPaused(true);
                     setPausedAt(new Date(response.data.pausedAt!));
-                    setLastPausedTimer(timer);
+                    setLastPausedTimer(calculatedTimer);
+                    setStickyPausedTimer(calculatedTimer); // Set sticky timer
+                    setTimer(calculatedTimer);
                 }
                 showToast.info('Session paused', 'Paused');
             }
@@ -242,6 +302,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                     setPausedAt(null);
                     setTotalPausedTime(response.data.totalPausedMs || 0);
                     setLastPausedTimer(null);
+                    setStickyPausedTimer(null); // Clear sticky timer
                 }
                 showToast.info('Session resumed', 'Resumed');
             }
