@@ -88,25 +88,8 @@ export default function GalleryScreen() {
         )}
       </ScrollView>
 
-      <View
-        className="absolute left-0 right-0 items-center"
-        style={{ bottom: 80 + insets.bottom }}
-      >
-        <Pressable
-          onPress={() => setShowAddModal(true)}
-          className="w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center active:opacity-80"
-        >
-          <MaterialIcons name="add" size={32} color="#FFFFFF" />
-        </Pressable>
-      </View>
 
-      <AddDocumentModal
-        visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        categories={categories}
-        isDark={isDark}
-        onSuccess={loadDocuments}
-      />
+
     </SafeAreaView>
   );
 }
