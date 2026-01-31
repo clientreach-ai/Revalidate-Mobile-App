@@ -1,13 +1,22 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+  ActivityIndicator,
+  Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { useAuthStore } from '@/features/auth/auth.store';
+import { useTimerStore } from '@/features/timer/timer.store';
 import { useProfile } from '@/hooks/useProfile';
 import { usePremium } from '@/hooks/usePremium';
-import { apiService, API_ENDPOINTS } from '@/services/api';
 import { API_CONFIG } from '@revalidation-tracker/constants';
 import { showToast } from '@/utils/toast';
 import '../../global.css';
@@ -28,6 +37,7 @@ export default function ProfileScreen() {
   const { isDark } = useThemeStore();
   const { profile, isLoading, isRefreshing, refresh } = useProfile();
   const { isPremium } = usePremium();
+  const timerStore = useTimerStore();
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,7 +56,9 @@ export default function ProfileScreen() {
 
   const loadLocalProfileImage = async () => {
     try {
-      const key = profile?.id ? `profile_image_uri_${profile.id}` : 'profile_image_uri';
+      const key = profile?.id
+        ? `profile_image_uri_${profile.id}`
+        : 'profile_image_uri';
       let savedImage = await AsyncStorage.getItem(key);
 
       // migrate legacy key to per-user key when possible
@@ -71,7 +83,9 @@ export default function ProfileScreen() {
   };
 
   // Calculate days until revalidation
-  const getDaysUntilRevalidation = (revalidationDate: string | null): number | null => {
+  const getDaysUntilRevalidation = (
+    revalidationDate: string | null
+  ): number | null => {
     if (!revalidationDate) return null;
 
     const today = new Date();
@@ -121,23 +135,15 @@ export default function ProfileScreen() {
     return Math.max(0, Math.min(100, percentage));
   };
 
-  const daysLeft = profile?.revalidationDate ? getDaysUntilRevalidation(profile.revalidationDate) : null;
+  const daysLeft = profile?.revalidationDate
+    ? getDaysUntilRevalidation(profile.revalidationDate)
+    : null;
   const progressPercentage = getProgressPercentage(daysLeft);
 
   const handleLogout = async () => {
     try {
-      // Try to pause active session if exists before logging out
-      const token = await AsyncStorage.getItem('authToken');
-      if (token) {
-        try {
-          await apiService.post(API_ENDPOINTS.WORK_HOURS.PAUSE, {}, token);
-        } catch (e) {
-          // Ignore error (no active session or network error)
-        }
-      }
-
-      await AsyncStorage.removeItem('authToken');
-      await AsyncStorage.removeItem('userData');
+      await useAuthStore.getState().logout();
+      timerStore.reset();
       showToast.success('Logged out successfully', 'Success');
       router.replace('/(auth)/login');
     } catch (error) {
@@ -186,15 +192,19 @@ export default function ProfileScreen() {
       iconColor: '#64748B',
       onPress: () => handleMenuPress('2'),
     },
-    ...(isPremium ? [{
-      id: 'export',
-      title: 'Export Data',
-      subtitle: 'Download PDF Report',
-      icon: 'file-download' as keyof typeof MaterialIcons.glyphMap,
-      iconBgColor: 'bg-blue-50',
-      iconColor: '#3B82F6',
-      onPress: () => router.push('/export'),
-    }] : []),
+    ...(isPremium
+      ? [
+          {
+            id: 'export',
+            title: 'Export Data',
+            subtitle: 'Download PDF Report',
+            icon: 'file-download' as keyof typeof MaterialIcons.glyphMap,
+            iconBgColor: 'bg-blue-50',
+            iconColor: '#3B82F6',
+            onPress: () => router.push('/export'),
+          },
+        ]
+      : []),
     {
       id: '3',
       title: 'Subscription',
@@ -246,7 +256,10 @@ export default function ProfileScreen() {
       >
         {isLoading && !profile ? (
           <View className="flex-1 items-center justify-center py-20">
-            <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+            <ActivityIndicator
+              size="large"
+              color={isDark ? '#D4AF37' : '#2B5F9E'}
+            />
             <Text className={`mt-4 ${secondaryTextColor}`}>
               Loading profile...
             </Text>
@@ -265,28 +278,47 @@ export default function ProfileScreen() {
             {/* Profile Section */}
             <View className="items-center mb-8">
               <View className="relative">
-                <View className={`w-32 h-32 rounded-full border-4 overflow-hidden shadow-sm ${isPremium ? 'border-[#D4AF37]' : borderColor}`}>
+                <View
+                  className={`w-32 h-32 rounded-full border-4 overflow-hidden shadow-sm ${isPremium ? 'border-[#D4AF37]' : borderColor}`}
+                >
                   {profileImage ? (
-                    <Image source={{ uri: profileImage }} className="w-full h-full" />
+                    <Image
+                      source={{ uri: profileImage }}
+                      className="w-full h-full"
+                    />
                   ) : (
-                    <View className={`w-full h-full items-center justify-center ${isPremium ? 'bg-premium-400' : 'bg-teal-200'}`}>
-                      <MaterialIcons name="person" size={64} color={isPremium ? '#1F2937' : '#14B8A6'} />
+                    <View
+                      className={`w-full h-full items-center justify-center ${isPremium ? 'bg-premium-400' : 'bg-teal-200'}`}
+                    >
+                      <MaterialIcons
+                        name="person"
+                        size={64}
+                        color={isPremium ? '#1F2937' : '#14B8A6'}
+                      />
                     </View>
                   )}
                 </View>
                 <Pressable
-                  onPress={() => router.push('/(tabs)/profile/account-settings')}
+                  onPress={() =>
+                    router.push('/(tabs)/profile/account-settings')
+                  }
                   className={`absolute bottom-1 right-1 ${isPremium ? 'bg-[#D4AF37] border-[#fff]' : 'bg-[#2563EB]'} p-2 rounded-full border-2 shadow-lg ${borderColor}`}
                 >
                   <MaterialIcons name="edit" size={16} color="#FFFFFF" />
                 </Pressable>
               </View>
-              <Text className={`mt-4 text-2xl font-bold ${isPremium ? 'text-[#D4AF37]' : textColor}`}>
+              <Text
+                className={`mt-4 text-2xl font-bold ${isPremium ? 'text-[#D4AF37]' : textColor}`}
+              >
                 {profile?.name || 'User'}
               </Text>
               {profile?.professionalRole && (
-                <View className={`mt-2 flex-row items-center px-3 py-1 rounded-full ${isPremium ? 'bg-[#FFF5D6]' : 'bg-blue-100'}`}>
-                  <Text className={`${isPremium ? 'text-[#B87E00]' : 'text-[#2563EB]'} text-xs font-semibold uppercase tracking-wider`}>
+                <View
+                  className={`mt-2 flex-row items-center px-3 py-1 rounded-full ${isPremium ? 'bg-[#FFF5D6]' : 'bg-blue-100'}`}
+                >
+                  <Text
+                    className={`${isPremium ? 'text-[#B87E00]' : 'text-[#2563EB]'} text-xs font-semibold uppercase tracking-wider`}
+                  >
                     {getRoleDisplayName(profile.professionalRole)}
                   </Text>
                 </View>
@@ -295,7 +327,9 @@ export default function ProfileScreen() {
               {isPremium && (
                 <View className="mt-3 flex-row items-center space-x-2">
                   <View className="px-3 py-1 rounded-full bg-premium-400">
-                    <Text className="text-sm font-semibold text-[#1F2937]">⭐ Premium</Text>
+                    <Text className="text-sm font-semibold text-[#1F2937]">
+                      ⭐ Premium
+                    </Text>
                   </View>
                 </View>
               )}
@@ -304,23 +338,37 @@ export default function ProfileScreen() {
             {/* NMC Revalidation Due Card */}
             {profile?.revalidationDate && (
               <View className="px-6 mb-8">
-                <View className={`${isPremium ? 'bg-premium-400' : 'bg-primary-600'} p-5 rounded-2xl shadow-xl`}>
+                <View
+                  className={`${isPremium ? 'bg-premium-400' : 'bg-primary-600'} p-5 rounded-2xl shadow-xl`}
+                >
                   <View className="flex-row justify-between items-start mb-4">
                     <View>
-                      <Text className={`${isPremium ? 'text-amber-900' : 'text-blue-100'} text-sm opacity-80 mb-1`}>
+                      <Text
+                        className={`${isPremium ? 'text-amber-900' : 'text-blue-100'} text-sm opacity-80 mb-1`}
+                      >
                         NMC Revalidation Due
                       </Text>
-                      <Text className={`text-xl font-bold ${isPremium ? 'text-[#1F2937]' : 'text-white'}`}>
+                      <Text
+                        className={`text-xl font-bold ${isPremium ? 'text-[#1F2937]' : 'text-white'}`}
+                      >
                         {formatDate(profile.revalidationDate)}
                       </Text>
                     </View>
-                    <View className={`${isPremium ? 'bg-black/10' : 'bg-white/20'} p-2 rounded-lg`}>
-                      <MaterialIcons name="event-repeat" size={24} color={isPremium ? '#1F2937' : '#FFFFFF'} />
+                    <View
+                      className={`${isPremium ? 'bg-black/10' : 'bg-white/20'} p-2 rounded-lg`}
+                    >
+                      <MaterialIcons
+                        name="event-repeat"
+                        size={24}
+                        color={isPremium ? '#1F2937' : '#FFFFFF'}
+                      />
                     </View>
                   </View>
 
                   {/* Progress Bar */}
-                  <View className={`w-full ${isPremium ? 'bg-black/10' : 'bg-white/20'} rounded-full h-2 mb-3`}>
+                  <View
+                    className={`w-full ${isPremium ? 'bg-black/10' : 'bg-white/20'} rounded-full h-2 mb-3`}
+                  >
                     <View
                       className={`${isPremium ? 'bg-[#1F2937]' : 'bg-white'} h-2 rounded-full`}
                       style={{ width: `${progressPercentage}%` }}
@@ -328,9 +376,17 @@ export default function ProfileScreen() {
                   </View>
 
                   {daysLeft !== null && (
-                    <View className={`${isPremium ? 'bg-black/10' : 'bg-white/20'} self-start px-2 py-1 rounded`}>
-                      <Text className={`text-xs font-medium ${isPremium ? 'text-[#1F2937]' : 'text-white'}`}>
-                        {daysLeft > 0 ? `${daysLeft} Days Left` : daysLeft === 0 ? 'Due Today' : `${Math.abs(daysLeft)} Days Overdue`}
+                    <View
+                      className={`${isPremium ? 'bg-black/10' : 'bg-white/20'} self-start px-2 py-1 rounded`}
+                    >
+                      <Text
+                        className={`text-xs font-medium ${isPremium ? 'text-[#1F2937]' : 'text-white'}`}
+                      >
+                        {daysLeft > 0
+                          ? `${daysLeft} Days Left`
+                          : daysLeft === 0
+                            ? 'Due Today'
+                            : `${Math.abs(daysLeft)} Days Overdue`}
                       </Text>
                     </View>
                   )}
@@ -341,10 +397,20 @@ export default function ProfileScreen() {
             {/* Menu Items */}
             <View className="px-6" style={{ gap: 12 }}>
               {menuItems.map((item) => {
-                const itemBgColor = item.isDestructive ? 'bg-red-50' : headerBgColor;
-                const itemTextColor = item.isDestructive ? 'text-red-600' : textColor;
-                const subtitleColor = isDark ? 'text-gray-400' : 'text-slate-500';
-                const chevronColor = item.isDestructive ? '#DC2626' : (isDark ? '#64748B' : '#CBD5E1');
+                const itemBgColor = item.isDestructive
+                  ? 'bg-red-50'
+                  : headerBgColor;
+                const itemTextColor = item.isDestructive
+                  ? 'text-red-600'
+                  : textColor;
+                const subtitleColor = isDark
+                  ? 'text-gray-400'
+                  : 'text-slate-500';
+                const chevronColor = item.isDestructive
+                  ? '#DC2626'
+                  : isDark
+                    ? '#64748B'
+                    : '#CBD5E1';
 
                 return (
                   <Pressable
@@ -352,7 +418,9 @@ export default function ProfileScreen() {
                     onPress={item.onPress}
                     className={`w-full flex-row items-center p-4 rounded-2xl shadow-sm ${itemBgColor}`}
                   >
-                    <View className={`w-10 h-10 rounded-xl ${item.iconBgColor} items-center justify-center mr-4`}>
+                    <View
+                      className={`w-10 h-10 rounded-xl ${item.iconBgColor} items-center justify-center mr-4`}
+                    >
                       <MaterialIcons
                         name={item.icon}
                         size={20}
@@ -365,7 +433,9 @@ export default function ProfileScreen() {
                           {item.title}
                         </Text>
                         <Text className={`text-xs mt-0.5 ${subtitleColor}`}>
-                          {item.id === '3' && isPremium ? 'Premium' : item.subtitle}
+                          {item.id === '3' && isPremium
+                            ? 'Premium'
+                            : item.subtitle}
                         </Text>
                       </View>
                     ) : (

@@ -12,6 +12,6 @@ router.use(authenticateToken);
 
 router.get('/', listNotifications);
 router.patch('/read-all', markAllNotificationsRead);
-router.patch('/:id/read', markNotificationRead);
+router.patch('/:id', markNotificationRead);
 
 export default router;

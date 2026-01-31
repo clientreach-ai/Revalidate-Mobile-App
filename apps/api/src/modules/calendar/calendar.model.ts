@@ -1,6 +1,9 @@
 import { prisma } from '../../lib/prisma';
 import { ApiError } from '../../common/middleware/error-handler';
-import { sendPushNotification, isValidExpoPushToken } from '../notifications/push.service';
+import {
+  sendPushNotification,
+  isValidExpoPushToken,
+} from '../notifications/push.service';
 
 export interface CalendarEvent {
   id: string;
@@ -185,13 +188,14 @@ export async function getCalendarEventById(
     status: event.status,
     createdAt: event.created_at,
     updatedAt: event.updated_at,
-    attendees: event.attendees?.map(a => ({
-      id: a.id.toString(),
-      userId: a.user_id ? a.user_id.toString() : null,
-      name: a.users ? a.users.name : null,
-      email: a.attendee_email ?? (a.users ? a.users.email : null),
-      status: a.status ?? null,
-    })) || [],
+    attendees:
+      event.attendees?.map((a) => ({
+        id: a.id.toString(),
+        userId: a.user_id ? a.user_id.toString() : null,
+        name: a.users ? a.users.name : null,
+        email: a.attendee_email ?? (a.users ? a.users.email : null),
+        status: a.status ?? null,
+      })) || [],
   };
 }
 
@@ -229,9 +233,7 @@ export async function getUserCalendarEvents(
 
   // Refined where with filters
   const finalWhere: any = {
-    AND: [
-      where,
-    ]
+    AND: [where],
   };
 
   if (options.startDate || options.endDate) {
@@ -261,7 +263,7 @@ export async function getUserCalendarEvents(
   ]);
 
   return {
-    events: events.map(event => ({
+    events: events.map((event) => ({
       id: event.id.toString(),
       userId: event.user_id.toString(),
       type: mapEventType(event.type),
@@ -389,7 +391,7 @@ export async function inviteAttendees(
 ): Promise<any[]> {
   const event = await prisma.user_calendars.findFirst({
     where: { id: BigInt(eventId), user_id: BigInt(organizerId) },
-    include: { users: { select: { name: true } } }
+    include: { users: { select: { name: true } } },
   });
 
   if (!event) {
@@ -404,7 +406,9 @@ export async function inviteAttendees(
 
     if (a.userId) {
       try {
-        user = await prisma.users.findFirst({ where: { id: BigInt(a.userId) } });
+        user = await prisma.users.findFirst({
+          where: { id: BigInt(a.userId) },
+        });
       } catch (e) {
         user = null;
       }
@@ -438,8 +442,7 @@ export async function inviteAttendees(
           },
         });
 
-        // Send push notification to premium users
-        if (user.subscription_tier === 'premium' && user.device_token) {
+        if (user.device_token) {
           const deviceToken = String(user.device_token);
           if (isValidExpoPushToken(deviceToken)) {
             await sendPushNotification(
@@ -455,7 +458,12 @@ export async function inviteAttendees(
       console.warn('Failed to create notification for invite', err);
     }
 
-    created.push({ id: attendeeRecord.id.toString(), userId: attendeeRecord.user_id?.toString() ?? null, email: attendeeRecord.attendee_email, status: attendeeRecord.status });
+    created.push({
+      id: attendeeRecord.id.toString(),
+      userId: attendeeRecord.user_id?.toString() ?? null,
+      email: attendeeRecord.attendee_email,
+      status: attendeeRecord.status,
+    });
   }
 
   return created;
@@ -474,7 +482,9 @@ export async function respondToInvite(
   attendeeId: string,
   status: 'accepted' | 'declined'
 ): Promise<any> {
-  const attendee = await prisma.user_calendar_attendees.findFirst({ where: { id: BigInt(attendeeId), event_id: BigInt(eventId) } });
+  const attendee = await prisma.user_calendar_attendees.findFirst({
+    where: { id: BigInt(attendeeId), event_id: BigInt(eventId) },
+  });
   if (!attendee) {
     throw new ApiError(404, 'Invite not found');
   }
@@ -482,7 +492,17 @@ export async function respondToInvite(
   // Get the event with organizer info
   const event = await prisma.user_calendars.findFirst({
     where: { id: BigInt(eventId) },
-    include: { users: { select: { id: true, name: true, email: true, subscription_tier: true, device_token: true } } }
+    include: {
+      users: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          subscription_tier: true,
+          device_token: true,
+        },
+      },
+    },
   });
 
   if (!event) {
@@ -501,19 +521,30 @@ export async function respondToInvite(
       throw new ApiError(403, 'Not authorized to respond to this invite');
     }
     respondingUser = await prisma.users.findFirst({ where: { id: userIdNum } });
-    if (!respondingUser || String(respondingUser.email).toLowerCase() !== String(attendee.attendee_email).toLowerCase()) {
+    if (
+      !respondingUser ||
+      String(respondingUser.email).toLowerCase() !==
+        String(attendee.attendee_email).toLowerCase()
+    ) {
       throw new ApiError(403, 'Not authorized to respond to this invite');
     }
   } else {
     respondingUser = await prisma.users.findFirst({ where: { id: userIdNum } });
   }
 
-  const updated = await prisma.user_calendar_attendees.update({ where: { id: BigInt(attendeeId) }, data: { status } });
+  const updated = await prisma.user_calendar_attendees.update({
+    where: { id: BigInt(attendeeId) },
+    data: { status },
+  });
 
   // Notify the organizer when invite is accepted
   if (status === 'accepted' && event.users) {
     const organizer = event.users;
-    const responderName = respondingUser?.name || respondingUser?.email || attendee.attendee_email || 'Someone';
+    const responderName =
+      respondingUser?.name ||
+      respondingUser?.email ||
+      attendee.attendee_email ||
+      'Someone';
     const eventTitle = event.title || 'your event';
     const eventDate = event.date.toISOString().split('T')[0];
 
@@ -534,8 +565,7 @@ export async function respondToInvite(
       console.warn('Failed to create in-app notification for organizer', err);
     }
 
-    // For premium users, also send push notification
-    if (organizer.subscription_tier === 'premium' && organizer.device_token) {
+    if (organizer.device_token) {
       try {
         const deviceToken = String(organizer.device_token);
         if (isValidExpoPushToken(deviceToken)) {
@@ -552,9 +582,13 @@ export async function respondToInvite(
     }
   }
 
-  return { id: updated.id.toString(), userId: updated.user_id ? updated.user_id.toString() : null, email: updated.attendee_email, status: updated.status };
+  return {
+    id: updated.id.toString(),
+    userId: updated.user_id ? updated.user_id.toString() : null,
+    email: updated.attendee_email,
+    status: updated.status,
+  };
 }
-
 
 /**
  * Copy an existing calendar event to a new date. Copies attendees.
@@ -564,7 +598,9 @@ export async function copyCalendarEvent(
   userId: string,
   newDateStr: string
 ): Promise<CalendarEvent> {
-  const existing = await prisma.user_calendars.findFirst({ where: { id: BigInt(eventId), user_id: BigInt(userId) } });
+  const existing = await prisma.user_calendars.findFirst({
+    where: { id: BigInt(eventId), user_id: BigInt(userId) },
+  });
   if (!existing) {
     throw new ApiError(404, 'Calendar event not found');
   }
@@ -590,7 +626,9 @@ export async function copyCalendarEvent(
   });
 
   // copy attendees
-  const attendees = await prisma.user_calendar_attendees.findMany({ where: { event_id: existing.id } });
+  const attendees = await prisma.user_calendar_attendees.findMany({
+    where: { event_id: existing.id },
+  });
   for (const a of attendees) {
     await prisma.user_calendar_attendees.create({
       data: {

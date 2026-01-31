@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Modal, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Modal, Image, Platform } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +46,15 @@ export default function ReflectionsScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileUri, setFileUri] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<{ name: string, type: string } | null>(null);
+
+  // Date Picker State
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'DECEMBER'
+  ];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   useEffect(() => {
     loadReflections();
@@ -116,6 +125,60 @@ export default function ReflectionsScreen() {
     } catch {
       return dateString;
     }
+  };
+
+  // Calendar logic helpers
+  const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
+
+  const formatYMD = (year: number, month: number, day: number) => {
+    const m = String(month + 1).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    return `${year}-${m}-${d}`;
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      if (selectedMonth === 0) {
+        setSelectedMonth(11);
+        setSelectedYear(selectedYear - 1);
+      } else {
+        setSelectedMonth(selectedMonth - 1);
+      }
+    } else {
+      if (selectedMonth === 11) {
+        setSelectedMonth(0);
+        setSelectedYear(selectedYear + 1);
+      } else {
+        setSelectedMonth(selectedMonth + 1);
+      }
+    }
+  };
+
+  const handleDateSelect = (day: number) => {
+    const iso = formatYMD(selectedYear, selectedMonth, day);
+    setNewReflection({ ...newReflection, date: iso });
+    setShowDatePicker(false);
+  };
+
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+    const firstDay = getFirstDayOfMonth(selectedMonth, selectedYear);
+    const nodes: any[] = [];
+    for (let i = 0; i < firstDay; i++) nodes.push(<View key={`empty-${i}`} className="w-10 h-10" />);
+    for (let day = 1; day <= daysInMonth; day++) {
+      const isSelected = newReflection.date === formatYMD(selectedYear, selectedMonth, day);
+      nodes.push(
+        <Pressable
+          key={day}
+          onPress={() => handleDateSelect(day)}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#2B5E9C]' : isDark ? 'bg-slate-700/50' : 'bg-transparent'}`}
+        >
+          <Text className={`text-sm font-medium ${isSelected ? 'text-white' : isDark ? 'text-white' : 'text-gray-900'}`}>{day}</Text>
+        </Pressable>
+      );
+    }
+    return nodes;
   };
 
   const onRefresh = async () => {
@@ -385,13 +448,29 @@ export default function ReflectionsScreen() {
             </View>
             <View className="p-6 gap-4">
               <View>
-                <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  value={newReflection.date}
-                  onChangeText={(t) => setNewReflection({ ...newReflection, date: t })}
-                  className={`p-3 rounded-lg border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-300 text-slate-800"}`}
-                  placeholder="2024-03-20"
-                />
+                <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Date</Text>
+                <Pressable
+                  onPress={() => {
+                    if (newReflection.date) {
+                      const parts = newReflection.date.split('-').map(Number);
+                      if (parts.length === 3) {
+                        setSelectedYear(parts[0]);
+                        setSelectedMonth(parts[1] - 1);
+                      }
+                    } else {
+                      const now = new Date();
+                      setSelectedYear(now.getFullYear());
+                      setSelectedMonth(now.getMonth());
+                    }
+                    setShowDatePicker(true);
+                  }}
+                  className={`flex-row justify-between items-center p-3 rounded-lg border ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-300"}`}
+                >
+                  <Text className={isDark ? "text-white" : "text-slate-800"}>
+                    {newReflection.date ? formatDate(newReflection.date) : "Select date..."}
+                  </Text>
+                  <MaterialIcons name="calendar-today" size={20} color={isDark ? "#ccc" : "#666"} />
+                </Pressable>
               </View>
               <View>
                 <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Reflection Content</Text>
@@ -450,6 +529,48 @@ export default function ReflectionsScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Date Picker Modal */}
+      <Modal
+        visible={showDatePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <Pressable className="flex-1 bg-black/50 justify-end" onPress={() => setShowDatePicker(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-t-3xl p-6`}>
+            <View className="flex-row items-center justify-between mb-4">
+              <Pressable onPress={() => navigateMonth('prev')} className="p-2 rounded-full">
+                <MaterialIcons name="chevron-left" size={24} color={isDark ? '#D1D5DB' : '#4B5563'} />
+              </Pressable>
+              <View className="flex-row items-center gap-2">
+                <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{monthNames[selectedMonth]}</Text>
+                <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{selectedYear}</Text>
+              </View>
+              <Pressable onPress={() => navigateMonth('next')} className="p-2 rounded-full">
+                <MaterialIcons name="chevron-right" size={24} color={isDark ? '#D1D5DB' : '#4B5563'} />
+              </Pressable>
+            </View>
+
+            <View className="flex-row justify-between mb-3">
+              {dayNames.map((day) => (
+                <View key={day} className="w-10 items-center">
+                  <Text className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{day}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View className="flex-row flex-wrap justify-between mb-6">{renderCalendar()}</View>
+
+            <View className="flex-row gap-3">
+              <Pressable onPress={() => setShowDatePicker(false)} className={`flex-1 py-3 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                <Text className={`text-center font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Cancel</Text>
+              </Pressable>
+            </View>
+            <View style={{ height: Platform.OS === 'ios' ? 20 : 0 }} />
+          </Pressable>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );

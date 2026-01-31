@@ -1,8 +1,8 @@
-import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Modal, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Modal, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
@@ -20,6 +20,7 @@ interface Appraisal {
     hasDocuments?: boolean;
     createdAt: string;
     type?: string;
+    rawDate: string; // Add this for sorting
 }
 
 interface ApiAppraisal {
@@ -88,15 +89,38 @@ export default function AppraisalScreen() {
     // Discussion Selection State
     const [showDiscussionDropdown, setShowDiscussionDropdown] = useState(false);
 
+    // Date Picker State
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
     // File State
     const [fileUri, setFileUri] = useState<string | null>(null);
     const [attachment, setAttachment] = useState<{ name: string, type: string } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const isSubmittingRef = useRef(false);
 
-    useEffect(() => {
-        loadAppraisals();
-        loadCachedHospitals();
-    }, []);
+    // Filtering State
+    const [typeFilter, setTypeFilter] = useState('All');
+    const [timeFilter, setTimeFilter] = useState('All');
+
+    const TIME_FILTERS = [
+        { label: 'All', value: 'All' },
+        { label: 'Last 30 Days', value: '30' },
+        { label: 'Last 6 Months', value: '180' },
+        { label: 'This Year', value: 'year' },
+    ];
+
+    useFocusEffect(
+        useCallback(() => {
+            loadAppraisals();
+            loadCachedHospitals();
+        }, [])
+    );
 
     // Load cached hospitals for faster initial display
     const loadCachedHospitals = async () => {
@@ -135,14 +159,17 @@ export default function AppraisalScreen() {
             const token = await AsyncStorage.getItem('authToken');
             if (!token) return router.replace('/(auth)/login');
 
-            const response = await apiService.get<{
-                success: boolean;
-                data: ApiAppraisal[];
-                pagination: { total: number };
-            }>(API_ENDPOINTS.APPRAISALS.LIST, token);
+            const response = await apiService.get<any>(API_ENDPOINTS.APPRAISALS.LIST, token, true);
 
-            if (response?.data) {
-                const mappedAppraisals: Appraisal[] = response.data.map((a) => {
+            let rawData: ApiAppraisal[] = [];
+            if (response?.data && Array.isArray(response.data)) {
+                rawData = response.data;
+            } else if (Array.isArray(response)) {
+                rawData = response;
+            }
+
+            if (rawData.length > 0) {
+                const mappedAppraisals: Appraisal[] = rawData.map((a) => {
                     return {
                         id: String(a.id),
                         date: formatDate(a.appraisalDate),
@@ -151,10 +178,18 @@ export default function AppraisalScreen() {
                         discussionWith: a.discussionWith,
                         hasDocuments: a.documentIds && a.documentIds.length > 0,
                         createdAt: a.createdAt,
+                        rawDate: a.appraisalDate, // Store the raw ISO date
                     };
                 });
-                mappedAppraisals.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                // Sort by appraisal date (descending), then by creation date (descending)
+                mappedAppraisals.sort((a, b) => {
+                    const dateDiff = new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime();
+                    if (dateDiff !== 0) return dateDiff;
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                });
                 setAppraisals(mappedAppraisals);
+            } else {
+                setAppraisals([]);
             }
         } catch (error: any) {
             console.error('Error loading appraisals:', error);
@@ -164,6 +199,36 @@ export default function AppraisalScreen() {
             setRefreshing(false);
         }
     };
+
+    const filteredAppraisals = useMemo(() => {
+        return appraisals.filter(appraisal => {
+            // Type Filter
+            if (typeFilter !== 'All' && appraisal.type !== typeFilter) {
+                return false;
+            }
+
+            // Time Filter
+            if (timeFilter !== 'All') {
+                const appraisalDate = new Date(appraisal.createdAt);
+                const now = new Date();
+
+                if (timeFilter === '30') {
+                    const thirtyDaysAgo = new Date();
+                    thirtyDaysAgo.setDate(now.getDate() - 30);
+                    if (appraisalDate < thirtyDaysAgo) return false;
+                } else if (timeFilter === '180') {
+                    const sixMonthsAgo = new Date();
+                    sixMonthsAgo.setMonth(now.getMonth() - 6);
+                    if (appraisalDate < sixMonthsAgo) return false;
+                } else if (timeFilter === 'year') {
+                    const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+                    if (appraisalDate < firstDayOfYear) return false;
+                }
+            }
+
+            return true;
+        });
+    }, [appraisals, typeFilter, timeFilter]);
 
     const searchHospitals = async (query: string) => {
         try {
@@ -198,6 +263,60 @@ export default function AppraisalScreen() {
             const date = new Date(dateString);
             return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
         } catch { return dateString; }
+    };
+
+    // Calendar logic helpers
+    const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+    const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
+
+    const formatYMD = (year: number, month: number, day: number) => {
+        const m = String(month + 1).padStart(2, '0');
+        const d = String(day).padStart(2, '0');
+        return `${year}-${m}-${d}`;
+    };
+
+    const navigateMonth = (direction: 'prev' | 'next') => {
+        if (direction === 'prev') {
+            if (selectedMonth === 0) {
+                setSelectedMonth(11);
+                setSelectedYear(selectedYear - 1);
+            } else {
+                setSelectedMonth(selectedMonth - 1);
+            }
+        } else {
+            if (selectedMonth === 11) {
+                setSelectedMonth(0);
+                setSelectedYear(selectedYear + 1);
+            } else {
+                setSelectedMonth(selectedMonth + 1);
+            }
+        }
+    };
+
+    const handleDateSelect = (day: number) => {
+        const iso = formatYMD(selectedYear, selectedMonth, day);
+        setNewAppraisal({ ...newAppraisal, date: iso });
+        setShowDatePicker(false);
+    };
+
+    const renderCalendar = () => {
+        const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+        const firstDay = getFirstDayOfMonth(selectedMonth, selectedYear);
+        const nodes: any[] = [];
+        for (let i = 0; i < firstDay; i++) nodes.push(<View key={`empty-${i}`} className="w-10 h-10" />);
+        for (let day = 1; day <= daysInMonth; day++) {
+            const isSelected = newAppraisal.date === formatYMD(selectedYear, selectedMonth, day);
+            nodes.push(
+                <Pressable
+                    key={day}
+                    onPress={() => handleDateSelect(day)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#E11D48]' : isDark ? 'bg-slate-700/50' : 'bg-transparent'}`}
+                >
+                    <Text className={`text-sm font-medium ${isSelected ? 'text-white' : isDark ? 'text-white' : 'text-gray-900'}`}>{day}</Text>
+                </Pressable>
+            );
+        }
+        return nodes;
     };
 
     const handleFileSelect = async (source: 'gallery' | 'camera' | 'files') => {
@@ -235,10 +354,12 @@ export default function AppraisalScreen() {
     };
 
     const handleAddAppraisal = async () => {
+        if (isSubmittingRef.current) return;
         if (!newAppraisal.date) return showToast.error('Please select a date', 'Validation Error');
         if (!newAppraisal.discussionWith) return showToast.error('Please select discussion partner', 'Validation Error');
 
         try {
+            isSubmittingRef.current = true;
             setIsSubmitting(true);
             const token = await AsyncStorage.getItem('authToken');
             if (!token) return;
@@ -281,15 +402,40 @@ export default function AppraisalScreen() {
 
             console.log('Creating appraisal with payload:', JSON.stringify(payload));
 
-            await apiService.post(API_ENDPOINTS.APPRAISALS.CREATE, payload, token);
+            const response: any = await apiService.post(API_ENDPOINTS.APPRAISALS.CREATE, payload, token);
 
             showToast.success('Appraisal record added', 'Success');
             resetForm();
-            loadAppraisals();
+
+            // Immediate local update if the response has the data, otherwise full reload
+            if (response?.data) {
+                const newA = response.data;
+                const mappedNew: Appraisal = {
+                    id: String(newA.id),
+                    date: formatDate(newA.appraisalDate),
+                    notes: newA.notes || 'No notes provided',
+                    type: (newA as any).appraisalType || payload.appraisal_type || 'Annual Appraisal',
+                    discussionWith: newA.discussionWith,
+                    hasDocuments: newA.documentIds && newA.documentIds.length > 0,
+                    createdAt: newA.createdAt,
+                    rawDate: newA.appraisalDate,
+                };
+                setAppraisals(prev => {
+                    const updated = [mappedNew, ...prev];
+                    return updated.sort((a, b) => {
+                        const dateDiff = new Date(b.rawDate).getTime() - new Date(a.rawDate).getTime();
+                        if (dateDiff !== 0) return dateDiff;
+                        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                    });
+                });
+            } else {
+                await loadAppraisals();
+            }
         } catch (error: any) {
             console.error('Error creating appraisal:', error);
             showToast.error(error.message || 'Failed to create appraisal', 'Error');
         } finally {
+            isSubmittingRef.current = false;
             setIsSubmitting(false);
         }
     };
@@ -320,15 +466,59 @@ export default function AppraisalScreen() {
                 </View>
             </View>
 
+            {/* Filters Section */}
+            <View className="py-2">
+                {/* Appraisal Type Filters */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                    className="mb-2"
+                >
+                    <Pressable
+                        onPress={() => setTypeFilter('All')}
+                        className={`px-4 py-2 rounded-full border ${typeFilter === 'All' ? 'bg-[#E11D48] border-[#E11D48]' : isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}
+                    >
+                        <Text className={`text-xs font-bold ${typeFilter === 'All' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>All Types</Text>
+                    </Pressable>
+                    {APPRAISAL_TYPES.map(type => (
+                        <Pressable
+                            key={type}
+                            onPress={() => setTypeFilter(type)}
+                            className={`px-4 py-2 rounded-full border ${typeFilter === type ? 'bg-[#E11D48] border-[#E11D48]' : isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}
+                        >
+                            <Text className={`text-xs font-bold ${typeFilter === type ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>{type}</Text>
+                        </Pressable>
+                    ))}
+                </ScrollView>
+
+                {/* Time Filters */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+                >
+                    {TIME_FILTERS.map(filter => (
+                        <Pressable
+                            key={filter.value}
+                            onPress={() => setTimeFilter(filter.value)}
+                            className={`px-4 py-2 rounded-full border ${timeFilter === filter.value ? 'bg-[#2B5E9C] border-[#2B5E9C]' : isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-gray-200'}`}
+                        >
+                            <Text className={`text-xs font-bold ${timeFilter === filter.value ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>{filter.label}</Text>
+                        </Pressable>
+                    ))}
+                </ScrollView>
+            </View>
+
             {loading && !refreshing ? (
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
                 </View>
             ) : (
                 <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadAppraisals(); }} />}>
-                    {appraisals.length > 0 ? (
+                    {filteredAppraisals.length > 0 ? (
                         <View style={{ gap: 16 }}>
-                            {appraisals.map((appraisal) => (
+                            {filteredAppraisals.map((appraisal) => (
                                 <View key={appraisal.id} className={`rounded-xl shadow-sm border p-4 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
                                     <View className="flex-row justify-between items-start mb-2">
                                         <View className="flex-row items-center gap-2">
@@ -362,6 +552,23 @@ export default function AppraisalScreen() {
                                     </View>
                                 </View>
                             ))}
+                        </View>
+                    ) : appraisals.length > 0 ? (
+                        // Case where we have appraisals but they are filtered out
+                        <View className={`p-8 rounded-3xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
+                            <View className="w-20 h-20 rounded-full bg-rose-50 items-center justify-center mb-4">
+                                <MaterialIcons name="filter-list" size={48} color="#E11D48" />
+                            </View>
+                            <Text className={`text-xl text-center font-bold mb-2 ${isDark ? "text-white" : "text-slate-800"}`}>No matches found</Text>
+                            <Text className={`text-center text-sm mb-6 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+                                Try adjusting your filters to find what you're looking for.
+                            </Text>
+                            <Pressable
+                                onPress={() => { setTypeFilter('All'); setTimeFilter('All'); }}
+                                className="bg-[#E11D48] px-8 py-3 rounded-2xl shadow-md active:opacity-90"
+                            >
+                                <Text className="text-white font-bold">Clear Filters</Text>
+                            </Pressable>
                         </View>
                     ) : (
                         <View className={`p-8 rounded-3xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
@@ -502,13 +709,33 @@ export default function AppraisalScreen() {
 
                             {/* Date */}
                             <View className="z-10">
-                                <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Date (YYYY-MM-DD)</Text>
-                                <TextInput
-                                    value={newAppraisal.date}
-                                    onChangeText={(t) => setNewAppraisal({ ...newAppraisal, date: t })}
-                                    className={`p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`}
-                                    placeholder="2024-03-20"
-                                />
+                                <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Date</Text>
+                                <Pressable
+                                    onPress={() => {
+                                        if (newAppraisal.date) {
+                                            const parts = newAppraisal.date.split('-').map(Number);
+                                            if (parts.length === 3) {
+                                                const y = parts[0];
+                                                const m = parts[1];
+                                                if (y !== undefined && m !== undefined && !isNaN(y) && !isNaN(m)) {
+                                                    setSelectedYear(y);
+                                                    setSelectedMonth(m - 1);
+                                                }
+                                            }
+                                        } else {
+                                            const now = new Date();
+                                            setSelectedYear(now.getFullYear());
+                                            setSelectedMonth(now.getMonth());
+                                        }
+                                        setShowDatePicker(true);
+                                    }}
+                                    className={`flex-row justify-between items-center p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}
+                                >
+                                    <Text className={isDark ? "text-white" : "text-slate-800"}>
+                                        {newAppraisal.date ? formatDate(newAppraisal.date) : "Select date..."}
+                                    </Text>
+                                    <MaterialIcons name="calendar-today" size={20} color={isDark ? "#ccc" : "#666"} />
+                                </Pressable>
                             </View>
 
                             {/* Notes */}
@@ -563,6 +790,48 @@ export default function AppraisalScreen() {
                     </View>
                 </View>
             </Modal >
+
+            {/* Date Picker Modal */}
+            <Modal
+                visible={showDatePicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowDatePicker(false)}
+            >
+                <Pressable className="flex-1 bg-black/50 justify-end" onPress={() => setShowDatePicker(false)}>
+                    <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-t-3xl p-6`}>
+                        <View className="flex-row items-center justify-between mb-4">
+                            <Pressable onPress={() => navigateMonth('prev')} className="p-2 rounded-full">
+                                <MaterialIcons name="chevron-left" size={24} color={isDark ? '#D1D5DB' : '#4B5563'} />
+                            </Pressable>
+                            <View className="flex-row items-center gap-2">
+                                <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{monthNames[selectedMonth]}</Text>
+                                <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{selectedYear}</Text>
+                            </View>
+                            <Pressable onPress={() => navigateMonth('next')} className="p-2 rounded-full">
+                                <MaterialIcons name="chevron-right" size={24} color={isDark ? '#D1D5DB' : '#4B5563'} />
+                            </Pressable>
+                        </View>
+
+                        <View className="flex-row justify-between mb-3">
+                            {dayNames.map((day) => (
+                                <View key={day} className="w-10 items-center">
+                                    <Text className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{day}</Text>
+                                </View>
+                            ))}
+                        </View>
+
+                        <View className="flex-row flex-wrap justify-between mb-6">{renderCalendar()}</View>
+
+                        <View className="flex-row gap-3">
+                            <Pressable onPress={() => setShowDatePicker(false)} className={`flex-1 py-3 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                                <Text className={`text-center font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Cancel</Text>
+                            </Pressable>
+                        </View>
+                        <View style={{ height: Platform.OS === 'ios' ? 20 : 0 }} />
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </SafeAreaView >
     );
 }

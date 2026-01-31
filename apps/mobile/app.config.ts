@@ -20,9 +20,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: 'com.revalidationtracker.app',
     buildNumber: '1',
     infoPlist: {
-      NSCameraUsageDescription: 'This app needs access to your camera to upload document evidence.',
-      NSPhotoLibraryUsageDescription: 'This app needs access to your photo library to upload document evidence.',
-      NSPhotoLibraryAddUsageDescription: 'This app needs access to save documents to your photo library.',
+      NSCameraUsageDescription:
+        'This app needs access to your camera to upload document evidence.',
+      NSPhotoLibraryUsageDescription:
+        'This app needs access to your photo library to upload document evidence.',
+      NSPhotoLibraryAddUsageDescription:
+        'This app needs access to save documents to your photo library.',
+      UIBackgroundModes: ['fetch', 'processing'],
     },
   },
   android: {
@@ -38,6 +42,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'android.permission.WRITE_EXTERNAL_STORAGE',
       'android.permission.INTERNET',
       'android.permission.ACCESS_NETWORK_STATE',
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.WAKE_LOCK',
+      'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+      'android.permission.POST_NOTIFICATIONS',
     ],
   },
   web: {
@@ -45,11 +53,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     'expo-router',
+    'expo-task-manager',
     [
       'expo-image-picker',
       {
-        photosPermission: 'The app accesses your photos to upload document evidence.',
-        cameraPermission: 'The app accesses your camera to upload document evidence.',
+        photosPermission:
+          'The app accesses your photos to upload document evidence.',
+        cameraPermission:
+          'The app accesses your camera to upload document evidence.',
       },
     ],
     [
@@ -84,7 +95,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     eas: {
       // EAS requires a static projectId for linking during builds. Fill with the
       // project id reported by the EAS CLI so `eas build` can run non-interactively.
-      projectId: (process.env as { EAS_PROJECT_ID?: string }).EAS_PROJECT_ID || '356a49db-0d9f-4cd6-b573-ec3f9e318ce2',
+      projectId:
+        (process.env as { EAS_PROJECT_ID?: string }).EAS_PROJECT_ID ||
+        '356a49db-0d9f-4cd6-b573-ec3f9e318ce2',
     },
   },
   scheme: 'revalidation-tracker',

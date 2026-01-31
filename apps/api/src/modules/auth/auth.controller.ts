@@ -304,8 +304,9 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
         select: { id: true, email: true, status: true },
       });
     } catch (dbError: any) {
-      logger.error('Database error during user lookup', dbError);
-      throw new ApiError(500, 'Database connection error. Please try again later.');
+      // Log warning but allow fallback to raw SQL (needed for users with invalid enum values like '')
+      logger.warn('Prisma user lookup failed, falling back to raw SQL', { error: dbError });
+      user = null;
     }
 
     // If not found with exact match, try case-insensitive using raw SQL

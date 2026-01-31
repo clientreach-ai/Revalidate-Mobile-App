@@ -288,7 +288,7 @@ export default function NotificationsScreen() {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) return;
       await apiService.patch(
-        `${API_ENDPOINTS.NOTIFICATIONS.MARK_READ}/${id}/read`,
+        `${API_ENDPOINTS.NOTIFICATIONS.MARK_READ}/${id}`,
         {},
         token
       );
@@ -391,7 +391,7 @@ export default function NotificationsScreen() {
                   (a.email &&
                     userData.email &&
                     String(a.email).toLowerCase() ===
-                      String(userData.email).toLowerCase())
+                    String(userData.email).toLowerCase())
               );
 
               if (
@@ -449,9 +449,8 @@ export default function NotificationsScreen() {
           className={`px-4 py-2 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}
         >
           <Text
-            className={`text-xs font-semibold uppercase tracking-wider ${
-              isDark ? 'text-gray-400' : 'text-slate-500'
-            }`}
+            className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-slate-500'
+              }`}
           >
             {title}
           </Text>
@@ -460,11 +459,10 @@ export default function NotificationsScreen() {
           <Pressable
             key={notification.id}
             onPress={() => handleNotificationPress(notification)}
-            className={`flex-row items-center gap-4 px-4 py-4 border-b ${
-              isDark
+            className={`flex-row items-center gap-4 px-4 py-4 border-b ${isDark
                 ? 'bg-slate-800 border-slate-700'
                 : 'bg-white border-slate-100'
-            } ${!notification.isRead ? 'opacity-100' : 'opacity-80'}`}
+              } ${!notification.isRead ? 'opacity-100' : 'opacity-80'}`}
           >
             <View className="relative">
               <View
@@ -478,38 +476,34 @@ export default function NotificationsScreen() {
               </View>
               {!notification.isRead && (
                 <View
-                  className={`absolute -top-1 -right-1 w-3 h-3 bg-[#2563EB] border-2 rounded-full ${
-                    isDark ? 'border-slate-800' : 'border-white'
-                  }`}
+                  className={`absolute -top-1 -right-1 w-3 h-3 bg-[#2563EB] border-2 rounded-full ${isDark ? 'border-slate-800' : 'border-white'
+                    }`}
                 />
               )}
             </View>
             <View className="flex-1 min-w-0">
               <View className="flex-row justify-between items-baseline mb-1">
                 <Text
-                  className={`text-[15px] flex-1 ${notification.isRead ? 'font-medium' : 'font-bold'} ${
-                    isDark ? 'text-white' : 'text-slate-800'
-                  }`}
+                  className={`text-[15px] flex-1 ${notification.isRead ? 'font-medium' : 'font-bold'} ${isDark ? 'text-white' : 'text-slate-800'
+                    }`}
                   numberOfLines={1}
                 >
                   {notification.title}
                 </Text>
                 <Text
-                  className={`text-xs ml-2 shrink-0 ${
-                    !notification.isRead
+                  className={`text-xs ml-2 shrink-0 ${!notification.isRead
                       ? 'font-medium text-[#2563EB]'
                       : isDark
                         ? 'font-normal text-gray-400'
                         : 'font-normal text-slate-500'
-                  }`}
+                    }`}
                 >
                   {notification.time}
                 </Text>
               </View>
               <Text
-                className={`text-sm font-normal leading-snug ${
-                  isDark ? 'text-gray-400' : 'text-slate-500'
-                }`}
+                className={`text-sm font-normal leading-snug ${isDark ? 'text-gray-400' : 'text-slate-500'
+                  }`}
                 numberOfLines={2}
               >
                 {notification.description}
@@ -524,34 +518,34 @@ export default function NotificationsScreen() {
   const isDetailMode = !!notificationId && typeof notificationId === 'string';
   const detailNotification: Notification | null = isDetailMode
     ? notifications.find((n) => n.id === notificationId) ||
-      (() => {
-        const safeTitle =
-          typeof notificationTitle === 'string' && notificationTitle
-            ? notificationTitle
-            : 'Notification';
-        const safeBody =
-          typeof notificationBody === 'string' ? notificationBody : '';
-        const safeTime =
-          typeof notificationTime === 'string' ? notificationTime : '';
-        const iconInfo = getIconForNotification(
-          safeTitle,
-          typeof notificationType === 'string' ? notificationType : undefined
-        );
-        return {
-          id: notificationId,
-          title: safeTitle,
-          description: safeBody,
-          time: safeTime,
-          icon: iconInfo.icon,
-          iconColor: iconInfo.color,
-          iconBgColor: iconInfo.bgColor,
-          isRead: true,
-          section: 'today',
-          createdAt: new Date(),
-          type:
-            typeof notificationType === 'string' ? notificationType : undefined,
-        } as Notification;
-      })()
+    (() => {
+      const safeTitle =
+        typeof notificationTitle === 'string' && notificationTitle
+          ? notificationTitle
+          : 'Notification';
+      const safeBody =
+        typeof notificationBody === 'string' ? notificationBody : '';
+      const safeTime =
+        typeof notificationTime === 'string' ? notificationTime : '';
+      const iconInfo = getIconForNotification(
+        safeTitle,
+        typeof notificationType === 'string' ? notificationType : undefined
+      );
+      return {
+        id: notificationId,
+        title: safeTitle,
+        description: safeBody,
+        time: safeTime,
+        icon: iconInfo.icon,
+        iconColor: iconInfo.color,
+        iconBgColor: iconInfo.bgColor,
+        isRead: true,
+        section: 'today',
+        createdAt: new Date(),
+        type:
+          typeof notificationType === 'string' ? notificationType : undefined,
+      } as Notification;
+    })()
     : null;
 
   return (
@@ -561,9 +555,8 @@ export default function NotificationsScreen() {
     >
       {/* Header */}
       <View
-        className={`px-4 pt-4 pb-2 ${
-          isDark ? 'bg-slate-800/80' : 'bg-white/80'
-        }`}
+        className={`px-4 pt-4 pb-2 ${isDark ? 'bg-slate-800/80' : 'bg-white/80'
+          }`}
       >
         <View className="flex-row items-center justify-between mb-4">
           <Pressable
@@ -582,9 +575,8 @@ export default function NotificationsScreen() {
           )}
         </View>
         <Text
-          className={`text-3xl font-bold tracking-tight px-0.5 ${
-            isDark ? 'text-white' : 'text-slate-800'
-          }`}
+          className={`text-3xl font-bold tracking-tight px-0.5 ${isDark ? 'text-white' : 'text-slate-800'
+            }`}
         >
           {isDetailMode ? 'Notification' : 'Notifications'}
         </Text>
@@ -597,11 +589,10 @@ export default function NotificationsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View
-            className={`mx-4 mt-4 p-5 rounded-3xl border ${
-              isDark
+            className={`mx-4 mt-4 p-5 rounded-3xl border ${isDark
                 ? 'bg-slate-800 border-slate-700'
                 : 'bg-white border-slate-100'
-            }`}
+              }`}
           >
             <View className="flex-row items-center mb-4">
               <View
@@ -615,17 +606,15 @@ export default function NotificationsScreen() {
               </View>
               <View className="flex-1">
                 <Text
-                  className={`text-lg font-bold ${
-                    isDark ? 'text-white' : 'text-slate-800'
-                  }`}
+                  className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-800'
+                    }`}
                 >
                   {detailNotification.title}
                 </Text>
                 {!!detailNotification.time && (
                   <Text
-                    className={`text-xs mt-1 ${
-                      isDark ? 'text-gray-400' : 'text-slate-500'
-                    }`}
+                    className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-slate-500'
+                      }`}
                   >
                     {detailNotification.time}
                   </Text>
@@ -634,9 +623,8 @@ export default function NotificationsScreen() {
             </View>
             {!!detailNotification.description && (
               <Text
-                className={`text-sm leading-relaxed ${
-                  isDark ? 'text-gray-300' : 'text-slate-600'
-                }`}
+                className={`text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-slate-600'
+                  }`}
               >
                 {detailNotification.description}
               </Text>
@@ -688,11 +676,10 @@ export default function NotificationsScreen() {
             </>
           ) : (
             <View
-              className={`p-8 mx-4 mt-4 rounded-2xl border items-center ${
-                isDark
+              className={`p-8 mx-4 mt-4 rounded-2xl border items-center ${isDark
                   ? 'bg-slate-800 border-slate-700'
                   : 'bg-white border-slate-100'
-              }`}
+                }`}
             >
               <MaterialIcons
                 name="notifications-none"
