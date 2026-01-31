@@ -3,6 +3,9 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { clearAllOfflineData } from '@/services/offline-storage';
+import { apiService } from '@/services/api';
+import { API_ENDPOINTS } from '@revalidation-tracker/constants';
+import { useTimerStore } from '@/features/timer/timer.store';
 
 export interface AuthUser {
   id: string;
@@ -38,7 +41,7 @@ const initialState: AuthState = {
 
 export const useAuthStore = create<AuthState & AuthActions>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialState,
       setAuth: (token, user) =>
         set({
@@ -55,6 +58,21 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           user: state.user ? { ...state.user, ...userData } : null,
         })),
       logout: async () => {
+        const { token, user } = get();
+
+        // Auto-pause any active work session before logout
+        if (token) {
+          try {
+            await apiService.post(API_ENDPOINTS.WORK_HOURS.PAUSE, {}, token);
+          } catch (err) {
+            // Session may not be active, ignore error
+            console.log('No active session to pause on logout');
+          }
+        }
+
+        // Reset memory-only timer store
+        useTimerStore.getState().reset();
+
         // Clear SQLite cache
         clearAllOfflineData().catch((err) => {
           console.error('Failed to clear offline data on logout:', err);
@@ -96,3 +114,4 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 // Utility hook to wait for auth hydration
 export const useAuthHydrated = () =>
   useAuthStore((state) => state._hasHydrated);
+

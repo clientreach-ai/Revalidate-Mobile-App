@@ -12,15 +12,14 @@ TaskManager.defineTask(TIMER_BACKGROUND_TASK, async () => {
   try {
     const state = useTimerStore.getState();
     if (state.status === 'running' && state.startTime) {
-      const start = new Date(state.startTime).getTime();
+      const start = TimerService.parseSafeDate(state.startTime);
       const now = Date.now();
-      const elapsed = now - start + state.accumulatedMs;
+      // Session Model: Elapsed = Now - T0 - TotalPaused
+      // accumulatedMs is now "Total Paused Time"
+      const elapsed = Math.max(0, now - start - state.accumulatedMs);
 
       // Update store UI will reflect this when app foregrounds
       useTimerStore.getState().setElapsedMs(elapsed);
-
-      // Persist state occasionally if needed, but most importantly
-      // we just want to keep the process alive or ensure it calculates correctly on wake
     }
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch (error) {
@@ -129,9 +128,48 @@ export const TimerService = {
     return true;
   },
 
-  calculateElapsed(startTime: string | null, accumulatedMs: number): number {
+  parseSafeDate(dateStr: string | null | undefined): number {
+    if (!dateStr) return Date.now();
+    // Normalize date string: replace space with T and ensure it ends with Z if no offset is present
+    const normalized = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
+    const hasOffset = normalized.includes('Z') || normalized.includes('+') || (normalized.split('-').length > 3);
+    const safeStr = hasOffset ? normalized : `${normalized}Z`;
+    const timestamp = new Date(safeStr).getTime();
+    return isNaN(timestamp) ? Date.now() : timestamp;
+  },
+
+  calculateElapsedBetween(startTime: string | null, endTime: string | number | null, accumulatedMs: number): number {
     if (!startTime) return accumulatedMs;
-    const start = new Date(startTime).getTime();
-    return Date.now() - start + accumulatedMs;
+    const start = this.parseSafeDate(startTime);
+    const end = typeof endTime === 'number' ? endTime : this.parseSafeDate(endTime);
+    return Math.max(0, end - start - accumulatedMs);
+  },
+
+  calculateElapsed(startTime: string | null, accumulatedMs: number): number {
+    return this.calculateElapsedBetween(startTime, Date.now(), accumulatedMs);
+  },
+
+  async pauseTimer() {
+    try {
+      await this.unregisterBackgroundTask();
+    } catch (err) {
+      console.error('Failed to pause timer background task', err);
+    }
+  },
+
+  async resumeTimer() {
+    try {
+      await this.registerBackgroundTask();
+    } catch (err) {
+      console.error('Failed to resume timer background task', err);
+    }
+  },
+
+  async stopTimer() {
+    try {
+      await this.unregisterBackgroundTask();
+    } catch (err) {
+      console.error('Failed to stop timer background task', err);
+    }
   },
 };

@@ -9,6 +9,7 @@ import { usePremium } from '@/hooks/usePremium';
 import { DiscoveryModal, useDiscoveryModal } from '@/features/auth/DiscoveryModal';
 import { TimerService } from '@/features/timer/timer.service';
 import { useTimerStore } from '@/features/timer/timer.store';
+import { useAuthStore } from '@/features/auth/auth.store';
 
 // Modular Imports
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData';
@@ -25,7 +26,6 @@ import '../../global.css';
 export default function DashboardScreen() {
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
-  const timerStore = useTimerStore();
   const { showModal, showDiscoveryModal, hideModal } = useDiscoveryModal();
 
   // Data Hook
@@ -78,7 +78,6 @@ export default function DashboardScreen() {
   }, [showDiscoveryModal]);
 
   useEffect(() => {
-    timerStore.load();
     TimerService.registerBackgroundTask();
   }, []);
 

@@ -5,7 +5,6 @@ import {
   updateOperationStatus,
   deleteOperation,
   cacheUserProfile,
-  type OfflineOperation,
 } from './offline-storage';
 import { apiService } from './api';
 import { checkNetworkStatus, subscribeToNetworkChanges } from './network-monitor';
@@ -14,9 +13,15 @@ import { useSubscriptionStore } from '@/features/subscription/subscription.store
 import { useAuthStore } from '@/features/auth/auth.store';
 
 let isSyncing = false;
+let isPreCaching = false;
+let lastPreCacheTime = 0;
+let isInitialized = false;
+const PRE_CACHE_THROTTLE = 300000; // Increased to 5 minutes
 let networkUnsubscribe: (() => void) | null = null;
 
 export async function initializeSyncService() {
+  if (isInitialized) return;
+
   const isConnected = await checkNetworkStatus();
 
   if (isConnected) {
@@ -28,6 +33,8 @@ export async function initializeSyncService() {
       await syncPendingOperations();
     }
   });
+
+  isInitialized = true;
 }
 
 export function cleanupSyncService() {
@@ -35,6 +42,7 @@ export function cleanupSyncService() {
     networkUnsubscribe();
     networkUnsubscribe = null;
   }
+  isInitialized = false;
 }
 
 export async function syncPendingOperations(): Promise<void> {
@@ -72,13 +80,11 @@ export async function syncPendingOperations(): Promise<void> {
 
         await updateOperationStatus(operation.id!, 'syncing');
 
-        let response: any;
-
         const operationToken = operation.headers?.Authorization?.replace('Bearer ', '') || token;
 
         switch (operation.method) {
           case 'GET':
-            response = await apiService.get(operation.endpoint, operationToken);
+            await apiService.get(operation.endpoint, operationToken);
             break;
           case 'POST':
             // Check if this is a file upload (has file property in data)
@@ -87,7 +93,7 @@ export async function syncPendingOperations(): Promise<void> {
               const additionalData = { ...operation.data };
               delete additionalData.file;
               try {
-                response = await apiService.uploadFile(
+                await apiService.uploadFile(
                   operation.endpoint,
                   { uri: fileData.uri, type: fileData.type, name: fileData.name },
                   operationToken,
@@ -99,17 +105,17 @@ export async function syncPendingOperations(): Promise<void> {
                 throw fileError;
               }
             } else {
-              response = await apiService.post(operation.endpoint, operation.data, operationToken);
+              await apiService.post(operation.endpoint, operation.data, operationToken);
             }
             break;
           case 'PUT':
-            response = await apiService.put(operation.endpoint, operation.data, operationToken);
+            await apiService.put(operation.endpoint, operation.data, operationToken);
             break;
           case 'PATCH':
-            response = await apiService.patch(operation.endpoint, operation.data, operationToken);
+            await apiService.patch(operation.endpoint, operation.data, operationToken);
             break;
           case 'DELETE':
-            response = await apiService.delete(operation.endpoint, operationToken);
+            await apiService.delete(operation.endpoint, operationToken);
             break;
         }
 
@@ -150,14 +156,21 @@ export async function syncPendingOperations(): Promise<void> {
  * Also pre-fetches important data to cache for offline use
  */
 async function refreshUserCacheIfPremium(): Promise<void> {
+  if (isPreCaching) return;
+
+  const now = Date.now();
+  if (now - lastPreCacheTime < PRE_CACHE_THROTTLE) {
+    return;
+  }
+
   try {
+    isPreCaching = true;
+    lastPreCacheTime = now;
     const { isPremium, canUseOffline } = useSubscriptionStore.getState();
     if (!isPremium && !canUseOffline) return;
 
     const token = await AsyncStorage.getItem('authToken');
     if (!token) return;
-
-    console.log('[SyncService] Pre-caching data for offline use...');
 
     // Fetch and cache user profile (FORCE fetch for sync)
     try {
@@ -188,35 +201,30 @@ async function refreshUserCacheIfPremium(): Promise<void> {
         }
       }
     } catch (e) {
-      console.log('[SyncService] Failed to cache user profile:', e);
+      // Quietly fail profile sync
     }
 
-    // Pre-fetch and cache other important data (API auto-caches to SQLite)
+    // Pre-fetch only critical data to reduce noise/load
     const endpointsToCache = [
       '/api/v1/users/profile',
-      '/api/v1/cpd-hours',
       '/api/v1/work-hours',
-      '/api/v1/reflections',
-      '/api/v1/feedback',
-      '/api/v1/appraisals',
-      '/api/v1/calendar/events',
-      '/api/v1/documents',
+      '/api/v1/cpd-hours',
     ];
 
     for (const endpoint of endpointsToCache) {
       try {
-        console.log(`[SyncService] Pre-caching ${endpoint}...`);
-        await apiService.get(endpoint, token, true); // Use forceRefresh to bypass cache and update it
+        await apiService.get(endpoint, token, true);
       } catch (e) {
-        console.warn(`[SyncService] Failed to pre-cache ${endpoint}:`, e);
-        // Non-critical, continue with other endpoints
+        // Non-critical, continue
       }
     }
 
-    console.log('[SyncService] Pre-caching complete');
+    // Only log on successful completion, and keep it one-liner
+    console.log('[SyncService] Offine data synchronized.');
   } catch (error) {
-    console.log('Failed to refresh user cache:', error);
     // Non-critical - silently fail
+  } finally {
+    isPreCaching = false;
   }
 }
 

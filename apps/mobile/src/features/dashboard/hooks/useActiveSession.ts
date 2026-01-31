@@ -10,13 +10,17 @@ import { ActiveSession } from '../dashboard.types';
 
 export const useActiveSession = (onSessionEnded?: () => void) => {
     const router = useRouter();
-    const timerStore = useTimerStore();
-    const setStatus = useTimerStore(state => state.setStatus);
-    const setStartTime = useTimerStore(state => state.setStartTime);
-    const setAccumulatedMs = useTimerStore(state => state.setAccumulatedMs);
-    const setElapsedMs = useTimerStore(state => state.setElapsedMs);
-    const persist = useTimerStore(state => state.persist);
-    const reset = useTimerStore(state => state.reset);
+
+    // Stable selectors for actions to avoid unnecessary re-renders
+    const storeActiveSessionId = useTimerStore(s => s.activeSessionId);
+    const setSessionData = useTimerStore(s => s.setSessionData);
+    const setStatus = useTimerStore(s => s.setStatus);
+    const setStartTime = useTimerStore(s => s.setStartTime);
+    const setAccumulatedMs = useTimerStore(s => s.setAccumulatedMs);
+    const setElapsedMs = useTimerStore(s => s.setElapsedMs);
+    const storePause = useTimerStore(s => s.pause);
+    const storeResume = useTimerStore(s => s.resume);
+    const resetStore = useTimerStore(s => s.reset);
 
     const isMounted = useRef(true);
     const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -27,18 +31,6 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
     const [isPaused, setIsPaused] = useState(false);
     const [pausedAt, setPausedAt] = useState<Date | null>(null);
     const [totalPausedTime, setTotalPausedTime] = useState(0);
-    const [lastPausedTimer, setLastPausedTimer] = useState<{
-        hours: number;
-        minutes: number;
-        seconds: number;
-    } | null>(null);
-
-    // NEW: Stick to this value when the user manually pauses, ignoring background updates
-    const [stickyPausedTimer, setStickyPausedTimer] = useState<{
-        hours: number;
-        minutes: number;
-        seconds: number;
-    } | null>(null);
 
     useEffect(() => {
         isMounted.current = true;
@@ -53,14 +45,17 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
         pausedMs: number = totalPausedTime
     ) => {
         if (!session || !session.isActive || session.isPaused) return;
-        const startTime = new Date(session.startTime);
-        const now = new Date();
-        const diffMs = now.getTime() - startTime.getTime() - pausedMs;
-        const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+        const elapsedMs = TimerService.calculateElapsed(session.startTime, pausedMs);
+        const totalSeconds = Math.floor(elapsedMs / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
-        setTimer({ hours, minutes, seconds });
+
+        // Use functional update to avoid unnecessary re-renders if values are the same
+        setTimer(prev => {
+            if (prev.hours === hours && prev.minutes === minutes && prev.seconds === seconds) return prev;
+            return { hours, minutes, seconds };
+        });
     }, [activeSession, totalPausedTime]);
 
     const loadActiveSession = useCallback(async () => {
@@ -74,37 +69,34 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
             const response = await apiService.get<{
                 success: boolean;
                 data: ActiveSession | null;
-            }>(API_ENDPOINTS.WORK_HOURS.ACTIVE, token);
+            }>(API_ENDPOINTS.WORK_HOURS.ACTIVE, token, true);
 
             if (response?.data && response.data.isActive) {
                 if (!isMounted.current) return;
                 const session = response.data;
-                setActiveSession(session);
-                setIsPaused(session.isPaused || false);
-                setTotalPausedTime(session.totalPausedMs || 0);
-                setPausedAt(session.pausedAt ? new Date(session.pausedAt) : null);
+                const sessionId = session.id.toString();
 
-                if (session.isPaused && session.pausedAt) {
-                    const startTime = new Date(session.startTime);
-                    const pauseTime = new Date(session.pausedAt);
-                    const diffMs = pauseTime.getTime() - startTime.getTime() - (session.totalPausedMs || 0);
-                    const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
-                    const h = Math.floor(totalSeconds / 3600);
-                    const m = Math.floor((totalSeconds % 3600) / 60);
-                    const s = totalSeconds % 60;
-
-                    // Only update if we don't have a sticky timer set by the user
-                    if (!stickyPausedTimer) {
-                        setTimer({ hours: h, minutes: m, seconds: s });
-                    }
-
-                    setLastPausedTimer({ hours: h, minutes: m, seconds: s });
+                if (storeActiveSessionId === sessionId) {
+                    console.log('[useActiveSession] Local store is authoritative. Ignoring server time data.');
+                    // Only sync metadata if needed, but for now we trust local completely for timer.
+                    setActiveSession(session);
+                    // Do NOT overwrite local timer state (isPaused, pausedAt etc) from server.
+                    // Instead, we might want to sync local state FROM store if they drifted?
+                    // Actually, if store is authoritative, we should just let the store drive.
                 } else {
-                    setLastPausedTimer(null);
-                    // Also check here, though sticky should be null if running
-                    if (!stickyPausedTimer) {
-                        updateTimerFromSession(session, session.totalPausedMs || 0);
-                    }
+                    console.log('[useActiveSession] Hydrating from server data (New Session/Restart)');
+                    setActiveSession(session);
+                    setIsPaused(session.isPaused || false);
+                    setTotalPausedTime(session.totalPausedMs || 0);
+                    setPausedAt(session.pausedAt ? new Date(TimerService.parseSafeDate(session.pausedAt)) : null);
+
+                    setSessionData({
+                        id: sessionId,
+                        startTime: session.startTime,
+                        accumulatedMs: session.totalPausedMs || 0,
+                        pausedAt: session.pausedAt,
+                        status: session.isPaused ? 'paused' : 'running'
+                    });
                 }
             } else {
                 if (isMounted.current) {
@@ -112,104 +104,98 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                     setIsPaused(false);
                     setPausedAt(null);
                     setTotalPausedTime(0);
+                    resetStore();
                 }
-                await AsyncStorage.removeItem('workSessionPauseState');
             }
             if (isMounted.current) setActiveSessionLoaded(true);
         } catch (error) {
             console.error('Error loading active session:', error);
             if (isMounted.current) setActiveSessionLoaded(true);
         }
-    }, [updateTimerFromSession]);
+    }, [storeActiveSessionId, setSessionData, resetStore]);
 
+    // Effect for handling the timer tick and synchronization
     useEffect(() => {
-        if (activeSession && activeSession.isActive) {
-            // Use activeSession.isPaused as source of truth to handle async state updates
-            const sessionIsPaused = isPaused || activeSession.isPaused;
-
-            if (sessionIsPaused) {
-                if (timerStore.status !== 'paused') setStatus('paused');
-                if (timerStore.accumulatedMs !== totalPausedTime) setAccumulatedMs(totalPausedTime);
-                persist();
-
+        if (!activeSession || !activeSession.isActive) {
+            if (activeSessionLoaded) {
                 if (timerIntervalRef.current) {
                     clearInterval(timerIntervalRef.current);
                     timerIntervalRef.current = null;
                 }
-
-                // Priority 0: Sticky User Pause (Highest Priority)
-                if (stickyPausedTimer) {
-                    setTimer(stickyPausedTimer);
-                }
-                // Priority 1: Use explicitly saved paused timer
-                else if (lastPausedTimer && (lastPausedTimer.hours > 0 || lastPausedTimer.minutes > 0 || lastPausedTimer.seconds > 0)) {
-                    setTimer(lastPausedTimer);
-                }
-                // Priority 2: Calculate from pausedAt timestamp
-                else if (activeSession.pausedAt) {
-                    const startTime = new Date(activeSession.startTime);
-                    const pauseTime = new Date(activeSession.pausedAt);
-                    const pausedMs = activeSession.totalPausedMs || totalPausedTime || 0;
-
-                    // Validation
-                    if (!isNaN(startTime.getTime()) && !isNaN(pauseTime.getTime())) {
-                        const diffMs = pauseTime.getTime() - startTime.getTime() - pausedMs;
-                        const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
-                        const h = Math.floor(totalSeconds / 3600);
-                        const m = Math.floor((totalSeconds % 3600) / 60);
-                        const s = totalSeconds % 60;
-
-                        const isNonZero = h > 0 || m > 0 || s > 0;
-                        if (isNonZero) {
-                            setTimer({ hours: h, minutes: m, seconds: s });
-                        }
-                    }
-                }
-            } else {
-                if (timerStore.status !== 'running') setStatus('running');
-                if (timerStore.startTime !== activeSession.startTime) setStartTime(activeSession.startTime);
-                if (timerStore.accumulatedMs !== totalPausedTime) setAccumulatedMs(totalPausedTime);
-                persist();
-
-                const updateTick = () => {
-                    const elapsed = TimerService.calculateElapsed(
-                        activeSession.startTime,
-                        -totalPausedTime
-                    );
-                    const totalSeconds = Math.max(0, Math.floor(elapsed / 1000));
-                    const h = Math.floor(totalSeconds / 3600);
-                    const m = Math.floor((totalSeconds % 3600) / 60);
-                    const s = totalSeconds % 60;
-                    if (isMounted.current) {
-                        setTimer({ hours: h, minutes: m, seconds: s });
-                        setElapsedMs(elapsed);
-                    }
-                };
-
-                updateTick();
-                timerIntervalRef.current = setInterval(updateTick, 1000) as any;
-            }
-        } else if (activeSessionLoaded) {
-            if (timerIntervalRef.current) {
-                clearInterval(timerIntervalRef.current);
-                timerIntervalRef.current = null;
-            }
-            if (!activeSession || !activeSession.isActive) {
                 if (isMounted.current) {
                     setTimer({ hours: 0, minutes: 0, seconds: 0 });
                     setIsPaused(false);
                     setPausedAt(null);
                     setTotalPausedTime(0);
-                    setLastPausedTimer(null);
+                    resetStore();
                 }
-                if (timerStore.status !== 'idle') reset();
-                AsyncStorage.removeItem('workSessionPauseState').catch(console.error);
             }
+            return;
         }
-        return () => {
+
+        const sessionIsPaused = isPaused || activeSession.isPaused;
+
+        if (sessionIsPaused) {
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
+
+            const elapsedMs = TimerService.calculateElapsedBetween(
+                activeSession.startTime,
+                pausedAt ? pausedAt.toISOString() : (activeSession.pausedAt || Date.now()),
+                totalPausedTime // Use local referenced total time
+            );
+
+            const totalSeconds = Math.floor(elapsedMs / 1000);
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+
+            setTimer(prev => {
+                if (prev.hours === h && prev.minutes === m && prev.seconds === s) return prev;
+                return { hours: h, minutes: m, seconds: s };
+            });
+
+            // Critical: Only update store if elapsedMs changed significantly (e.g. > 100ms) 
+            // to avoid minor fluctuations triggering re-renders
+            setElapsedMs(elapsedMs);
+            setStatus('paused');
+        } else {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+
+            const updateTick = () => {
+                const elapsedMs = TimerService.calculateElapsed(
+                    activeSession.startTime,
+                    totalPausedTime || 0
+                );
+                const totalSeconds = Math.floor(elapsedMs / 1000);
+                const h = Math.floor(totalSeconds / 3600);
+                const m = Math.floor((totalSeconds % 3600) / 60);
+                const s = totalSeconds % 60;
+
+                if (isMounted.current) {
+                    setTimer(prev => {
+                        if (prev.hours === h && prev.minutes === m && prev.seconds === s) return prev;
+                        return { hours: h, minutes: m, seconds: s };
+                    });
+                    setElapsedMs(elapsedMs);
+                }
+            };
+
+            setStatus('running');
+            setStartTime(activeSession.startTime);
+            updateTick();
+            timerIntervalRef.current = setInterval(updateTick, 1000) as any;
+        }
+
+        return () => {
+            if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+            }
         };
-    }, [activeSession, activeSessionLoaded, isPaused, totalPausedTime, setStatus, setStartTime, setAccumulatedMs, setElapsedMs, persist, reset, timerStore.status, timerStore.startTime, timerStore.accumulatedMs]);
+    }, [activeSession, activeSessionLoaded, isPaused, totalPausedTime, setStatus, setStartTime, setElapsedMs, resetStore]);
 
     const handleStartSession = async () => {
         try {
@@ -234,10 +220,11 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                     setIsPaused(false);
                     setPausedAt(null);
                     setTotalPausedTime(0);
-                    setLastPausedTimer(null);
-                    setStickyPausedTimer(null); // Clear sticky timer
+
+                    setStatus('running');
+                    setStartTime(response.data.startTime);
+                    setAccumulatedMs(0);
                 }
-                await AsyncStorage.removeItem('workSessionPauseState');
                 updateTimerFromSession(response.data, 0);
                 showToast.success('Clinical session started', 'Success');
             }
@@ -249,64 +236,86 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
 
     const handlePauseSession = async () => {
         if (!activeSession || isPaused) return;
+
+        // Optimistic Update
+        const pauseTime = new Date();
+        const prevIsPaused = isPaused;
+        const prevAccumulatedMs = totalPausedTime;
+
+        // Immediately update local state & Store
+        setIsPaused(true);
+        setPausedAt(pauseTime);
+        setActiveSession(prev => prev ? { ...prev, isPaused: true, pausedAt: pauseTime.toISOString() } : null);
+        storePause(); // Update Global Store
+        showToast.info('Session paused', 'Paused');
+
         try {
             const token = await AsyncStorage.getItem('authToken');
-            if (!token) return;
+            if (!token) throw new Error('No auth token');
 
             const response = await apiService.post<{
                 success: boolean;
                 data: ActiveSession;
-            }>(API_ENDPOINTS.WORK_HOURS.PAUSE, {}, token);
+            }>(API_ENDPOINTS.WORK_HOURS.PAUSE, { paused_at: pauseTime.toISOString() }, token);
 
-            if (response?.data) {
-                if (isMounted.current) {
-                    // Update timer state with calculated values to prevent 00:00:00 flash
-                    const startTime = new Date(activeSession.startTime);
-                    const now = new Date();
-                    const diffMs = now.getTime() - startTime.getTime() - totalPausedTime;
-                    const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
-                    const h = Math.floor(totalSeconds / 3600);
-                    const m = Math.floor((totalSeconds % 3600) / 60);
-                    const s = totalSeconds % 60;
-                    const calculatedTimer = { hours: h, minutes: m, seconds: s };
-
-                    setActiveSession(response.data);
-                    setIsPaused(true);
-                    setPausedAt(new Date(response.data.pausedAt!));
-                    setLastPausedTimer(calculatedTimer);
-                    setStickyPausedTimer(calculatedTimer); // Set sticky timer
-                    setTimer(calculatedTimer);
-                }
-                showToast.info('Session paused', 'Paused');
-            }
+            // STRICT CLIENT AUTHORITY:
+            // Server response is ignored for UI state. We trust our optimistic update.
         } catch (error: any) {
+            // Revert optimistic update on failure
+            if (isMounted.current) {
+                setIsPaused(prevIsPaused);
+                setPausedAt(null);
+                setTotalPausedTime(prevAccumulatedMs);
+                setStatus('running');
+            }
             showToast.error(error?.message || 'Failed to pause session');
         }
     };
 
     const handleResumeSession = async () => {
-        if (!activeSession || !isPaused) return;
+        if (!activeSession || !isPaused || !pausedAt) return;
+
+        // Optimistic Update
+        const resumeTime = new Date();
+        // Calculate pending pause duration to add to total
+        const currentPauseDuration = Math.max(0, resumeTime.getTime() - pausedAt.getTime());
+        const prevTotalPaused = totalPausedTime;
+        const prevPausedAt = pausedAt;
+
+        // Immediately update local state & Store
+        setIsPaused(false);
+        setPausedAt(null); // Clear pausedAt
+        setTotalPausedTime(prev => prev + currentPauseDuration);
+        setActiveSession(prev => prev ? {
+            ...prev,
+            isPaused: false,
+            pausedAt: null,
+            totalPausedMs: (prev.totalPausedMs || 0) + currentPauseDuration
+        } : null);
+
+        storeResume(); // Update Global Store
+        showToast.info('Session resumed', 'Resumed');
+
         try {
             const token = await AsyncStorage.getItem('authToken');
-            if (!token) return;
+            if (!token) throw new Error('No auth token');
 
             const response = await apiService.post<{
                 success: boolean;
                 data: ActiveSession;
-            }>(API_ENDPOINTS.WORK_HOURS.RESUME, {}, token);
+            }>(API_ENDPOINTS.WORK_HOURS.RESUME, { resumed_at: resumeTime.toISOString() }, token);
 
-            if (response?.data) {
-                if (isMounted.current) {
-                    setActiveSession(response.data);
-                    setIsPaused(false);
-                    setPausedAt(null);
-                    setTotalPausedTime(response.data.totalPausedMs || 0);
-                    setLastPausedTimer(null);
-                    setStickyPausedTimer(null); // Clear sticky timer
-                }
-                showToast.info('Session resumed', 'Resumed');
-            }
+            // STRICT CLIENT AUTHORITY:
+            // Server response is ignored for UI state. We trust our optimistic update.
         } catch (error: any) {
+            // Revert optimistic update
+            if (isMounted.current) {
+                setIsPaused(true);
+                setPausedAt(prevPausedAt);
+                setTotalPausedTime(prevTotalPaused);
+                setStatus('paused');
+                setAccumulatedMs(prevTotalPaused);
+            }
             showToast.error(error?.message || 'Failed to resume session');
         }
     };
@@ -340,9 +349,11 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                                     setIsPaused(false);
                                     setPausedAt(null);
                                     setTotalPausedTime(0);
-                                    setLastPausedTimer(null);
+
+                                    resetStore();
+                                    setStatus('running');
+                                    setStartTime(response.data.startTime);
                                 }
-                                await AsyncStorage.removeItem('workSessionPauseState');
                                 showToast.success('Session restarted', 'Success');
                             }
                         } catch (error: any) {
@@ -378,7 +389,10 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                                 { end_time: endTime },
                                 token
                             );
-                            if (isMounted.current) setActiveSession(null);
+                            if (isMounted.current) {
+                                setActiveSession(null);
+                                resetStore();
+                            }
                             showToast.success('Session ended');
                             if (onSessionEnded) onSessionEnded();
                         } catch (error: any) {
@@ -392,7 +406,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 },
             ]
         );
-    }, [activeSession, onSessionEnded]);
+    }, [activeSession, onSessionEnded, resetStore]);
 
     return {
         activeSession,
@@ -401,7 +415,6 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
         isPaused,
         pausedAt,
         totalPausedTime,
-        lastPausedTimer,
         loadActiveSession,
         handleStartSession,
         handlePauseSession,

@@ -1,73 +1,90 @@
 import { create } from 'zustand';
-import { TimerState, TimerStatus } from './timer.types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { TimerStatus } from './timer.types';
 
-interface TimerStore extends TimerState {
-    setStatus: (status: TimerStatus) => void;
-    setStartTime: (time: string | null) => void;
-    setAccumulatedMs: (ms: number) => void;
-    setLastPausedAt: (time: string | null) => void;
-    setElapsedMs: (ms: number) => void;
-    reset: () => void;
-    persist: () => Promise<void>;
-    load: () => Promise<void>;
+interface TimerStore {
+  userId: string | null;
+  activeSessionId: string | null;
+
+  status: TimerStatus; // 'idle' | 'running' | 'paused'
+  startTime: string | null; // T0 (Session Start)
+  pausedAt: string | null; // Timestamp of last pause
+  accumulatedMs: number; // Total duration of all *completed* pauses
+  // Note: elapsedMs is calculated UI state, but we store it for background task continuity if needed
+  elapsedMs: number;
+
+  setUserId: (userId: string | null) => void;
+  setActiveSessionId: (id: string | null) => void;
+  setSessionData: (data: { startTime: string | null; accumulatedMs: number; pausedAt?: string | null; status: TimerStatus; id: string }) => void;
+
+  setStatus: (status: TimerStatus) => void;
+  setStartTime: (time: string | null) => void;
+  setAccumulatedMs: (ms: number) => void;
+  setElapsedMs: (ms: number) => void;
+
+  pause: () => void;
+  resume: () => void;
+  reset: () => void;
 }
 
-const STORAGE_KEY = 'v1_timer_state';
-
 export const useTimerStore = create<TimerStore>((set, get) => ({
-    status: 'idle',
-    startTime: null,
-    accumulatedMs: 0,
-    lastPausedAt: null,
-    elapsedMs: 0,
+  userId: null,
+  activeSessionId: null,
 
-    setStatus: (status) => set({ status }),
-    setStartTime: (startTime) => set({ startTime }),
-    setAccumulatedMs: (accumulatedMs) => set({ accumulatedMs }),
-    setLastPausedAt: (lastPausedAt) => set({ lastPausedAt }),
-    setElapsedMs: (elapsedMs) => set({ elapsedMs }),
+  status: 'idle',
+  startTime: null,
+  pausedAt: null,
+  accumulatedMs: 0,
+  elapsedMs: 0,
 
-    reset: () => {
-        set({
-            status: 'idle',
-            startTime: null,
-            accumulatedMs: 0,
-            lastPausedAt: null,
-            elapsedMs: 0,
-        });
-        AsyncStorage.removeItem(STORAGE_KEY);
-    },
+  setUserId: (userId) => set({ userId }),
+  setActiveSessionId: (activeSessionId) => set({ activeSessionId }),
 
-    persist: async () => {
-        const state = get();
-        const data = {
-            status: state.status,
-            startTime: state.startTime,
-            accumulatedMs: state.accumulatedMs,
-            lastPausedAt: state.lastPausedAt,
-        };
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    },
+  setSessionData: (data) => set({
+    startTime: data.startTime,
+    accumulatedMs: data.accumulatedMs,
+    pausedAt: data.pausedAt || null,
+    status: data.status,
+    activeSessionId: data.id
+  }),
 
-    load: async () => {
-        try {
-            const data = await AsyncStorage.getItem(STORAGE_KEY);
-            if (data) {
-                const parsed = JSON.parse(data);
-                set({ ...parsed });
+  setStatus: (status) => set({ status }),
+  setStartTime: (startTime) => set({ startTime }),
+  setAccumulatedMs: (accumulatedMs) => set({ accumulatedMs }),
+  setElapsedMs: (elapsedMs) => set({ elapsedMs }),
 
-                // Calculate initial elapsedMs if running
-                if (parsed.status === 'running' && parsed.startTime) {
-                    const start = new Date(parsed.startTime).getTime();
-                    const now = Date.now();
-                    set({ elapsedMs: now - start + (parsed.accumulatedMs || 0) });
-                } else if (parsed.status === 'paused') {
-                    set({ elapsedMs: parsed.accumulatedMs || 0 });
-                }
-            }
-        } catch (e) {
-            console.error('Failed to load timer state', e);
-        }
-    },
+  pause: () => {
+    const { status } = get();
+    if (status !== 'running') return;
+
+    set({
+      status: 'paused',
+      pausedAt: new Date().toISOString(),
+    });
+  },
+
+  resume: () => {
+    const { status, pausedAt, accumulatedMs } = get();
+    if (status !== 'paused' || !pausedAt) return;
+
+    const now = Date.now();
+    const pauseStart = new Date(pausedAt).getTime();
+    const pauseDuration = Math.max(0, now - pauseStart);
+
+    set({
+      status: 'running',
+      pausedAt: null,
+      accumulatedMs: accumulatedMs + pauseDuration,
+    });
+  },
+
+  reset: () => {
+    set({
+      status: 'idle',
+      activeSessionId: null,
+      startTime: null,
+      pausedAt: null,
+      accumulatedMs: 0,
+      elapsedMs: 0,
+    });
+  },
 }));

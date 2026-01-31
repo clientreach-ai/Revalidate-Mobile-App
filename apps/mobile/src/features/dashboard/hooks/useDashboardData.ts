@@ -36,7 +36,7 @@ export const useDashboardData = () => {
         };
     }, []);
 
-    const loadUserData = useCallback(async () => {
+    const loadUserData = useCallback(async (force = false) => {
         try {
             if (isMounted.current) setIsUserLoading(true);
             const token = await AsyncStorage.getItem('authToken');
@@ -47,7 +47,7 @@ export const useDashboardData = () => {
             const response = await apiService.get<{ success: boolean; data: any }>(
                 API_ENDPOINTS.USERS.ME,
                 token,
-                true
+                force
             );
             if (response?.data) {
                 const data = response.data;
@@ -97,14 +97,18 @@ export const useDashboardData = () => {
                     console.log('Error loading local profile image:', e);
                 }
             }
-        } catch (error) {
-            console.error('Error loading user data:', error);
+        } catch (error: any) {
+            if (error && error.name === 'AbortError') {
+                // Fetch aborted (likely background timeout) — ignore to avoid noisy error output
+            } else {
+                console.error('Error loading user data:', error);
+            }
         } finally {
             if (isMounted.current) setIsUserLoading(false);
         }
     }, [router]);
 
-    const loadDashboardStats = useCallback(async () => {
+    const loadDashboardStats = useCallback(async (force = false) => {
         try {
             if (isMounted.current) setIsStatsLoading(true);
             const token = await AsyncStorage.getItem('authToken');
@@ -113,7 +117,7 @@ export const useDashboardData = () => {
             const whr = await apiService.get<{
                 success: boolean;
                 data: { totalHours: number; totalEarnings?: number };
-            }>(API_ENDPOINTS.WORK_HOURS.STATS_TOTAL, token, true);
+            }>(API_ENDPOINTS.WORK_HOURS.STATS_TOTAL, token, force);
 
             let totalHours = whr?.data?.totalHours || 0;
             let totalEarnings = whr?.data?.totalEarnings || 0;
@@ -123,7 +127,7 @@ export const useDashboardData = () => {
                     const onboarding = await apiService.get<{ data: any }>(
                         API_ENDPOINTS.USERS.ONBOARDING.DATA,
                         token,
-                        true
+                        force
                     );
                     if (onboarding?.data) {
                         if (totalHours === 0)
@@ -139,7 +143,7 @@ export const useDashboardData = () => {
                 const cpd = await apiService.get<{
                     success: boolean;
                     data: { totalHours: number };
-                }>('/api/v1/cpd-hours/stats/total', token, true);
+                }>('/api/v1/cpd-hours/stats/total', token, force);
                 cpdHours = cpd?.data?.totalHours || 0;
             } catch (e) { }
 
@@ -148,7 +152,7 @@ export const useDashboardData = () => {
                 const ref = await apiService.get<{ pagination: { total: number } }>(
                     '/api/v1/reflections?limit=1',
                     token,
-                    true
+                    force
                 );
                 reflectionsCount = ref?.pagination?.total || 0;
             } catch (e) { }
@@ -158,7 +162,7 @@ export const useDashboardData = () => {
                 const appr = await apiService.get<{ pagination: { total: number } }>(
                     API_ENDPOINTS.APPRAISALS.LIST + '?limit=1',
                     token,
-                    true
+                    force
                 );
                 appraisalsCount = appr?.pagination?.total || 0;
             } catch (e) { }
@@ -181,7 +185,7 @@ export const useDashboardData = () => {
 
     // Handled by store
 
-    const loadRecentActivities = useCallback(async () => {
+    const loadRecentActivities = useCallback(async (force = false) => {
         try {
             if (isMounted.current) setIsActivitiesLoading(true);
             const token = await AsyncStorage.getItem('authToken');
@@ -189,7 +193,7 @@ export const useDashboardData = () => {
             const res = await apiService.get<{ data: any[] }>(
                 `/api/v1/notifications?limit=6`,
                 token,
-                true
+                force
             );
             if (res?.data) {
                 const mapped: RecentActivity[] = res.data.map((it: any) => ({
@@ -213,10 +217,10 @@ export const useDashboardData = () => {
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await Promise.all([
-            loadUserData(),
-            loadDashboardStats(),
-            loadNotificationsCount(),
-            loadRecentActivities(),
+            loadUserData(true),
+            loadDashboardStats(true),
+            loadNotificationsCount(true),
+            loadRecentActivities(true),
         ]);
         if (isMounted.current) setRefreshing(false);
     }, [loadUserData, loadDashboardStats, loadNotificationsCount, loadRecentActivities]);

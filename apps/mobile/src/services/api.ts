@@ -21,8 +21,8 @@ class ApiService {
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
-    // Faster timeout for better UX (10 seconds instead of 30)
-    this.timeout = 10000;
+    // Increased timeout for better stability on slow networks/cold starts (30 seconds)
+    this.timeout = 30000;
 
     // Skip local backend detection if already pointing to production
     const isProductionUrl = this.baseURL.includes('fly.dev') ||
@@ -54,24 +54,46 @@ class ApiService {
       'http://localhost:3000', // iOS simulator / expo web
       'http://127.0.0.1:3000',
     ];
-    const probeTimeout = 500; // 500ms - quick probe
+    const probeTimeout = 1000; // Increased to 1s
 
     for (const base of candidates) {
       try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), probeTimeout);
-        const res = await fetch(`${base}/health`, { method: 'GET', signal: controller.signal as any });
-        clearTimeout(timer);
-        if (res && res.ok) {
+        const { response, timeoutId } = await this.fetchWithTimeout(`${base}/health`, { method: 'GET' }, probeTimeout);
+
+        if (response && response.ok) {
+          if (timeoutId) clearTimeout(timeoutId);
           this.baseURL = base;
           console.log(`[ApiService] switched baseURL to ${base}`);
           return;
         }
+        if (timeoutId) clearTimeout(timeoutId);
       } catch (e) {
         // ignore and try next candidate
       }
     }
   }
+
+  // Helper to handle fetch with timeout properly
+  private async fetchWithTimeout(
+    url: string,
+    options: RequestInit,
+    timeoutMs: number = this.timeout
+  ): Promise<{ response: Response; timeoutId: any }> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal as any,
+      });
+      return { response, timeoutId };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+
   private getOfflineCapability(): { canOffline: boolean; isFreeUser: boolean } {
     const { isPremium, canUseOffline } = useSubscriptionStore.getState();
     return {
@@ -80,13 +102,6 @@ class ApiService {
     };
   }
 
-  /**
-   * Identifies endpoints that REQUIRE internet for all users.
-   */
-  /**
-   * Identifies endpoints that REQUIRE internet for all users.
-   * Authentication and onboarding should typically be online-only.
-   */
   private isOnlineOnly(endpoint: string): boolean {
     const onlineOnlyPrefixes = [
       '/api/v1/auth/login',
@@ -108,11 +123,12 @@ class ApiService {
   }
 
   private async getRaw<T>(endpoint: string, token?: string): Promise<T> {
-    const response = await fetch(this.getUrl(endpoint), {
+    const { response, timeoutId } = await this.fetchWithTimeout(this.getUrl(endpoint), {
       method: 'GET',
       headers: this.getHeaders(token),
-      signal: this.createTimeoutSignal(this.timeout) as any,
     });
+
+    if (timeoutId) clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorMessage = await this.parseErrorResponse(response);
@@ -153,12 +169,6 @@ class ApiService {
       headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;
-  }
-
-  private createTimeoutSignal(timeoutMs: number): AbortSignal {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), timeoutMs);
-    return controller.signal;
   }
 
   // SQLite-based Cache Management for Premium Offline Mode
@@ -239,14 +249,27 @@ class ApiService {
           this.updateSubscriptionCache((data as any).data.subscriptionTier);
         }
         return data;
-      } catch (e) {
-        // Silently log - premium users get cached data, no need to surface error
-        console.log('Background revalidation failed for', endpoint);
+      } catch (e: any) {
+        // Silently log timeouts - premium users get cached data.
+        if (e.name === 'AbortError') {
+          console.log(`[ApiService] Background revalidation skipped (timeout/aborted) for ${endpoint}`);
+        } else {
+          console.log(`[ApiService] Background revalidation failed for ${endpoint}:`, e.message || e);
+        }
         throw e;
       }
     };
 
     if (cachedData) {
+      // Check if cache is fresh enough to skip background revalidation
+      // Strategy: Session-long cache (effectively infinite)
+      // Only re-fetch if forceRefresh=true (Pull-to-Refresh) or if cache is missing.
+
+      if (!forceRefresh) {
+        console.log(`[ApiService] Returning session cache for ${endpoint}`);
+        return cachedData;
+      }
+
       // Return cache immediately, silent background update
       fetchNewData().catch(() => { });
       return cachedData;
@@ -261,6 +284,15 @@ class ApiService {
       // Premium user offline with no cache - return empty/fallback response
       const isConnected = await checkNetworkStatus();
       if (!isConnected && canOffline) {
+        console.log('Premium user offline, attempt cache fallback for:', endpoint);
+
+        // If we forced refresh, cachedData is null. Try to fetch it now as fallback.
+        const fallbackCache = cachedData || await this.getCache<T>(endpoint);
+        if (fallbackCache) {
+          console.log(`[ApiService] Offline fallback: Returning cache for ${endpoint}`);
+          return fallbackCache;
+        }
+
         console.log('Premium user offline, no cache for:', endpoint);
 
         // Special handling for auth/me to avoid breaking UI that expects a user object
@@ -476,12 +508,13 @@ class ApiService {
 
   async post<T>(endpoint: string, data: unknown, token?: string): Promise<T> {
     try {
-      const response = await fetch(this.getUrl(endpoint), {
+      const { response, timeoutId } = await this.fetchWithTimeout(this.getUrl(endpoint), {
         method: 'POST',
         headers: this.getHeaders(token),
         body: JSON.stringify(data),
-        signal: this.createTimeoutSignal(this.timeout) as any,
       });
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorMessage = await this.parseErrorResponse(response);
@@ -495,12 +528,13 @@ class ApiService {
 
   async put<T>(endpoint: string, data: unknown, token?: string): Promise<T> {
     try {
-      const response = await fetch(this.getUrl(endpoint), {
+      const { response, timeoutId } = await this.fetchWithTimeout(this.getUrl(endpoint), {
         method: 'PUT',
         headers: this.getHeaders(token),
         body: JSON.stringify(data),
-        signal: this.createTimeoutSignal(this.timeout) as any,
       });
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorMessage = await this.parseErrorResponse(response);
@@ -514,12 +548,13 @@ class ApiService {
 
   async patch<T>(endpoint: string, data: unknown, token?: string): Promise<T> {
     try {
-      const response = await fetch(this.getUrl(endpoint), {
+      const { response, timeoutId } = await this.fetchWithTimeout(this.getUrl(endpoint), {
         method: 'PATCH',
         headers: this.getHeaders(token),
         body: JSON.stringify(data),
-        signal: this.createTimeoutSignal(this.timeout) as any,
       });
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorMessage = await this.parseErrorResponse(response);
@@ -533,11 +568,12 @@ class ApiService {
 
   async delete<T>(endpoint: string, token?: string): Promise<T> {
     try {
-      const response = await fetch(this.getUrl(endpoint), {
+      const { response, timeoutId } = await this.fetchWithTimeout(this.getUrl(endpoint), {
         method: 'DELETE',
         headers: this.getHeaders(token),
-        signal: this.createTimeoutSignal(this.timeout) as any,
       });
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorMessage = await this.parseErrorResponse(response);
@@ -551,12 +587,13 @@ class ApiService {
 
   async postBlob(endpoint: string, data: unknown, token?: string): Promise<Blob> {
     try {
-      const response = await fetch(this.getUrl(endpoint), {
+      const { response, timeoutId } = await this.fetchWithTimeout(this.getUrl(endpoint), {
         method: 'POST',
         headers: this.getHeaders(token),
         body: JSON.stringify(data),
-        signal: this.createTimeoutSignal(this.timeout) as any,
       });
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorMessage = await this.parseErrorResponse(response);
@@ -622,13 +659,13 @@ class ApiService {
     });
 
     try {
-      const response = await fetch(url, {
+      const { response, timeoutId } = await this.fetchWithTimeout(url, {
         method: 'POST',
         headers,
         body: formData as any,
-        // Increased timeout for uploads
-        signal: this.createTimeoutSignal(60000) as any,
-      });
+      }, 60000); // 60s for uploads
+
+      if (timeoutId) clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorMessage = await this.parseErrorResponse(response);

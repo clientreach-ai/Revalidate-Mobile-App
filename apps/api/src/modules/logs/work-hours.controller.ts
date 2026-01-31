@@ -83,7 +83,12 @@ export const pause = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'No active work session to pause');
   }
 
-  const paused = await pauseWorkSession(req.user.userId, active.id.toString());
+  const { paused_at } = req.body;
+  const paused = await pauseWorkSession(
+    req.user.userId,
+    active.id.toString(),
+    paused_at
+  );
 
   res.json({
     success: true,
@@ -105,9 +110,11 @@ export const resume = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'No active work session to resume');
   }
 
+  const { resumed_at } = req.body;
   const resumed = await resumeWorkSession(
     req.user.userId,
-    active.id.toString()
+    active.id.toString(),
+    resumed_at
   );
 
   res.json({

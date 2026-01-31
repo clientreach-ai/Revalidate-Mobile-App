@@ -5,7 +5,7 @@ import { apiService, API_ENDPOINTS } from '@/services/api';
 interface NotificationState {
     unreadCount: number;
     isLoading: boolean;
-    refreshUnreadCount: () => Promise<void>;
+    refreshUnreadCount: (force?: boolean) => Promise<void>;
     setUnreadCount: (count: number) => void;
     decrementUnreadCount: () => void;
 }
@@ -14,7 +14,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     unreadCount: 0,
     isLoading: false,
 
-    refreshUnreadCount: async () => {
+    refreshUnreadCount: async (force = false) => {
         try {
             set({ isLoading: true });
             const token = await AsyncStorage.getItem('authToken');
@@ -26,14 +26,18 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             const response = await apiService.get<{ success: boolean; data: { count: number } }>(
                 API_ENDPOINTS.NOTIFICATIONS.UNREAD_COUNT,
                 token,
-                true // useCache: true (service will handle cache-first)
+                force // useCache: false (let service handle cache-first)
             );
 
             if (response?.data) {
                 set({ unreadCount: response.data.count });
             }
-        } catch (error) {
-            console.warn('Failed to refresh unread count:', error);
+        } catch (error: any) {
+            if (error && error.name === 'AbortError') {
+                // Background fetch timed out; ignore to avoid noisy logs
+            } else {
+                console.warn('Failed to refresh unread count:', error);
+            }
         } finally {
             set({ isLoading: false });
         }

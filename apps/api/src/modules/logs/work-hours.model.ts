@@ -360,11 +360,13 @@ export async function getTotalWorkHours(
 /**
  * Pause an active work session
  */
-export async function pauseWorkSession(userId: string, sessionId: string): Promise<WorkHours> {
+export async function pauseWorkSession(userId: string, sessionId: string, pausedAt?: string): Promise<WorkHours> {
   const pool = getMySQLPool();
+  const pauseTime = pausedAt ? new Date(pausedAt) : new Date(); // Use client time or server time
+
   await pool.execute(
-    'UPDATE work_hours SET is_paused = 1, paused_at = NOW(), updated_at = NOW() WHERE id = ? AND user_id = ? AND is_active = 1',
-    [sessionId, userId]
+    'UPDATE work_hours SET is_paused = 1, paused_at = ?, updated_at = NOW() WHERE id = ? AND user_id = ? AND is_active = 1',
+    [pauseTime, sessionId, userId]
   );
   const updated = await getWorkHoursById(sessionId, userId);
   if (!updated) throw new ApiError(404, 'Active work session not found');
@@ -374,21 +376,24 @@ export async function pauseWorkSession(userId: string, sessionId: string): Promi
 /**
  * Resume a paused work session
  */
-export async function resumeWorkSession(userId: string, sessionId: string): Promise<WorkHours> {
+export async function resumeWorkSession(userId: string, sessionId: string, resumedAt?: string): Promise<WorkHours> {
   const pool = getMySQLPool();
   const existing = await getWorkHoursById(sessionId, userId);
   if (!existing || !existing.is_active) throw new ApiError(404, 'Active work session not found');
 
+  const resumeTime = resumedAt ? new Date(resumedAt) : new Date();
+
   if (existing.is_paused && existing.paused_at) {
     // Add time spent in pause to total_paused_ms
+    // Use TIMESTAMPDIFF with the provided/calculated resume time
     await pool.execute(
       `UPDATE work_hours 
        SET is_paused = 0, 
-           total_paused_ms = COALESCE(total_paused_ms, 0) + (TIMESTAMPDIFF(SECOND, paused_at, NOW()) * 1000),
+           total_paused_ms = COALESCE(total_paused_ms, 0) + (TIMESTAMPDIFF(MICROSECOND, paused_at, ?) / 1000),
            paused_at = NULL, 
            updated_at = NOW() 
        WHERE id = ? AND user_id = ?`,
-      [sessionId, userId]
+      [resumeTime, sessionId, userId]
     );
   }
 
