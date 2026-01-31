@@ -5,7 +5,8 @@ import { authenticateToken } from '../modules/auth/auth.middleware';
 
 const router = Router();
 
-// Get all hospitals
+// Hospital routes
 router.get('/', authenticateToken, hospitalsController.list);
+router.get('/search', authenticateToken, hospitalsController.list);
 
 export default router;

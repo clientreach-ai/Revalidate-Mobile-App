@@ -526,6 +526,7 @@ export async function getOnboardingData(userId: string) {
       earned: true,
       notepad: true,
       subscription_tier: true,
+      onboarding_status: true,
     },
   });
 

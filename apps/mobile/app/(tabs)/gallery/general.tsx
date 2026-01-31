@@ -8,7 +8,8 @@ import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
-import { downloadAndShareFile, isImageFile } from '@/utils/document';
+import { downloadAndShareFile } from '@/utils/document';
+import { useGeneralGalleryData } from '@/features/gallery/hooks/useGeneralGalleryData';
 import '../../global.css';
 
 const { width } = Dimensions.get('window');
@@ -17,62 +18,23 @@ const CONTAINER_PADDING = 24;
 const GAP = 12;
 const ITEM_WIDTH = (width - (CONTAINER_PADDING * 2) - (GAP * (COLUMN_COUNT - 1))) / COLUMN_COUNT;
 
-interface ApiDocument {
-    id: number;
-    name: string;
-    category?: string;
-    size?: string;
-    type?: string;
-    document?: string; // The Actual file URL
-    created_at: string;
-    updated_at: string;
-}
-
 export default function GeneralGalleryScreen() {
     const router = useRouter();
     const { isDark } = useThemeStore();
-    const [refreshing, setRefreshing] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [documents, setDocuments] = useState<any[]>([]);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
+    const {
+        loading,
+        refreshing,
+        documents,
+        loadDocuments,
+        onRefresh
+    } = useGeneralGalleryData();
+
     useEffect(() => {
         loadDocuments();
-    }, []);
-
-    const normalize = (v?: string | number | null) => {
-        if (v === null || v === undefined) return '';
-        return String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
-    };
-
-    const categoryMap: Record<string, string> = {
-        'cpd': 'CPD Hours',
-        'cpdhours': 'CPD Hours',
-        'working': 'Working Hours',
-        'work': 'Working Hours',
-        'workinghours': 'Working Hours',
-        'feedback': 'Feedback Log',
-        'feedbacklog': 'Feedback Log',
-        'reflection': 'Reflective Accounts',
-        'reflections': 'Reflective Accounts',
-        'reflective': 'Reflective Accounts',
-        'appraisal': 'Appraisal',
-        'gallery': 'General Gallery',
-        'personal': 'General Gallery',
-        'general': 'General Gallery',
-        'uncategorized': 'General Gallery',
-        'profilepicture': 'General Gallery',
-        'discussion': 'Feedback Log',
-    };
-
-    const otherCategoryNames = [
-        'Working Hours',
-        'CPD Hours',
-        'Feedback Log',
-        'Reflective Accounts',
-        'Appraisal'
-    ].map(n => normalize(n));
+    }, [loadDocuments]);
 
     const getFullUrl = (url: string) => {
         if (!url) return '';
@@ -86,70 +48,10 @@ export default function GeneralGalleryScreen() {
         return `${apiBase}${pathPart.startsWith('/') ? '' : '/'}${pathPart}`;
     };
 
-    const loadDocuments = async () => {
-        try {
-            setLoading(true);
-            const token = await AsyncStorage.getItem('authToken');
-            if (!token) {
-                router.replace('/(auth)/login');
-                return;
-            }
-
-            const response = await apiService.get<{
-                success: boolean;
-                data: ApiDocument[];
-            }>(`${API_ENDPOINTS.DOCUMENTS.LIST}?limit=1000`, token);
-
-            if (response.success && response.data) {
-                const mapped = response.data.map((apiDoc) => {
-                    const fullUrl = apiDoc.document ? getFullUrl(apiDoc.document) : '';
-                    const isImg = isImageFile(fullUrl || apiDoc.name) ||
-                        apiDoc.type === 'image' ||
-                        apiDoc.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/i) !== null;
-                    const isPdf = (apiDoc.type === 'file' || apiDoc.name.toLowerCase().endsWith('.pdf'));
-
-                    const docCat = apiDoc.category || '';
-                    const normCat = normalize(docCat);
-                    const mappedTitleToken = categoryMap[normCat] || docCat;
-                    const normMapped = normalize(mappedTitleToken);
-                    const isGeneral = normCat === '' || normMapped === normalize('General Gallery');
-
-                    return {
-                        id: String(apiDoc.id),
-                        name: apiDoc.name,
-                        category: apiDoc.category || 'General',
-                        size: apiDoc.size || '0.0 MB',
-                        document: apiDoc.document,
-                        fullUrl: fullUrl,
-                        isImage: isImg,
-                        isGeneral: isGeneral,
-                        icon: (isPdf ? 'picture-as-pdf' : 'insert-drive-file') as keyof typeof MaterialIcons.glyphMap,
-                        created_at: apiDoc.created_at
-                    };
-                });
-
-                // FILTER: Show if it's an image OR it's specifically "General" content
-                const filtered = mapped.filter(doc => doc.isImage || doc.isGeneral);
-
-                // Sort by date newest first
-                filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-                setDocuments(filtered);
-            }
-        } catch (error: any) {
-            console.error('Error loading documents:', error);
-            showToast.error('Failed to load documents', 'Error');
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    };
-
     const handleViewDocument = async (file: any) => {
         try {
             let url = file.fullUrl;
 
-            // If the list item does not include the actual file URL, fetch it on demand
             if (!url) {
                 const token = await AsyncStorage.getItem('authToken');
                 if (!token) {
@@ -183,11 +85,6 @@ export default function GeneralGalleryScreen() {
             console.error('Error opening document:', e);
             showToast.error('Failed to open document', 'Error');
         }
-    };
-
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await loadDocuments();
     };
 
     return (

@@ -8,31 +8,32 @@ import { ApiError } from '../../common/middleware/error-handler';
 export interface AppraisalRecord {
   id: number;
   user_id: number;
-  appraisal_type: string;
   appraisal_date: string;
-  discussion_with?: string;
-  hospital_id?: number;
   notes?: string;
   document_ids?: string; // JSON array of document IDs
+  hospital_id?: number;
+  appraisal_type?: string;
+  discussion_with?: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateAppraisalRecord {
-  appraisal_type?: string;
   appraisal_date: string;
-  discussion_with?: string;
-  hospital_id?: number;
   notes?: string;
   document_ids?: number[];
+  hospital_id?: number | null;
+  appraisal_type?: string | null;
+  discussion_with?: string | null;
 }
 
 export interface UpdateAppraisalRecord {
   appraisal_date?: string;
-  discussion_with?: string;
-  hospital_id?: number;
   notes?: string;
   document_ids?: number[];
+  hospital_id?: number | null;
+  appraisal_type?: string | null;
+  discussion_with?: string | null;
 }
 
 export async function createAppraisalRecord(
@@ -43,17 +44,17 @@ export async function createAppraisalRecord(
 
   const [result] = await pool.execute(
     `INSERT INTO appraisal_records (
-      user_id, appraisal_type, appraisal_date, discussion_with, hospital_id, notes, document_ids, 
+      user_id, appraisal_date, notes, document_ids, hospital_id, appraisal_type, discussion_with,
       created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       userId,
-      data.appraisal_type || 'Annual Appraisal',
       data.appraisal_date,
-      data.discussion_with || null,
-      data.hospital_id || null,
       data.notes || null,
       data.document_ids ? JSON.stringify(data.document_ids) : null,
+      data.hospital_id || null,
+      data.appraisal_type || null,
+      data.discussion_with || null,
     ]
   ) as any;
 
@@ -89,22 +90,27 @@ export async function getUserAppraisalRecords(
     startDate?: string;
     endDate?: string;
   }
-): Promise<{ appraisalRecords: AppraisalRecord[]; total: number }> {
+): Promise<{ appraisalRecords: (AppraisalRecord & { hospital_name?: string })[]; total: number }> {
   const pool = getMySQLPool();
 
-  let query = 'SELECT * FROM appraisal_records WHERE user_id = ?';
+  let query = `
+    SELECT ar.*, h.name as hospital_name 
+    FROM appraisal_records ar 
+    LEFT JOIN hospitals h ON ar.hospital_id = h.id 
+    WHERE ar.user_id = ?
+  `;
   const params: any[] = [userId];
 
   if (options?.startDate) {
-    query += ' AND appraisal_date >= ?';
+    query += ' AND ar.appraisal_date >= ?';
     params.push(options.startDate);
   }
   if (options?.endDate) {
-    query += ' AND appraisal_date <= ?';
+    query += ' AND ar.appraisal_date <= ?';
     params.push(options.endDate);
   }
 
-  query += ' ORDER BY appraisal_date DESC';
+  query += ' ORDER BY ar.appraisal_date DESC';
 
   if (options?.limit) {
     query += ' LIMIT ?';
@@ -131,7 +137,7 @@ export async function getUserAppraisalRecords(
   const [countResult] = await pool.execute(countQuery, countParams) as any[];
   const total = countResult[0].total;
 
-  return { appraisalRecords: appraisalRecords as AppraisalRecord[], total };
+  return { appraisalRecords: appraisalRecords as (AppraisalRecord & { hospital_name?: string })[], total };
 }
 
 export async function updateAppraisalRecord(
@@ -153,14 +159,6 @@ export async function updateAppraisalRecord(
     fields.push('appraisal_date = ?');
     values.push(updates.appraisal_date);
   }
-  if (updates.discussion_with !== undefined) {
-    fields.push('discussion_with = ?');
-    values.push(updates.discussion_with || null);
-  }
-  if (updates.hospital_id !== undefined) {
-    fields.push('hospital_id = ?');
-    values.push(updates.hospital_id || null);
-  }
   if (updates.notes !== undefined) {
     fields.push('notes = ?');
     values.push(updates.notes || null);
@@ -168,6 +166,18 @@ export async function updateAppraisalRecord(
   if (updates.document_ids !== undefined) {
     fields.push('document_ids = ?');
     values.push(updates.document_ids.length > 0 ? JSON.stringify(updates.document_ids) : null);
+  }
+  if (updates.hospital_id !== undefined) {
+    fields.push('hospital_id = ?');
+    values.push(updates.hospital_id);
+  }
+  if (updates.appraisal_type !== undefined) {
+    fields.push('appraisal_type = ?');
+    values.push(updates.appraisal_type);
+  }
+  if (updates.discussion_with !== undefined) {
+    fields.push('discussion_with = ?');
+    values.push(updates.discussion_with);
   }
 
   if (fields.length === 0) {

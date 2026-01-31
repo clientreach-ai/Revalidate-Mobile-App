@@ -104,12 +104,14 @@ export const API_ENDPOINTS = {
   APPRAISALS: {
     LIST: '/api/v1/appraisals',
     CREATE: '/api/v1/appraisals',
+    UPLOAD: '/api/v1/appraisals/upload',
     GET_BY_ID: '/api/v1/appraisals',
     UPDATE: '/api/v1/appraisals',
     DELETE: '/api/v1/appraisals',
   },
   HOSPITALS: {
     LIST: '/api/v1/hospitals',
+    SEARCH: '/api/v1/hospitals/search',
   },
   HEALTH: '/health',
   PROFILE: {

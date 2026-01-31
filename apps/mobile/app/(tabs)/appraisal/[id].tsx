@@ -11,13 +11,13 @@ import '../../global.css';
 
 interface AppraisalDetail {
     id: number;
-    appraisalType?: string;
-    appraisalDate: string;
-    discussionWith?: string;
-    hospitalId?: number;
-    hospitalName?: string;
+    appraisal_date: string;
     notes: string | null;
     documentIds: number[];
+    hospital_id?: number | null;
+    hospital_name?: string | null;
+    appraisal_type?: string | null;
+    discussion_with?: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -101,7 +101,7 @@ export default function AppraisalDetailScreen() {
                     <Pressable onPress={() => router.back()} className="w-10 h-10 items-center justify-center">
                         <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
                     </Pressable>
-                    <Text className={`text-lg font-bold ml-2 ${isDark ? "text-white" : "text-[#121417]"}`}>Detail Account</Text>
+                    <Text className={`text-lg font-bold ml-2 ${isDark ? "text-white" : "text-[#121417]"}`}>Appraisal Detail</Text>
                 </View>
             </View>
 
@@ -113,32 +113,24 @@ export default function AppraisalDetailScreen() {
                         </View>
                         <View>
                             <Text className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                                {appraisal.appraisalType || 'Annual Appraisal'}
+                                {appraisal.appraisal_type || 'Annual Appraisal'}
                             </Text>
-                            <Text className={`text-sm ${isDark ? "text-gray-400" : "text-slate-500"}`}>{formatDate(appraisal.appraisalDate)}</Text>
+                            <Text className={`text-sm ${isDark ? "text-gray-400" : "text-slate-500"}`}>{formatDate(appraisal.appraisal_date)}</Text>
                         </View>
                     </View>
 
                     <View className="gap-5">
                         <View>
                             <Text className={`text-xs font-bold uppercase tracking-widest mb-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>Discussion With</Text>
-                            <Text className={`text-base font-medium ${isDark ? "text-gray-200" : "text-slate-700"}`}>{appraisal.discussionWith || 'Not specified'}</Text>
+                            <Text className={`text-base font-medium ${isDark ? "text-gray-200" : "text-slate-700"}`}>{appraisal.discussion_with || 'Not specified'}</Text>
                         </View>
 
-                        {appraisal.hospitalName ? (
+                        {appraisal.hospital_name ? (
                             <View>
                                 <Text className={`text-xs font-bold uppercase tracking-widest mb-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>Location</Text>
                                 <View className="flex-row items-center gap-1">
                                     <MaterialIcons name="place" size={16} color="#E11D48" />
-                                    <Text className={`text-base font-medium ${isDark ? "text-gray-200" : "text-slate-700"}`}>{appraisal.hospitalName}</Text>
-                                </View>
-                            </View>
-                        ) : appraisal.hospitalId ? (
-                            <View>
-                                <Text className={`text-xs font-bold uppercase tracking-widest mb-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>Location</Text>
-                                <View className="flex-row items-center gap-1">
-                                    <MaterialIcons name="place" size={16} color="#E11D48" />
-                                    <Text className={`text-base font-medium ${isDark ? "text-gray-200" : "text-slate-700"}`}>Hospital ID: {appraisal.hospitalId}</Text>
+                                    <Text className={`text-base font-medium ${isDark ? "text-gray-200" : "text-slate-700"}`}>{appraisal.hospital_name}</Text>
                                 </View>
                             </View>
                         ) : null}
@@ -150,7 +142,7 @@ export default function AppraisalDetailScreen() {
                             </Text>
                         </View>
 
-                        {appraisal.documentIds.length > 0 && (
+                        {appraisal.documentIds && appraisal.documentIds.length > 0 && (
                             <View>
                                 <Text className={`text-xs font-bold uppercase tracking-widest mb-3 ${isDark ? "text-gray-500" : "text-slate-400"}`}>Evidence Attached</Text>
                                 <View className={`p-4 rounded-2xl flex-row items-center justify-between border ${isDark ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-100"}`}>
