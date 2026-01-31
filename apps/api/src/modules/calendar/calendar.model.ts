@@ -33,10 +33,10 @@ export interface CreateCalendarEvent {
   type: 'official' | 'personal';
   title: string;
   description?: string;
-  date: string; // ISO date string
-  endDate?: string; // ISO date string
-  startTime?: string; // HH:MM format
-  endTime?: string; // HH:MM format
+  date: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
   location?: string;
   invite?: string;
 }
@@ -45,10 +45,10 @@ export interface UpdateCalendarEvent {
   type?: 'official' | 'personal';
   title?: string;
   description?: string;
-  date?: string; // ISO date string
-  endDate?: string; // ISO date string
-  startTime?: string; // HH:MM format
-  endTime?: string; // HH:MM format
+  date?: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
   location?: string;
   invite?: string;
 }
@@ -61,32 +61,22 @@ export interface GetCalendarEventsOptions {
   offset?: number;
 }
 
-/**
- * Map database type values to API format
- * Database stores: "1" = official, "2" = personal
- */
+
 function mapEventType(dbType: string): 'official' | 'personal' {
   if (dbType === '1' || dbType === 'official') return 'official';
   if (dbType === '2' || dbType === 'personal') return 'personal';
-  return 'personal'; // default fallback
+  return 'personal';
 }
 
-/**
- * Map API type to database format
- * Database stores: "1" = official, "2" = personal
- */
+
 function mapTypeToDb(apiType: 'official' | 'personal'): string {
   return apiType === 'official' ? '1' : '2';
 }
 
-/**
- * Create a calendar event
- */
 export async function createCalendarEvent(
   userId: string,
   data: CreateCalendarEvent
 ): Promise<CalendarEvent> {
-  // Validate and normalize inputs early to return helpful errors instead of raw 500s
   if (!userId) {
     throw new ApiError(400, 'Missing userId');
   }
@@ -120,7 +110,7 @@ export async function createCalendarEvent(
         end_time: data.endTime || null,
         venue: data.location || null,
         invite: data.invite || null,
-        status: 'one', // Active (mapped enum value)
+        status: 'one',
       },
     });
 
@@ -141,15 +131,12 @@ export async function createCalendarEvent(
       updatedAt: event.updated_at,
     };
   } catch (err: any) {
-    // Convert DB errors into ApiError with a safe message to avoid leaking internals
     console.error('Prisma error creating calendar event:', err);
     throw new ApiError(500, 'Failed to create calendar event');
   }
 }
 
-/**
- * Get calendar event by ID
- */
+
 export async function getCalendarEventById(
   eventId: string,
   userId: string
@@ -199,9 +186,7 @@ export async function getCalendarEventById(
   };
 }
 
-/**
- * Get user's calendar events
- */
+
 export async function getUserCalendarEvents(
   userId: string,
   options: GetCalendarEventsOptions = {}
@@ -221,17 +206,13 @@ export async function getUserCalendarEvents(
   };
 
   if (options.startDate) {
-    // If we have a complex where clause, we wrap date filters
     const dateCondition = { date: { gte: new Date(options.startDate) } };
     if (options.endDate) {
       (dateCondition.date as any).lte = new Date(options.endDate);
     }
 
-    // Apply filters to each side of the OR or add as an AND condition
-    // In Prisma, we can use AND with OR
   }
 
-  // Refined where with filters
   const finalWhere: any = {
     AND: [where],
   };
@@ -283,15 +264,12 @@ export async function getUserCalendarEvents(
   };
 }
 
-/**
- * Update calendar event
- */
+
 export async function updateCalendarEvent(
   eventId: string,
   userId: string,
   data: UpdateCalendarEvent
 ): Promise<CalendarEvent> {
-  // Check if event exists and belongs to user
   const existing = await prisma.user_calendars.findFirst({
     where: {
       id: BigInt(eventId),
@@ -355,9 +333,6 @@ export async function updateCalendarEvent(
   };
 }
 
-/**
- * Delete calendar event
- */
 export async function deleteCalendarEvent(
   eventId: string,
   userId: string
@@ -378,10 +353,7 @@ export async function deleteCalendarEvent(
   });
 }
 
-/**
- * Invite attendees to an event. Attendees may be existing users (matched by email)
- * or external emails. Creates attendee records and notifications for matched users.
- */
+
 export type InviteInput = { userId?: string; email?: string };
 
 export async function inviteAttendees(
@@ -389,16 +361,20 @@ export async function inviteAttendees(
   organizerId: string,
   attendees: InviteInput[]
 ): Promise<any[]> {
-  const event = await prisma.user_calendars.findFirst({
-    where: { id: BigInt(eventId), user_id: BigInt(organizerId) },
-    include: { users: { select: { name: true } } },
-  });
+  const events = await prisma.$queryRaw<any[]>`
+    SELECT user_calendars.id, title, date, users.name as organizerName
+    FROM user_calendars
+    LEFT JOIN users ON user_calendars.user_id = users.id
+    WHERE user_calendars.id = ${BigInt(eventId)} AND user_calendars.user_id = ${BigInt(organizerId)}
+    LIMIT 1
+  `;
+  const event = events?.[0] || null;
 
   if (!event) {
     throw new ApiError(404, 'Calendar event not found');
   }
 
-  const organizerName = event.users?.name || 'Someone';
+  const organizerName = event.organizerName || 'Someone';
   const created: any[] = [];
 
   for (const a of attendees) {
@@ -406,16 +382,20 @@ export async function inviteAttendees(
 
     if (a.userId) {
       try {
-        user = await prisma.users.findFirst({
-          where: { id: BigInt(a.userId) },
-        });
+        const users = await prisma.$queryRaw<any[]>`
+          SELECT id, email, name, device_token FROM users WHERE id = ${BigInt(a.userId)} LIMIT 1
+        `;
+        user = users?.[0] || null;
       } catch (e) {
         user = null;
       }
     }
 
     if (!user && a.email) {
-      user = await prisma.users.findFirst({ where: { email: a.email } });
+      const users = await prisma.$queryRaw<any[]>`
+        SELECT id, email, name, device_token FROM users WHERE email = ${a.email} LIMIT 1
+      `;
+      user = users?.[0] || null;
     }
 
     const attendeeRecord = await prisma.user_calendar_attendees.create({
@@ -430,17 +410,12 @@ export async function inviteAttendees(
     const notificationTitle = 'Event invitation';
     const notificationMessage = `${organizerName} has invited you to join "${event.title}" on ${event.date.toISOString().split('T')[0]}`;
 
-    // create an in-app notification for matched users
     try {
       if (user) {
-        await prisma.notifications.create({
-          data: {
-            user_id: user.id,
-            title: notificationTitle,
-            message: notificationMessage,
-            type: `calendar_invite:${eventId}`,
-          },
-        });
+        await prisma.$executeRaw`
+          INSERT INTO notifications (user_id, title, message, type, status, recyclebin_status, created_at, updated_at)
+          VALUES (${user.id}, ${notificationTitle}, ${notificationMessage}, ${`calendar_invite:${eventId}`}, '0', '0', NOW(), NOW())
+        `;
 
         if (user.device_token) {
           const deviceToken = String(user.device_token);
@@ -469,13 +444,6 @@ export async function inviteAttendees(
   return created;
 }
 
-/**
- * Respond to an invite (accept/decline) by updating the attendee status.
- * Only the invited user (matched by user_id or attendee_email) may update their status.
- * When accepted, the event organizer is notified:
- * - Premium users: receive push notification + in-app notification
- * - Free users: receive in-app notification message only
- */
 export async function respondToInvite(
   eventId: string,
   userId: string,
@@ -489,47 +457,43 @@ export async function respondToInvite(
     throw new ApiError(404, 'Invite not found');
   }
 
-  // Get the event with organizer info
-  const event = await prisma.user_calendars.findFirst({
-    where: { id: BigInt(eventId) },
-    include: {
-      users: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          subscription_tier: true,
-          device_token: true,
-        },
-      },
-    },
-  });
+  const events = await prisma.$queryRaw<any[]>`
+    SELECT uc.id, uc.user_id, uc.title, uc.date, u.id as organizer_id, u.name as organizer_name, u.email as organizer_email, u.device_token as organizer_device_token
+    FROM user_calendars uc
+    LEFT JOIN users u ON uc.user_id = u.id
+    WHERE uc.id = ${BigInt(eventId)}
+    LIMIT 1
+  `;
+  const event = events?.[0] || null;
 
   if (!event) {
     throw new ApiError(404, 'Event not found');
   }
 
-  // Allow only the invited user to respond
   const userIdNum = BigInt(userId);
   const isOwnerMatch = attendee.user_id && attendee.user_id === userIdNum;
 
-  // Get the responding user's info
   let respondingUser = null;
   if (!isOwnerMatch) {
-    // If not linked to a user, allow match by email
     if (!attendee.attendee_email) {
       throw new ApiError(403, 'Not authorized to respond to this invite');
     }
-    respondingUser = await prisma.users.findFirst({ where: { id: userIdNum } });
+    const users = await prisma.$queryRaw<any[]>`
+      SELECT id, email, name, device_token FROM users WHERE id = ${userIdNum} LIMIT 1
+    `;
+    respondingUser = users?.[0] || null;
     if (
       !respondingUser ||
       String(respondingUser.email).toLowerCase() !==
-        String(attendee.attendee_email).toLowerCase()
+      String(attendee.attendee_email).toLowerCase()
     ) {
       throw new ApiError(403, 'Not authorized to respond to this invite');
     }
   } else {
-    respondingUser = await prisma.users.findFirst({ where: { id: userIdNum } });
+    const users = await prisma.$queryRaw<any[]>`
+      SELECT id, email, name, device_token FROM users WHERE id = ${userIdNum} LIMIT 1
+    `;
+    respondingUser = users?.[0] || null;
   }
 
   const updated = await prisma.user_calendar_attendees.update({
@@ -537,37 +501,33 @@ export async function respondToInvite(
     data: { status },
   });
 
-  // Notify the organizer when invite is accepted
-  if (status === 'accepted' && event.users) {
-    const organizer = event.users;
+  if (status === 'accepted') {
     const responderName =
       respondingUser?.name ||
       respondingUser?.email ||
       attendee.attendee_email ||
       'Someone';
     const eventTitle = event.title || 'your event';
-    const eventDate = event.date.toISOString().split('T')[0];
+    const eventDate =
+      event.date instanceof Date
+        ? event.date.toISOString().split('T')[0]
+        : String(event.date).split('T')[0];
 
     const notificationTitle = 'Event Join Request Accepted';
     const notificationMessage = `${responderName} has accepted your invitation to join "${eventTitle}" on ${eventDate}`;
 
-    // Always create in-app notification
     try {
-      await prisma.notifications.create({
-        data: {
-          user_id: organizer.id,
-          title: notificationTitle,
-          message: notificationMessage,
-          type: `calendar_response:${eventId}`,
-        },
-      });
+      await prisma.$executeRaw`
+        INSERT INTO notifications (user_id, title, message, type, status, recyclebin_status, created_at, updated_at)
+        VALUES (${event.organizer_id}, ${notificationTitle}, ${notificationMessage}, ${`calendar_response:${eventId}`}, '0', '0', NOW(), NOW())
+      `;
     } catch (err) {
       console.warn('Failed to create in-app notification for organizer', err);
     }
 
-    if (organizer.device_token) {
+    if (event.organizer_device_token) {
       try {
-        const deviceToken = String(organizer.device_token);
+        const deviceToken = String(event.organizer_device_token);
         if (isValidExpoPushToken(deviceToken)) {
           await sendPushNotification(
             deviceToken,
@@ -590,9 +550,6 @@ export async function respondToInvite(
   };
 }
 
-/**
- * Copy an existing calendar event to a new date. Copies attendees.
- */
 export async function copyCalendarEvent(
   eventId: string,
   userId: string,

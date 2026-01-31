@@ -1,7 +1,6 @@
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  CalendarEvent,
   CreateCalendarEvent,
   UpdateCalendarEvent,
   CalendarEventsResponse,
@@ -14,7 +13,7 @@ export async function getCalendarEvents(params?: {
   type?: 'official' | 'personal';
   limit?: number;
   offset?: number;
-}): Promise<CalendarEventsResponse> {
+}, forceRefresh = false): Promise<CalendarEventsResponse> {
   const token = await AsyncStorage.getItem('authToken');
   if (!token) {
     throw new Error('No authentication token found');
@@ -28,7 +27,7 @@ export async function getCalendarEvents(params?: {
   if (params?.offset) queryParams.append('offset', params.offset.toString());
 
   const endpoint = `${API_ENDPOINTS.CALENDAR.EVENTS}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-  return apiService.get<CalendarEventsResponse>(endpoint, token);
+  return apiService.get<CalendarEventsResponse>(endpoint, token, forceRefresh);
 }
 
 export async function getCalendarEventById(eventId: string): Promise<CalendarEventResponse> {
@@ -74,6 +73,7 @@ export async function inviteCalendarEvent(eventId: string, attendees: Array<{ us
   const token = await AsyncStorage.getItem('authToken');
   if (!token) throw new Error('No authentication token found');
 
+  console.log('Sending invite payload to API:', JSON.stringify({ attendees }));
   return apiService.post<{ success: boolean; data: any }>(`${API_ENDPOINTS.CALENDAR.EVENTS}/${eventId}/invite`, { attendees }, token);
 }
 

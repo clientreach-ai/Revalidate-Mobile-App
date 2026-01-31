@@ -58,7 +58,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           user: state.user ? { ...state.user, ...userData } : null,
         })),
       logout: async () => {
-        const { token, user } = get();
+        const { token } = get();
 
         // Auto-pause any active work session before logout
         if (token) {

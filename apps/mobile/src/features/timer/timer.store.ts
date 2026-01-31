@@ -14,7 +14,7 @@ interface TimerStore {
 
   setUserId: (userId: string | null) => void;
   setActiveSessionId: (id: string | null) => void;
-  setSessionData: (data: { startTime: string | null; accumulatedMs: number; pausedAt?: string | null; status: TimerStatus; id: string }) => void;
+  setSessionData: (data: { startTime: string | null; accumulatedMs: number; pausedAt?: string | null; status: TimerStatus; id: string; userId?: string | null }) => void;
 
   setStatus: (status: TimerStatus) => void;
   setStartTime: (time: string | null) => void;
@@ -44,7 +44,8 @@ export const useTimerStore = create<TimerStore>((set, get) => ({
     accumulatedMs: data.accumulatedMs,
     pausedAt: data.pausedAt || null,
     status: data.status,
-    activeSessionId: data.id
+    activeSessionId: data.id,
+    userId: data.userId || get().userId
   }),
 
   setStatus: (status) => set({ status }),

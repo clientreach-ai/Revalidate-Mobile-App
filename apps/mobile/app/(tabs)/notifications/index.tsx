@@ -75,7 +75,7 @@ export default function NotificationsScreen() {
   const [isModalFetching, setIsModalFetching] = useState(false);
 
   useEffect(() => {
-    loadNotifications();
+    loadNotifications(true);
   }, []);
 
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function NotificationsScreen() {
     markAsRead(notificationId);
   }, [notificationId]);
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (forceRefresh = false) => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
@@ -107,7 +107,7 @@ export default function NotificationsScreen() {
       const response = await apiService.get<{
         success: boolean;
         data: ApiNotification[];
-      }>(`${API_ENDPOINTS.NOTIFICATIONS.LIST}?limit=50`, token);
+      }>(`${API_ENDPOINTS.NOTIFICATIONS.LIST}?limit=50`, token, forceRefresh);
 
       if (response?.data) {
         const now = new Date();
@@ -258,7 +258,7 @@ export default function NotificationsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadNotifications();
+    await loadNotifications(true);
   };
 
   const markAllAsRead = async () => {

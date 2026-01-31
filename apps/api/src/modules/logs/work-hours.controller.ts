@@ -137,9 +137,11 @@ export const restart = asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'No active work session to restart');
   }
 
+  const { start_time } = req.body;
   const restarted = await restartWorkSession(
     req.user.userId,
-    active.id.toString()
+    active.id.toString(),
+    start_time
   );
 
   res.json({

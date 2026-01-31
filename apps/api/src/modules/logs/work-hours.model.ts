@@ -405,11 +405,13 @@ export async function resumeWorkSession(userId: string, sessionId: string, resum
 /**
  * Restart a work session
  */
-export async function restartWorkSession(userId: string, sessionId: string): Promise<WorkHours> {
+export async function restartWorkSession(userId: string, sessionId: string, startTime?: string): Promise<WorkHours> {
   const pool = getMySQLPool();
+  const restartTime = startTime ? new Date(startTime) : null;
+
   await pool.execute(
-    'UPDATE work_hours SET start_time = NOW(), is_paused = 0, paused_at = NULL, total_paused_ms = 0, updated_at = NOW() WHERE id = ? AND user_id = ? AND is_active = 1',
-    [sessionId, userId]
+    'UPDATE work_hours SET start_time = COALESCE(?, UTC_TIMESTAMP()), is_paused = 0, paused_at = NULL, total_paused_ms = 0, updated_at = NOW() WHERE id = ? AND user_id = ? AND is_active = 1',
+    [restartTime, sessionId, userId]
   );
   const updated = await getWorkHoursById(sessionId, userId);
   if (!updated) throw new ApiError(404, 'Active work session not found');

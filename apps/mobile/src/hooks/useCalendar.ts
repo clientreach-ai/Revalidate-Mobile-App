@@ -19,7 +19,7 @@ export function useCalendar() {
     startDate?: string;
     endDate?: string;
     type?: 'official' | 'personal';
-  }, showLoading = true) => {
+  }, showLoading = true, forceRefresh = false) => {
     try {
       if (showLoading) {
         setIsLoading(true);
@@ -27,7 +27,7 @@ export function useCalendar() {
         setIsRefreshing(true);
       }
 
-      const response = await getCalendarEvents(params);
+      const response = await getCalendarEvents(params, forceRefresh);
       setEvents(response.data);
     } catch (error: any) {
       console.error('Error fetching calendar events:', error);
@@ -98,6 +98,13 @@ export function useCalendar() {
   const inviteAttendees = useCallback(async (eventId: string, attendees: Array<{ userId?: string; email?: string }>) => {
     try {
       const res = await inviteCalendarEvent(eventId, attendees);
+      console.log('Invite response:', res);
+      // Optimistically update or use response if it contains the updated event
+      // Assuming res.data is the updated event or we need to refetch
+      // safetly try to update if it looks like an event
+      if (res.data && res.data.id === eventId) {
+        setEvents(prev => prev.map(e => e.id === eventId ? res.data : e));
+      }
       showToast.success('Invites sent', 'Success');
       return res.data;
     } catch (error: any) {
@@ -128,7 +135,7 @@ export function useCalendar() {
     events,
     isLoading,
     isRefreshing,
-    refresh: (params?: { startDate?: string; endDate?: string; type?: 'official' | 'personal' }) => fetchEvents(params, false),
+    refresh: (params?: { startDate?: string; endDate?: string; type?: 'official' | 'personal' }) => fetchEvents(params, false, true),
     createEvent,
     updateEvent,
     deleteEvent: removeEvent,

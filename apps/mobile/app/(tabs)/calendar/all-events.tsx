@@ -116,7 +116,16 @@ export default function AllEventsScreen() {
       if (activeFilter === 'personal') return event.type === 'personal';
       return true;
     })
-    .sort((a, b) => b.date.getTime() - a.date.getTime()); // recent first
+    .sort((a, b) => {
+      // Sort by date descending (latest date first)
+      const dateDiff = b.date.getTime() - a.date.getTime();
+      if (dateDiff !== 0) return dateDiff;
+
+      // If dates are same, sort by startTime descending (latest time first)
+      const timeA = a.startTime || '';
+      const timeB = b.startTime || '';
+      return timeB.localeCompare(timeA);
+    }); // recent first
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-GB', {
@@ -493,7 +502,7 @@ export default function AllEventsScreen() {
                               else setSelectedUsers(prev => [...prev, { id: String(u.id), name: u.name, email: u.email }]);
                               setSearchQuery('');
                               setSearchResults([]);
-                            }} className={`p-3 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-white'} mb-1 border`}> 
+                            }} className={`p-3 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-white'} mb-1 border`}>
                               <Text className={isDark ? 'text-white' : 'text-slate-800'}>{u.name} {u.email ? `· ${u.email}` : ''}</Text>
                             </Pressable>
                           ))

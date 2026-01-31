@@ -1,17 +1,24 @@
-import { View, Text, ScrollView, Pressable, Modal, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+// Force Update: 2026-01-31 22:15
+import { View, RefreshControl, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { getProfile } from '@/features/profile/profile.api';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useCalendar } from '@/hooks/useCalendar';
-import { searchUsers } from '@/features/users/users.api';
-import { getCalendarEventById, respondToInvite as apiRespondToInvite } from '@/features/calendar/calendar.api';
+import { respondToInvite as apiRespondToInvite } from '@/features/calendar/calendar.api';
 import { CalendarEvent, CreateCalendarEvent, UpdateCalendarEvent } from '@/features/calendar/calendar.types';
+import { showToast } from '@/utils/toast';
 import '../../global.css';
 import { useRouter } from 'expo-router';
-import { usePremium } from '@/hooks/usePremium';
+
+// Components
+import { CalendarHeader } from '@/features/calendar/components/CalendarHeader';
+import { MonthView } from '@/features/calendar/components/MonthView';
+import { EventList } from '@/features/calendar/components/EventList';
+import { AddEventModal } from '@/features/calendar/components/AddEventModal';
+import { InvitesModal } from '@/features/calendar/components/InvitesModal';
 
 type EventType = 'all' | 'official' | 'personal';
 
@@ -19,42 +26,22 @@ export default function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
-  const { isPremium } = usePremium();
   const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, inviteAttendees } = useCalendar();
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [showInvitesModal, setShowInvitesModal] = useState(false);
 
+  // Modal states
+  const [showInvitesModal, setShowInvitesModal] = useState(false);
+  const [showAddEventModal, setShowAddEventModal] = useState(false);
+
+  // Date and filter states
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
-  const [showAddEventModal, setShowAddEventModal] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+
+  // Editing state
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
-  const [eventForm, setEventForm] = useState({
-    title: '',
-    description: '',
-    location: '',
-    date: selectedDate,
-    startTime: '',
-    endTime: '',
-    type: 'official' as 'official' | 'personal',
-  });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Array<any>>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [selectedUsers, setSelectedUsers] = useState<Array<{ id: string; name?: string; email?: string }>>([]);
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  const dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-
+  // Helper for calendar grid
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -118,16 +105,6 @@ export default function CalendarScreen() {
     );
   };
 
-  const formatDateLabel = (date: Date) => {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const dayIndex = date.getDay();
-    const monthIndex = date.getMonth();
-    const dayName = days[dayIndex] ?? 'Monday';
-    const day = date.getDate();
-    const monthName = monthNames[monthIndex] ?? 'January';
-    return `${dayName.toUpperCase()}, ${day} ${monthName.toUpperCase()}`;
-  };
-
   // Convert API events to local format and filter
   const filteredEvents = events
     .map(event => ({
@@ -148,21 +125,19 @@ export default function CalendarScreen() {
       return true;
     });
 
-  // Refresh data when screen comes into focus (only on mount, not every time)
+  // Refresh data when screen comes into focus
   const hasRefreshedOnFocus = React.useRef(false);
   useFocusEffect(
     React.useCallback(() => {
-      // Skip first focus since useCalendar already fetches on mount
       if (!hasRefreshedOnFocus.current) {
         hasRefreshedOnFocus.current = true;
         return;
       }
-      // Only refresh on subsequent focuses (coming back from another screen)
       refresh();
-    }, []) // Empty dependency array - refresh is stable from useCallback
+    }, [])
   );
 
-  // Load current user's profile to find invites addressed to them
+  // Load current user's profile
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -172,178 +147,105 @@ export default function CalendarScreen() {
         const email = res?.data?.email ?? null;
         if (email) setUserEmail(String(email));
       } catch (e) {
-        // ignore profile fetch errors silently
+        // ignore
       }
     })();
     return () => { mounted = false; };
   }, []);
 
-  // Filter events to find invites addressed to the current user
+  // Filter events to find invites
   const inviteRows = events
     .map(event => {
       // Check if user is an attendee
-      if (!event.attendees || !Array.isArray(event.attendees) || !userEmail) return null;
+      if (!event.attendees || !Array.isArray(event.attendees) || !userEmail) {
+        // console.log('Skipping event', event.id, 'no attendees or no userEmail');
+        return null;
+      }
 
       const attendee = event.attendees.find(
-        a => a.email.toLowerCase() === userEmail.toLowerCase() && a.status === 'pending'
+        a => a.email && userEmail && a.email.toLowerCase() === userEmail.toLowerCase() && (a.status === 'pending' || a.status === 'invited')
       );
 
-      if (!attendee) return null;
+      if (attendee) {
+        console.log('Found invite for user:', userEmail, 'in event:', event.title);
+      } else {
+        console.log('No matching pending invite for:', userEmail, 'in event:', event.id, 'Attendees:', event.attendees);
+      }
 
+      if (!attendee) return null;
       return { event, attendee };
     })
     .filter((row): row is { event: CalendarEvent; attendee: any } => row !== null);
 
-  // When invites modal opens, we rely on the already loaded events
-  // If we needed to fetch fresh data, we could call refresh()
   useEffect(() => {
     if (showInvitesModal && !isLoading) {
-      // Optional: refresh events to ensure we have latest status
       refresh();
     }
   }, [showInvitesModal]);
 
   const calendarDays = getDaysInMonth(currentDate);
 
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
+  const handleSaveEvent = async (eventForm: any, selectedUsers: any[]) => {
+    try {
+      const dateStr = eventForm.date.toISOString().split('T')[0] as string;
 
-    if (!eventForm.title.trim()) {
-      errors.title = 'Event title is required';
-    }
-
-    if (!eventForm.startTime.trim()) {
-      errors.startTime = 'Start time is required';
-    } else if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eventForm.startTime)) {
-      errors.startTime = 'Please enter time in HH:MM format';
-    }
-
-    if (!eventForm.endTime.trim()) {
-      errors.endTime = 'End time is required';
-    } else if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eventForm.endTime)) {
-      errors.endTime = 'Please enter time in HH:MM format';
-    }
-
-    if (eventForm.startTime && eventForm.endTime) {
-      const startParts = eventForm.startTime.split(':');
-      const endParts = eventForm.endTime.split(':');
-      if (startParts.length === 2 && endParts.length === 2) {
-        const startHourStr = startParts[0];
-        const startMinStr = startParts[1];
-        const endHourStr = endParts[0];
-        const endMinStr = endParts[1];
-        if (startHourStr && startMinStr && endHourStr && endMinStr) {
-          const startHour = parseInt(startHourStr);
-          const startMin = parseInt(startMinStr);
-          const endHour = parseInt(endHourStr);
-          const endMin = parseInt(endMinStr);
-          const startMinutes = startHour * 60 + startMin;
-          const endMinutes = endHour * 60 + endMin;
-
-          if (endMinutes <= startMinutes) {
-            errors.endTime = 'End time must be after start time';
+      if (editingEventId) {
+        const updateData: UpdateCalendarEvent = {
+          type: eventForm.type,
+          title: eventForm.title,
+          description: eventForm.description || undefined,
+          date: dateStr,
+          startTime: eventForm.startTime || undefined,
+          endTime: eventForm.endTime || undefined,
+          location: eventForm.location || undefined,
+        };
+        await updateEvent(editingEventId, updateData);
+      } else {
+        const createData: CreateCalendarEvent = {
+          type: eventForm.type,
+          title: eventForm.title,
+          description: eventForm.description || undefined,
+          date: dateStr,
+          startTime: eventForm.startTime || undefined,
+          endTime: eventForm.endTime || undefined,
+          location: eventForm.location || undefined,
+        };
+        const created = await createEvent(createData);
+        if (selectedUsers && selectedUsers.length > 0) {
+          console.log('[DEBUG] Running logic V3 - Sending invites...');
+          showToast.error('DEBUG: Sending Invites V3'); // Visual confirmation
+          console.log('Sending invites (v2) to selected users:', selectedUsers);
+          const attendees = selectedUsers.map(u => ({
+            userId: u.id,
+            user_id: u.id, // Snake case for backend compatibility
+            email: u.email
+          }));
+          console.log('INVITE PAYLOAD (v2):', JSON.stringify(attendees));
+          try { // Added try-catch for inviteAttendees
+            await inviteAttendees(created.id, attendees);
+            await refresh(); // Force refresh to get updated attendees list from server
+          } catch (e) {
+            console.error('Failed to send invites:', e);
           }
         }
       }
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSaveEvent = async () => {
-    if (validateForm()) {
-      setIsSubmitting(true);
-      try {
-        const dateStr = eventForm.date.toISOString().split('T')[0] as string;
-
-        if (editingEventId) {
-          const updateData: UpdateCalendarEvent = {
-            type: eventForm.type,
-            title: eventForm.title,
-            description: eventForm.description || undefined,
-            date: dateStr,
-            startTime: eventForm.startTime || undefined,
-            endTime: eventForm.endTime || undefined,
-            location: eventForm.location || undefined,
-          };
-          await updateEvent(editingEventId, updateData);
-        } else {
-          const createData: CreateCalendarEvent = {
-            type: eventForm.type,
-            title: eventForm.title,
-            description: eventForm.description || undefined,
-            date: dateStr,
-            startTime: eventForm.startTime || undefined,
-            endTime: eventForm.endTime || undefined,
-            location: eventForm.location || undefined,
-          };
-          const created = await createEvent(createData);
-          if (selectedUsers && selectedUsers.length > 0) {
-            try {
-              const attendees = selectedUsers.map(u => ({ userId: u.id }));
-              await inviteAttendees(created.id, attendees);
-            } catch (e) {
-              console.error('Failed to send invites:', e);
-            }
-          }
-        }
-
-        setIsSubmitting(false);
-        setShowAddEventModal(false);
-        setEditingEventId(null);
-        setFormErrors({});
-        setEventForm({
-          title: '',
-          description: '',
-          location: '',
-          date: selectedDate,
-          startTime: '',
-          endTime: '',
-          type: 'official',
-        });
-      } catch (error) {
-        setIsSubmitting(false);
-      }
+      setShowAddEventModal(false);
+    } catch (e) {
+      console.error('Save event failed', e);
+      throw e;
     }
   };
 
-  // Debounced live search for users
-  useEffect(() => {
-    if (!searchQuery || searchQuery.length < 2) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
+  const handleRespondToInvite = async (eventId: string, attendeeId: string, status: 'accepted' | 'declined') => {
+    try {
+      await apiRespondToInvite(eventId, attendeeId, status);
+      await refresh();
+    } catch (e) {
+      console.error('Respond to invite failed', e);
     }
-
-    let cancelled = false;
-    setIsSearching(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res = await searchUsers(searchQuery, 10, 0);
-        if (!cancelled) setSearchResults(res.data || []);
-      } catch (e) {
-        console.error('User search failed', e);
-        if (!cancelled) setSearchResults([]);
-      } finally {
-        if (!cancelled) setIsSearching(false);
-      }
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [searchQuery]);
-
-  const formatTime = (hour: number, minute: number) => {
-    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
 
-  const onRefresh = async () => {
-    // Refresh all events, not just current month
-    await refresh(); // Load all events without date filters
-  };
+  const calendarDaysProps = getDaysInMonth(currentDate);
 
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
@@ -354,434 +256,54 @@ export default function CalendarScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={onRefresh}
+            onRefresh={refresh}
             tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
             colors={['#D4AF37', '#2B5F9E']}
           />
         }
       >
-        {/* Header */}
-        <View className="px-6 py-4 flex-row justify-between items-center">
-          <View>
-            <Text className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}>
-              Professional Calendar
-            </Text>
-            <Text className={`text-xs font-medium uppercase tracking-wider mt-0.5 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
-              UK Revalidation Tracker
-            </Text>
-          </View>
-          <View className="flex-row items-center" style={{ gap: 12 }}>
+        <CalendarHeader
+          currentDate={currentDate}
+          isDark={isDark}
+          onPrevMonth={() => navigateMonth('prev')}
+          onNextMonth={() => navigateMonth('next')}
+          onInvitesPress={() => setShowInvitesModal(true)}
+          invitesCount={inviteRows.length}
+        />
 
-            <Pressable
-              onPress={() => setShowInvitesModal(true)}
-              className={`relative w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                }`}
-            >
-              <MaterialIcons name="mail" size={20} color="#2B5F9E" />
-              {/* Invites Badge */}
-              {userEmail && events.filter(e => e.invite && String(e.invite).toLowerCase().includes(userEmail.toLowerCase())).length > 0 && (
-                <View className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white items-center justify-center">
-                  <Text className="text-white text-[8px] font-bold" style={{ lineHeight: 10 }}>{events.filter(e => e.invite && String(e.invite).toLowerCase().includes(userEmail.toLowerCase())).length}</Text>
-                </View>
-              )}
-            </Pressable>
-          </View>
-        </View>
+        <MonthView
+          currentDate={currentDate}
+          selectedDate={selectedDate}
+          calendarDays={calendarDaysProps}
+          isDark={isDark}
+          onDateSelect={setSelectedDate}
+          onPrevMonth={() => navigateMonth('prev')}
+          onNextMonth={() => navigateMonth('next')}
+        />
 
-        {/* Calendar Widget */}
-        <View className="px-4 mb-4">
-          <View className={`rounded-3xl p-5 shadow-sm border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-            }`}>
-            {/* Month Navigation */}
-            <View className="flex-row justify-between items-center mb-6 px-2">
-              <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-              </Text>
-              <View className="flex-row gap-1">
-                <Pressable
-                  onPress={() => navigateMonth('prev')}
-                  className="p-1 rounded-lg"
-                >
-                  <MaterialIcons name="chevron-left" size={24} color="#64748B" />
-                </Pressable>
-                <Pressable
-                  onPress={() => navigateMonth('next')}
-                  className="p-1 rounded-lg"
-                >
-                  <MaterialIcons name="chevron-right" size={24} color="#64748B" />
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Day Headers */}
-            <View className="flex-row justify-between mb-4">
-              {dayNames.map((day) => (
-                <View key={day} className="flex-1 items-center">
-                  <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? "text-gray-400" : "text-slate-400"
-                    }`}>
-                    {day}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Calendar Grid */}
-            <View className="flex-row flex-wrap">
-              {calendarDays.map((day, index) => {
-                const isSelected = isSameDay(day.date, selectedDate);
-                const isCurrentMonth = day.isCurrentMonth;
-
-                return (
-                  <Pressable
-                    key={index}
-                    onPress={() => setSelectedDate(day.date)}
-                    className="w-[14.28%] py-2 items-center justify-center"
-                  >
-                    <View className="relative items-center justify-center">
-                      {isSelected ? (
-                        <>
-                          <View className="w-8 h-8 rounded-full border-2 border-[#2B5F9E] items-center justify-center">
-                            <Text className="text-[#2B5F9E] font-bold text-sm">
-                              {day.date.getDate()}
-                            </Text>
-                          </View>
-                          <View className="absolute -bottom-1 w-1 h-1 bg-[#2B5F9E] rounded-full" />
-                        </>
-                      ) : (
-                        <Text
-                          className={`text-sm font-medium ${isCurrentMonth
-                            ? (isDark ? 'text-white' : 'text-slate-800')
-                            : (isDark ? 'text-gray-500' : 'text-slate-300')
-                            }`}
-                        >
-                          {day.date.getDate()}
-                        </Text>
-                      )}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-
-        {/* Filter Tabs */}
-        <View className="px-6 mb-4">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 12 }}
-          >
-            <Pressable
-              onPress={() => setActiveFilter('all')}
-              className={`px-5 py-2.5 rounded-full ${activeFilter === 'all'
-                ? 'bg-[#2B5F9E]'
-                : isDark
-                  ? 'bg-slate-800 border border-slate-700'
-                  : 'bg-white border border-slate-100'
-                }`}
-            >
-              <Text
-                className={`text-sm font-semibold ${activeFilter === 'all' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-slate-600')
-                  }`}
-              >
-                All Events
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setActiveFilter('official')}
-              className={`px-5 py-2.5 rounded-full ${activeFilter === 'official'
-                ? 'bg-[#2B5F9E]'
-                : isDark
-                  ? 'bg-slate-800 border border-slate-700'
-                  : 'bg-white border border-slate-100'
-                }`}
-            >
-              <Text
-                className={`text-sm font-semibold ${activeFilter === 'official' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-slate-600')
-                  }`}
-              >
-                Official CPD
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setActiveFilter('personal')}
-              className={`px-5 py-2.5 rounded-full ${activeFilter === 'personal'
-                ? 'bg-[#2B5F9E]'
-                : isDark
-                  ? 'bg-slate-800 border border-slate-700'
-                  : 'bg-white border border-slate-100'
-                }`}
-            >
-              <Text
-                className={`text-sm font-semibold ${activeFilter === 'personal' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-slate-600')
-                  }`}
-              >
-                Personal Development
-              </Text>
-            </Pressable>
-          </ScrollView>
-        </View>
-
-        {/* Events List */}
-        <View className="flex-1 px-6" style={{ gap: 16 }}>
-          <Text className={`text-xs font-bold uppercase tracking-widest mt-2 ${isDark ? "text-gray-400" : "text-slate-400"
-            }`}>
-            {formatDateLabel(selectedDate)}
-          </Text>
-
-          {isLoading ? (
-            <View className="items-center justify-center py-8">
-              <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
-            </View>
-          ) : filteredEvents.length > 0 ? (
-            filteredEvents.map((event) => (
-              <Pressable
-                key={event.id}
-                onPress={() => router.push({ pathname: '/calendar/[id]', params: { id: String(event.id), from: '/calendar' } })}
-                className={`p-4 rounded-2xl border shadow-sm flex-row items-start ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                  }`}
-                style={{ gap: 16 }}
-              >
-                {/* Time Line */}
-                <View className="items-center">
-                  <Text className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                    {event.startTime}
-                  </Text>
-                  <View className={`w-px h-12 my-1 ${isDark ? "bg-slate-600" : "bg-slate-200"}`} />
-                  <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-400"}`}>
-                    {event.endTime}
-                  </Text>
-                </View>
-
-                {/* Event Details */}
-                <View className="flex-1">
-                  <View className="flex-row justify-between items-start mb-1">
-                    <Text className={`font-bold flex-1 ${isDark ? "text-white" : "text-slate-800"}`}>
-                      {event.title}
-                    </Text>
-                    <View
-                      className={`px-2 py-0.5 rounded-full ${event.type === 'official'
-                        ? 'bg-blue-100'
-                        : 'bg-amber-100'
-                        }`}
-                    >
-                      <Text
-                        className={`text-[10px] font-bold uppercase tracking-tighter ${event.type === 'official'
-                          ? 'text-blue-600'
-                          : 'text-amber-600'
-                          }`}
-                      >
-                        {event.type === 'official' ? 'Official' : 'Personal'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text className={`text-sm mt-1 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
-                    {event.description}
-                  </Text>
-                  <View className="flex-row items-center mt-3">
-                    <MaterialIcons
-                      name={event.type === 'official' ? 'location-on' : 'history-edu'}
-                      size={16}
-                      color={isDark ? "#6B7280" : "#94A3B8"}
-                    />
-                    <Text className={`text-xs ml-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
-                      {event.location}
-                    </Text>
-                  </View>
-                </View>
-              </Pressable>
-            ))
-          ) : (
-            <View className={`p-8 rounded-2xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-              }`}>
-              <MaterialIcons name="event-busy" size={48} color={isDark ? "#4B5563" : "#CBD5E1"} />
-              <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
-                No events scheduled for this date
-              </Text>
-              <Pressable
-                onPress={() => {
-                  setEditingEventId(null);
-                  setEventForm({
-                    title: '',
-                    description: '',
-                    location: '',
-                    date: selectedDate,
-                    startTime: '',
-                    endTime: '',
-                    type: 'official',
-                  });
-                  setCurrentDate(selectedDate);
-                  setFormErrors({});
-                  setShowAddEventModal(true);
-                }}
-                className="mt-6 bg-[#2B5F9E] px-6 py-3 rounded-xl shadow-sm active:opacity-90"
-              >
-                <Text className="text-white font-bold">Add New Event</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {/* All Events Card */}
-          {!isLoading && events.length > 0 && (
-            <View className="mt-4">
-              <Pressable
-                className={`p-5 rounded-2xl border shadow-sm ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
-                  }`}
-                onPress={() => {
-                  router.push('/calendar/all-events');
-                }}
-              >
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-1">
-                    <View className="flex-row items-center mb-2">
-                      <MaterialIcons
-                        name="event-note"
-                        size={24}
-                        color={isDark ? "#D4AF37" : "#2B5F9E"}
-                      />
-                      <Text className={`ml-2 text-lg font-bold ${isDark ? "text-white" : "text-slate-800"
-                        }`}>
-                        All Events
-                      </Text>
-                    </View>
-                    <Text className={`text-sm mt-1 ${isDark ? "text-gray-400" : "text-slate-500"
-                      }`}>
-                      {events.length} {events.length === 1 ? 'event' : 'events'} total
-                    </Text>
-                    <View className="flex-row items-center mt-3" style={{ gap: 12 }}>
-                      <View className="flex-row items-center">
-                        <View className="w-3 h-3 rounded-full bg-blue-500" />
-                        <Text className={`text-xs ml-1.5 ${isDark ? "text-gray-400" : "text-slate-500"
-                          }`}>
-                          {events.filter(e => e.type === 'official').length} Official
-                        </Text>
-                      </View>
-                      <View className="flex-row items-center">
-                        <View className="w-3 h-3 rounded-full bg-amber-500" />
-                        <Text className={`text-xs ml-1.5 ${isDark ? "text-gray-400" : "text-slate-500"
-                          }`}>
-                          {events.filter(e => e.type === 'personal').length} Personal
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View className="items-center">
-                    <MaterialIcons
-                      name="chevron-right"
-                      size={24}
-                      color={isDark ? "#9CA3AF" : "#64748B"}
-                    />
-                    <Text className={`text-xs mt-1 font-medium ${isDark ? "text-gray-400" : "text-slate-500"
-                      }`}>
-                      See all
-                    </Text>
-                  </View>
-                </View>
-              </Pressable>
-            </View>
-          )}
-        </View>
+        <EventList
+          events={filteredEvents}
+          isLoading={isLoading}
+          selectedDate={selectedDate}
+          activeFilter={activeFilter}
+          isDark={isDark}
+          onFilterChange={setActiveFilter}
+          onAddEvent={() => {
+            setEditingEventId(null);
+            setShowAddEventModal(true);
+          }}
+          onSeeAllPress={() => router.push('/calendar/all-events')}
+          totalEventsCount={events.length}
+          officialCount={events.filter(e => e.type === 'official').length}
+          personalCount={events.filter(e => e.type === 'personal').length}
+        />
       </ScrollView>
-
-      {/* Invites Modal */}
-      <Modal
-        visible={showInvitesModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowInvitesModal(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className={`rounded-t-3xl max-h-[70%] ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
-            <SafeAreaView edges={['bottom']} className="px-6 py-4">
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Invites</Text>
-                <Pressable onPress={() => setShowInvitesModal(false)}>
-                  <MaterialIcons name="close" size={22} color={isDark ? '#9CA3AF' : '#64748B'} />
-                </Pressable>
-              </View>
-
-              <ScrollView style={{ maxHeight: 320 }} nestedScrollEnabled>
-                {inviteRows.length > 0 ? (
-                  inviteRows.map(({ event: ev, attendee }: any) => (
-                    <View key={ev.id} className={`p-4 rounded-xl mb-2 border ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
-                      <View>
-                        <Text className={`font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{ev.title}</Text>
-                        <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>{ev.date} {ev.startTime ? `• ${ev.startTime}` : ''}</Text>
-                      </View>
-                      <View className="flex-row mt-3" style={{ gap: 8 }}>
-                        <Pressable
-                          onPress={async () => {
-                            if (!attendee) return;
-                            try {
-                              await apiRespondToInvite(String(ev.id), String(attendee.id), 'accepted');
-                              // refresh events to update list
-                              await refresh();
-                            } catch (e) {
-                              console.error('Accept invite failed', e);
-                            }
-                          }}
-                          className="px-4 py-2 rounded-lg bg-[#2B5F9E]"
-                        >
-                          <Text className="text-white">Accept</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={async () => {
-                            if (!attendee) return;
-                            try {
-                              await apiRespondToInvite(String(ev.id), String(attendee.id), 'declined');
-                              await refresh();
-                            } catch (e) {
-                              console.error('Decline invite failed', e);
-                            }
-                          }}
-                          className="px-4 py-2 rounded-lg bg-gray-200"
-                        >
-                          <Text className="text-slate-800">Decline</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => {
-                            setShowInvitesModal(false);
-                            router.push({ pathname: '/calendar/[id]', params: { id: String(ev.id), from: '/calendar' } });
-                          }}
-                          className="px-4 py-2 rounded-lg border"
-                        >
-                          <Text className={`${isDark ? 'text-white' : 'text-slate-800'}`}>View</Text>
-                        </Pressable>
-                        {attendee && attendee.status && (
-                          <View className="ml-auto justify-center">
-                            <Text className={`text-xs ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Status: {attendee.status}</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  ))
-                ) : (
-                  <View className="p-4">
-                    <Text className={`${isDark ? 'text-gray-300' : 'text-slate-700'}`}>No invites at the moment</Text>
-                  </View>
-                )}
-              </ScrollView>
-            </SafeAreaView>
-          </View>
-        </View>
-      </Modal>
 
       {/* Floating Action Button */}
       <Pressable
         onPress={() => {
           setEditingEventId(null);
-          setEventForm({
-            title: '',
-            description: '',
-            location: '',
-            date: selectedDate,
-            startTime: '',
-            endTime: '',
-            type: 'official',
-          });
-          setCurrentDate(selectedDate);
-          setFormErrors({});
+          // Set date to selected date when opening from FAB
           setShowAddEventModal(true);
         }}
         className="absolute right-6 w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center active:opacity-80"
@@ -790,640 +312,29 @@ export default function CalendarScreen() {
         <MaterialIcons name="add" size={32} color="#FFFFFF" />
       </Pressable>
 
-      {/* Add Event Modal */}
-      <Modal
+      <InvitesModal
+        visible={showInvitesModal}
+        isDark={isDark}
+        onClose={() => setShowInvitesModal(false)}
+        invites={inviteRows}
+        onRespond={handleRespondToInvite}
+      />
+
+      <AddEventModal
         visible={showAddEventModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowAddEventModal(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className={`rounded-t-3xl max-h-[90%] flex-1 ${isDark ? "bg-slate-800" : "bg-white"
-            }`}>
-            <SafeAreaView edges={['bottom']} className="flex-1">
-              {/* Header */}
-              <View className={`flex-row items-center justify-between px-6 pt-4 pb-4 border-b ${isDark ? "border-slate-700" : "border-slate-100"
-                }`}>
-                <Text className={`text-2xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                  Add New Event
-                </Text>
-                <Pressable onPress={() => setShowAddEventModal(false)}>
-                  <MaterialIcons name="close" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
-                </Pressable>
-              </View>
-
-              <ScrollView
-                className="flex-1"
-                contentContainerStyle={{ paddingBottom: 20 }}
-                showsVerticalScrollIndicator={false}
-              >
-                <View className="px-6 pt-6" style={{ gap: 20 }}>
-                  {/* Event Title */}
-                  <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"
-                      }`}>
-                      Event Title *
-                    </Text>
-                    <TextInput
-                      value={eventForm.title}
-                      onChangeText={(text) => {
-                        setEventForm({ ...eventForm, title: text });
-                        if (formErrors.title) {
-                          setFormErrors({ ...formErrors, title: '' });
-                        }
-                      }}
-                      placeholder="Enter event title"
-                      placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
-                      className={`border rounded-2xl px-4 py-4 text-base ${isDark
-                        ? "bg-slate-700 text-white border-slate-600"
-                        : "bg-white text-slate-800 border-slate-200"
-                        } ${formErrors.title ? 'border-red-500' : ''}`}
-                    />
-                    {formErrors.title && (
-                      <Text className="text-red-500 text-xs mt-1">{formErrors.title}</Text>
-                    )}
-                  </View>
-
-                  {/* Description */}
-                  <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"
-                      }`}>
-                      Description
-                    </Text>
-                    <TextInput
-                      value={eventForm.description}
-                      onChangeText={(text) => setEventForm({ ...eventForm, description: text })}
-                      placeholder="Enter event description"
-                      placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
-                      multiline
-                      numberOfLines={4}
-                      textAlignVertical="top"
-                      className={`border rounded-2xl px-4 py-4 text-base min-h-[100px] ${isDark
-                        ? "bg-slate-700 text-white border-slate-600"
-                        : "bg-white text-slate-800 border-slate-200"
-                        }`}
-                    />
-                  </View>
-
-                  {/* Location */}
-                  <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"
-                      }`}>
-                      Location
-                    </Text>
-                    <View className="relative">
-                      <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
-                        <MaterialIcons name="location-on" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
-                      </View>
-                      <TextInput
-                        value={eventForm.location}
-                        onChangeText={(text) => setEventForm({ ...eventForm, location: text })}
-                        placeholder="Enter location"
-                        placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
-                        className={`border rounded-2xl pl-12 pr-4 py-4 text-base ${isDark
-                          ? "bg-slate-700 text-white border-slate-600"
-                          : "bg-white text-slate-800 border-slate-200"
-                          }`}
-                      />
-                    </View>
-                  </View>
-
-                  {/* Date Selection */}
-                  <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"
-                      }`}>
-                      Date
-                    </Text>
-                    <Pressable
-                      onPress={() => {
-                        setCurrentDate(eventForm.date);
-                        setShowDatePicker(true);
-                      }}
-                      className={`border rounded-2xl px-4 py-4 flex-row items-center justify-between ${isDark
-                        ? "bg-slate-700 border-slate-600 active:bg-slate-600"
-                        : "bg-white border-slate-200 active:bg-slate-50"
-                        }`}
-                    >
-                      <Text className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}>
-                        {eventForm.date.toLocaleDateString('en-GB', {
-                          weekday: 'long',
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
-                      </Text>
-                      <MaterialIcons name="calendar-today" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
-                    </Pressable>
-                  </View>
-
-                  {/* Time Selection */}
-                  <View className="flex-row" style={{ gap: 12 }}>
-                    <View className="flex-1">
-                      <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"
-                        }`}>
-                        Start Time *
-                      </Text>
-                      <Pressable
-                        onPress={() => setShowStartTimePicker(true)}
-                        className={`border rounded-2xl pl-12 pr-4 py-4 flex-row items-center ${isDark
-                          ? "bg-slate-700 border-slate-600"
-                          : "bg-white border-slate-200"
-                          } ${formErrors.startTime ? 'border-red-500' : ''}`}
-                      >
-                        <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
-                          <MaterialIcons name="access-time" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
-                        </View>
-                        <Text className={`text-base ${eventForm.startTime
-                          ? (isDark ? 'text-white' : 'text-slate-800')
-                          : (isDark ? 'text-gray-500' : 'text-slate-400')
-                          }`}>
-                          {eventForm.startTime || '09:00'}
-                        </Text>
-                      </Pressable>
-                      {formErrors.startTime && (
-                        <Text className="text-red-500 text-xs mt-1">{formErrors.startTime}</Text>
-                      )}
-                    </View>
-                    <View className="flex-1">
-                      <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"
-                        }`}>
-                        End Time *
-                      </Text>
-                      <Pressable
-                        onPress={() => setShowEndTimePicker(true)}
-                        className={`border rounded-2xl pl-12 pr-4 py-4 flex-row items-center ${isDark
-                          ? "bg-slate-700 border-slate-600"
-                          : "bg-white border-slate-200"
-                          } ${formErrors.endTime ? 'border-red-500' : ''}`}
-                      >
-                        <View className="absolute inset-y-0 left-0 pl-4 items-center justify-center z-10">
-                          <MaterialIcons name="access-time" size={20} color={isDark ? "#6B7280" : "#94A3B8"} />
-                        </View>
-                        <Text className={`text-base ${eventForm.endTime
-                          ? (isDark ? 'text-white' : 'text-slate-800')
-                          : (isDark ? 'text-gray-500' : 'text-slate-400')
-                          }`}>
-                          {eventForm.endTime || '10:30'}
-                        </Text>
-                      </Pressable>
-                      {formErrors.endTime && (
-                        <Text className="text-red-500 text-xs mt-1">{formErrors.endTime}</Text>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Event Type */}
-                  <View>
-                    <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"
-                      }`}>
-                      Event Type *
-                    </Text>
-                    <View className="flex-row" style={{ gap: 12 }}>
-                      <Pressable
-                        onPress={() => setEventForm({ ...eventForm, type: 'official' })}
-                        className={`flex-1 py-4 rounded-2xl border-2 items-center ${eventForm.type === 'official'
-                          ? 'bg-blue-50 border-[#2B5F9E]'
-                          : isDark
-                            ? 'bg-slate-700 border-slate-600'
-                            : 'bg-white border-slate-200'
-                          }`}
-                      >
-                        <MaterialIcons
-                          name="business"
-                          size={24}
-                          color={eventForm.type === 'official' ? '#2B5F9E' : (isDark ? '#6B7280' : '#94A3B8')}
-                        />
-                        <Text className={`text-sm font-semibold mt-2 ${eventForm.type === 'official'
-                          ? 'text-[#2B5F9E]'
-                          : (isDark ? 'text-gray-300' : 'text-slate-600')
-                          }`}>
-                          Official CPD
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => setEventForm({ ...eventForm, type: 'personal' })}
-                        className={`flex-1 py-4 rounded-2xl border-2 items-center ${eventForm.type === 'personal'
-                          ? 'bg-amber-50 border-amber-400'
-                          : isDark
-                            ? 'bg-slate-700 border-slate-600'
-                            : 'bg-white border-slate-200'
-                          }`}
-                      >
-                        <MaterialIcons
-                          name="person"
-                          size={24}
-                          color={eventForm.type === 'personal' ? '#F59E0B' : (isDark ? '#6B7280' : '#94A3B8')}
-                        />
-                        <Text className={`text-sm font-semibold mt-2 ${eventForm.type === 'personal'
-                          ? 'text-amber-600'
-                          : (isDark ? 'text-gray-300' : 'text-slate-600')
-                          }`}>
-                          Personal
-                        </Text>
-                      </Pressable>
-                    </View>
-
-                    {/* Invite users (optional) - live search */}
-                    <View>
-                      <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>Invite Users (optional)</Text>
-                      <TextInput
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        placeholder="Search users by name or email"
-                        placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
-                        className={`border rounded-2xl px-4 py-3 text-base ${isDark ? "bg-slate-700 text-white border-slate-600" : "bg-white text-slate-800 border-slate-200"}`}
-                      />
-
-                      {selectedUsers.length > 0 && (
-                        <View className="flex-row flex-wrap mt-3" style={{ gap: 8 }}>
-                          {selectedUsers.map((u) => (
-                            <Pressable key={u.id} onPress={() => setSelectedUsers(prev => prev.filter(x => x.id !== u.id))} className="px-3 py-1 rounded-full bg-slate-200">
-                              <Text className="text-sm">{u.name || u.email}</Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      )}
-
-                      {searchQuery.length >= 2 && (
-                        <View className="mt-2 max-h-40">
-                          {isSearching ? (
-                            <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-slate-600'}`}>Searching...</Text>
-                          ) : (
-                            searchResults.slice(0, 6).map((u) => (
-                              <Pressable key={u.id} onPress={() => {
-                                const exists = selectedUsers.some(s => s.id === String(u.id));
-                                if (exists) setSelectedUsers(prev => prev.filter(s => s.id !== String(u.id)));
-                                else setSelectedUsers(prev => [...prev, { id: String(u.id), name: u.name, email: u.email }]);
-                                setSearchQuery('');
-                                setSearchResults([]);
-                              }} className={`p-3 rounded-lg ${isDark ? 'bg-slate-700' : 'bg-white'} mb-1 border`}>
-                                <Text className={isDark ? 'text-white' : 'text-slate-800'}>{u.name} {u.email ? `· ${u.email}` : ''}</Text>
-                              </Pressable>
-                            ))
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              </ScrollView>
-
-              {/* Footer Actions */}
-              <View className={`px-6 pt-4 pb-6 border-t flex-row ${isDark ? "border-slate-700" : "border-slate-100"
-                }`} style={{ gap: 12 }}>
-                <Pressable
-                  onPress={() => setShowAddEventModal(false)}
-                  className={`flex-1 py-4 rounded-2xl items-center ${isDark ? "bg-slate-700" : "bg-slate-100"
-                    }`}
-                >
-                  <Text className={`font-semibold text-base ${isDark ? "text-gray-300" : "text-slate-700"
-                    }`}>
-                    Cancel
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleSaveEvent}
-                  disabled={isSubmitting}
-                  className={`flex-1 py-4 rounded-2xl items-center ${isSubmitting ? 'bg-[#2B5F9E]/50' : 'bg-[#2B5F9E]'
-                    }`}
-                >
-                  {isSubmitting ? (
-                    <Text className="text-white font-semibold text-base">Saving...</Text>
-                  ) : (
-                    <Text className="text-white font-semibold text-base">Save Event</Text>
-                  )}
-                </Pressable>
-              </View>
-            </SafeAreaView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Date Picker Modal */}
-      <Modal
-        visible={showDatePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <Pressable
-          className="flex-1 bg-black/50 justify-center items-center"
-          onPress={() => setShowDatePicker(false)}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            className={`rounded-3xl p-6 w-[90%] max-w-sm ${isDark ? "bg-slate-800" : "bg-white"
-              }`}
-          >
-            <Text className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
-              Select Date
-            </Text>
-            <View>
-              <View className="flex-row justify-between items-center mb-4 px-2">
-                <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                  {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-                </Text>
-                <View className="flex-row gap-1">
-                  <Pressable onPress={() => navigateMonth('prev')} className="p-1 rounded-lg">
-                    <MaterialIcons name="chevron-left" size={20} color="#64748B" />
-                  </Pressable>
-                  <Pressable onPress={() => navigateMonth('next')} className="p-1 rounded-lg">
-                    <MaterialIcons name="chevron-right" size={20} color="#64748B" />
-                  </Pressable>
-                </View>
-              </View>
-
-              <View className="flex-row justify-between mb-2">
-                {dayNames.map((day) => (
-                  <View key={day} className="flex-1 items-center">
-                    <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? "text-gray-400" : "text-slate-400"}`}>
-                      {day}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              <ScrollView className="max-h-64">
-                <View className="flex-row flex-wrap">
-                  {calendarDays.map((day, index) => {
-                    const isSelected = isSameDay(day.date, eventForm.date);
-                    const isCurrentMonth = day.isCurrentMonth;
-                    return (
-                      <Pressable
-                        key={index}
-                        onPress={() => {
-                          setEventForm({ ...eventForm, date: day.date });
-                          setSelectedDate(day.date);
-                          setShowDatePicker(false);
-                        }}
-                        className="w-[14.28%] py-2 items-center justify-center"
-                      >
-                        <View className="relative items-center justify-center">
-                          {isSelected ? (
-                            <>
-                              <View className="w-8 h-8 rounded-full border-2 border-[#2B5F9E] items-center justify-center">
-                                <Text className="text-[#2B5F9E] font-bold text-sm">{day.date.getDate()}</Text>
-                              </View>
-                              <View className="absolute -bottom-1 w-1 h-1 bg-[#2B5F9E] rounded-full" />
-                            </>
-                          ) : (
-                            <Text className={`text-sm font-medium ${isCurrentMonth
-                              ? (isDark ? 'text-white' : 'text-slate-800')
-                              : (isDark ? 'text-gray-500' : 'text-slate-300')
-                              }`}>
-                              {day.date.getDate()}
-                            </Text>
-                          )}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-            </View>
-            <Pressable
-              onPress={() => setShowDatePicker(false)}
-              className={`mt-4 py-3 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-100"
-                }`}
-            >
-              <Text className={`text-center font-semibold ${isDark ? "text-gray-300" : "text-slate-700"
-                }`}>
-                Cancel
-              </Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Start Time Picker Modal */}
-      <Modal
-        visible={showStartTimePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowStartTimePicker(false)}
-      >
-        <Pressable
-          className="flex-1 bg-black/50 justify-center items-center"
-          onPress={() => setShowStartTimePicker(false)}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            className={`rounded-3xl p-6 w-[90%] max-w-sm ${isDark ? "bg-slate-800" : "bg-white"
-              }`}
-          >
-            <Text className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
-              Select Start Time
-            </Text>
-            <View className="flex-row justify-center mb-4" style={{ gap: 8 }}>
-              <View className="flex-1">
-                <Text className={`text-xs text-center mb-2 ${isDark ? "text-gray-400" : "text-slate-500"
-                  }`}>
-                  Hour
-                </Text>
-                <ScrollView className="max-h-32">
-                  {Array.from({ length: 24 }, (_, hour) => (
-                    <Pressable
-                      key={hour}
-                      onPress={() => {
-                        const currentMin = eventForm.startTime ? parseInt(eventForm.startTime.split(':')[1] || '0') : 0;
-                        setEventForm({ ...eventForm, startTime: formatTime(hour, currentMin) });
-                        if (formErrors.startTime) {
-                          setFormErrors({ ...formErrors, startTime: '' });
-                        }
-                      }}
-                      className={`py-2 rounded-lg mb-1 ${eventForm.startTime && parseInt(eventForm.startTime.split(':')[0] || '0') === hour
-                        ? 'bg-[#2B5F9E]'
-                        : (isDark ? 'bg-slate-700' : 'bg-slate-50')
-                        }`}
-                    >
-                      <Text className={`text-center text-sm ${eventForm.startTime && parseInt(eventForm.startTime.split(':')[0] || '0') === hour
-                        ? 'text-white font-bold'
-                        : (isDark ? 'text-gray-300' : 'text-slate-700')
-                        }`}>
-                        {hour.toString().padStart(2, '0')}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-              <View className="flex-1">
-                <Text className={`text-xs text-center mb-2 ${isDark ? "text-gray-400" : "text-slate-500"
-                  }`}>
-                  Minute
-                </Text>
-                <ScrollView className="max-h-32">
-                  {[0, 15, 30, 45].map((minute) => (
-                    <Pressable
-                      key={minute}
-                      onPress={() => {
-                        const currentHour = eventForm.startTime ? parseInt(eventForm.startTime.split(':')[0] || '9') : 9;
-                        setEventForm({ ...eventForm, startTime: formatTime(currentHour, minute) });
-                        if (formErrors.startTime) {
-                          setFormErrors({ ...formErrors, startTime: '' });
-                        }
-                      }}
-                      className={`py-2 rounded-lg mb-1 ${eventForm.startTime && parseInt(eventForm.startTime.split(':')[1] || '0') === minute
-                        ? 'bg-[#2B5F9E]'
-                        : (isDark ? 'bg-slate-700' : 'bg-slate-50')
-                        }`}
-                    >
-                      <Text className={`text-center text-sm ${eventForm.startTime && parseInt(eventForm.startTime.split(':')[1] || '0') === minute
-                        ? 'text-white font-bold'
-                        : (isDark ? 'text-gray-300' : 'text-slate-700')
-                        }`}>
-                        {minute.toString().padStart(2, '0')}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-            <View className="flex-row" style={{ gap: 12 }}>
-              <Pressable
-                onPress={() => setShowStartTimePicker(false)}
-                className={`flex-1 py-3 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-100"
-                  }`}
-              >
-                <Text className={`text-center font-semibold ${isDark ? "text-gray-300" : "text-slate-700"
-                  }`}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setShowStartTimePicker(false)}
-                className="flex-1 py-3 rounded-xl bg-[#2B5F9E]"
-              >
-                <Text className="text-center font-semibold text-white">Done</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* End Time Picker Modal */}
-      <Modal
-        visible={showEndTimePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowEndTimePicker(false)}
-      >
-        <Pressable
-          className="flex-1 bg-black/50 justify-center items-center"
-          onPress={() => setShowEndTimePicker(false)}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            className={`rounded-3xl p-6 w-[90%] max-w-sm ${isDark ? "bg-slate-800" : "bg-white"
-              }`}
-          >
-            <Text className={`text-xl font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>
-              Select End Time
-            </Text>
-            <View className="flex-row justify-center mb-4" style={{ gap: 8 }}>
-              <View className="flex-1">
-                <Text className={`text-xs text-center mb-2 ${isDark ? "text-gray-400" : "text-slate-500"
-                  }`}>
-                  Hour
-                </Text>
-                <ScrollView className="max-h-32">
-                  {Array.from({ length: 24 }, (_, hour) => {
-                    const isSelected = (() => {
-                      if (!eventForm.endTime) return false;
-                      const parts = eventForm.endTime.split(':');
-                      return parts[0] ? parseInt(parts[0]) === hour : false;
-                    })();
-                    return (
-                      <Pressable
-                        key={hour}
-                        onPress={() => {
-                          const currentMin = eventForm.endTime ? (() => {
-                            const parts = eventForm.endTime.split(':');
-                            return parts[1] ? parseInt(parts[1]) : 30;
-                          })() : 30;
-                          setEventForm({ ...eventForm, endTime: formatTime(hour, currentMin) });
-                          if (formErrors.endTime) {
-                            setFormErrors({ ...formErrors, endTime: '' });
-                          }
-                        }}
-                        className={`py-2 rounded-lg mb-1 ${isSelected
-                          ? 'bg-[#2B5F9E]'
-                          : (isDark ? 'bg-slate-700' : 'bg-slate-50')
-                          }`}
-                      >
-                        <Text className={`text-center text-sm ${isSelected
-                          ? 'text-white font-bold'
-                          : (isDark ? 'text-gray-300' : 'text-slate-700')
-                          }`}>
-                          {hour.toString().padStart(2, '0')}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-              <View className="flex-1">
-                <Text className={`text-xs text-center mb-2 ${isDark ? "text-gray-400" : "text-slate-500"
-                  }`}>
-                  Minute
-                </Text>
-                <ScrollView className="max-h-32">
-                  {[0, 15, 30, 45].map((minute) => {
-                    const isSelected = (() => {
-                      if (!eventForm.endTime) return false;
-                      const parts = eventForm.endTime.split(':');
-                      return parts[1] ? parseInt(parts[1]) === minute : false;
-                    })();
-                    return (
-                      <Pressable
-                        key={minute}
-                        onPress={() => {
-                          const currentHour = eventForm.endTime ? (() => {
-                            const parts = eventForm.endTime.split(':');
-                            return parts[0] ? parseInt(parts[0]) : 10;
-                          })() : 10;
-                          setEventForm({ ...eventForm, endTime: formatTime(currentHour, minute) });
-                          if (formErrors.endTime) {
-                            setFormErrors({ ...formErrors, endTime: '' });
-                          }
-                        }}
-                        className={`py-2 rounded-lg mb-1 ${isSelected
-                          ? 'bg-[#2B5F9E]'
-                          : (isDark ? 'bg-slate-700' : 'bg-slate-50')
-                          }`}
-                      >
-                        <Text className={`text-center text-sm ${isSelected
-                          ? 'text-white font-bold'
-                          : (isDark ? 'text-gray-300' : 'text-slate-700')
-                          }`}>
-                          {minute.toString().padStart(2, '0')}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </View>
-            <View className="flex-row" style={{ gap: 12 }}>
-              <Pressable
-                onPress={() => setShowEndTimePicker(false)}
-                className={`flex-1 py-3 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-100"
-                  }`}
-              >
-                <Text className={`text-center font-semibold ${isDark ? "text-gray-300" : "text-slate-700"
-                  }`}>
-                  Cancel
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setShowEndTimePicker(false)}
-                className="flex-1 py-3 rounded-xl bg-[#2B5F9E]"
-              >
-                <Text className="text-center font-semibold text-white">Done</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </SafeAreaView >
+        isDark={isDark}
+        onClose={() => {
+          setShowAddEventModal(false);
+          setEditingEventId(null);
+        }}
+        onSave={handleSaveEvent}
+        initialDate={selectedDate}
+        editingEventId={editingEventId}
+      // If we were supporting edit from the list directly, we'd pass existing event data here.
+      // For now, the "Edit" flow in the original code wasn't deeply integrated into the list click (which goes to details).
+      // But the "No events" card had a button to add event which cleared state.
+      // We will keep it simple as per original logic.
+      />
+    </SafeAreaView>
   );
 }

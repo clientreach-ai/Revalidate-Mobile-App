@@ -63,7 +63,15 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
             if (isMounted.current) setActiveSessionLoaded(false);
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
-                if (isMounted.current) setActiveSessionLoaded(true);
+                if (isMounted.current) {
+                    setActiveSession(null);
+                    setTimer({ hours: 0, minutes: 0, seconds: 0 });
+                    setIsPaused(false);
+                    setPausedAt(null);
+                    setTotalPausedTime(0);
+                    resetStore();
+                    setActiveSessionLoaded(true);
+                }
                 return;
             }
             const response = await apiService.get<{
@@ -253,7 +261,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
             const token = await AsyncStorage.getItem('authToken');
             if (!token) throw new Error('No auth token');
 
-            const response = await apiService.post<{
+            await apiService.post<{
                 success: boolean;
                 data: ActiveSession;
             }>(API_ENDPOINTS.WORK_HOURS.PAUSE, { paused_at: pauseTime.toISOString() }, token);
@@ -300,7 +308,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
             const token = await AsyncStorage.getItem('authToken');
             if (!token) throw new Error('No auth token');
 
-            const response = await apiService.post<{
+            await apiService.post<{
                 success: boolean;
                 data: ActiveSession;
             }>(API_ENDPOINTS.WORK_HOURS.RESUME, { resumed_at: resumeTime.toISOString() }, token);
@@ -323,7 +331,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
     const handleRestartSession = async () => {
         Alert.alert(
             'Restart Session',
-            'This will stop the current session and start a new one. Continue?',
+            'Are you sure you want to start from 0?',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -337,10 +345,11 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                                 return;
                             }
 
+                            const startTime = new Date().toISOString();
                             const response = await apiService.post<{
                                 success: boolean;
                                 data: ActiveSession;
-                            }>(API_ENDPOINTS.WORK_HOURS.RESTART, {}, token);
+                            }>(API_ENDPOINTS.WORK_HOURS.RESTART, { start_time: startTime }, token);
 
                             if (response?.data) {
                                 if (isMounted.current) {
@@ -350,9 +359,13 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                                     setPausedAt(null);
                                     setTotalPausedTime(0);
 
-                                    resetStore();
-                                    setStatus('running');
-                                    setStartTime(response.data.startTime);
+                                    setSessionData({
+                                        id: response.data.id.toString(),
+                                        startTime: response.data.startTime,
+                                        accumulatedMs: 0,
+                                        pausedAt: null,
+                                        status: 'running'
+                                    });
                                 }
                                 showToast.success('Session restarted', 'Success');
                             }

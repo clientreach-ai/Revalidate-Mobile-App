@@ -83,11 +83,11 @@ export default function DashboardScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadUserData();
+      loadUserData(true);
       loadActiveSession();
-      loadDashboardStats();
-      loadNotificationsCount();
-      loadRecentActivities();
+      loadDashboardStats(true);
+      loadNotificationsCount(true);
+      loadRecentActivities(true);
     }, [loadUserData, loadActiveSession, loadDashboardStats, loadNotificationsCount, loadRecentActivities])
   );
 
