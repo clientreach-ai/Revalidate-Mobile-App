@@ -5,6 +5,7 @@ import { apiService, API_ENDPOINTS } from '@/services/api';
 import { setSubscriptionInfo } from '@/utils/subscription';
 import { UserData, DashboardStats, RecentActivity } from '../dashboard.types';
 import { formatTimeAgo } from '../dashboard.utils';
+import { useNotificationStore } from '@/features/notifications/notification.store';
 
 export const useDashboardData = () => {
     const router = useRouter();
@@ -18,7 +19,7 @@ export const useDashboardData = () => {
         reflectionsCount: 0,
         appraisalsCount: 0,
     });
-    const [unreadNotifications, setUnreadNotifications] = useState(0);
+    const { unreadCount: unreadNotifications, refreshUnreadCount: loadNotificationsCount } = useNotificationStore();
     const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
     const [revalidationDays, setRevalidationDays] = useState<number | null>(null);
     const [localProfileImage, setLocalProfileImage] = useState<string | null>(null);
@@ -178,35 +179,7 @@ export const useDashboardData = () => {
         }
     }, []);
 
-    const loadNotificationsCount = useCallback(async () => {
-        try {
-            const token = await AsyncStorage.getItem('authToken');
-            if (!token) return;
-            const res = await apiService.get<{ data: any[] }>(
-                '/api/v1/notifications',
-                token,
-                true
-            );
-            if (res?.data) {
-                const unread = res.data.filter((n) => {
-                    const isRead =
-                        n.isRead === true ||
-                        n.isRead === 1 ||
-                        n.isRead === '1' ||
-                        n.status === 1 ||
-                        n.status === '1';
-                    const isExplicitUnread =
-                        n.isRead === false ||
-                        n.isRead === 0 ||
-                        n.isRead === '0' ||
-                        n.status === 0 ||
-                        n.status === '0';
-                    return isExplicitUnread || !isRead;
-                }).length;
-                if (isMounted.current) setUnreadNotifications(unread);
-            }
-        } catch (e) { }
-    }, []);
+    // Handled by store
 
     const loadRecentActivities = useCallback(async () => {
         try {

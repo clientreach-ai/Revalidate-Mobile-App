@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
+import { useNotificationStore } from '@/features/notifications/notification.store';
 import '../../global.css';
 
 interface Notification {
@@ -57,6 +58,7 @@ export default function NotificationsScreen() {
     notificationType?: string;
   }>();
   const { isDark } = useThemeStore();
+  const refreshUnreadCount = useNotificationStore((state) => state.refreshUnreadCount);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -270,6 +272,7 @@ export default function NotificationsScreen() {
         {},
         token
       );
+      refreshUnreadCount();
     } catch (error: any) {
       console.warn('Failed to mark all notifications read:', error);
       showToast.error('Failed to mark all as read');
@@ -292,6 +295,7 @@ export default function NotificationsScreen() {
         {},
         token
       );
+      refreshUnreadCount();
     } catch (error: any) {
       console.warn('Failed to mark notification read:', error);
       showToast.error('Failed to mark notification as read');
@@ -460,8 +464,8 @@ export default function NotificationsScreen() {
             key={notification.id}
             onPress={() => handleNotificationPress(notification)}
             className={`flex-row items-center gap-4 px-4 py-4 border-b ${isDark
-                ? 'bg-slate-800 border-slate-700'
-                : 'bg-white border-slate-100'
+              ? 'bg-slate-800 border-slate-700'
+              : 'bg-white border-slate-100'
               } ${!notification.isRead ? 'opacity-100' : 'opacity-80'}`}
           >
             <View className="relative">
@@ -492,10 +496,10 @@ export default function NotificationsScreen() {
                 </Text>
                 <Text
                   className={`text-xs ml-2 shrink-0 ${!notification.isRead
-                      ? 'font-medium text-[#2563EB]'
-                      : isDark
-                        ? 'font-normal text-gray-400'
-                        : 'font-normal text-slate-500'
+                    ? 'font-medium text-[#2563EB]'
+                    : isDark
+                      ? 'font-normal text-gray-400'
+                      : 'font-normal text-slate-500'
                     }`}
                 >
                   {notification.time}
@@ -590,8 +594,8 @@ export default function NotificationsScreen() {
         >
           <View
             className={`mx-4 mt-4 p-5 rounded-3xl border ${isDark
-                ? 'bg-slate-800 border-slate-700'
-                : 'bg-white border-slate-100'
+              ? 'bg-slate-800 border-slate-700'
+              : 'bg-white border-slate-100'
               }`}
           >
             <View className="flex-row items-center mb-4">
@@ -677,8 +681,8 @@ export default function NotificationsScreen() {
           ) : (
             <View
               className={`p-8 mx-4 mt-4 rounded-2xl border items-center ${isDark
-                  ? 'bg-slate-800 border-slate-700'
-                  : 'bg-white border-slate-100'
+                ? 'bg-slate-800 border-slate-700'
+                : 'bg-white border-slate-100'
                 }`}
             >
               <MaterialIcons

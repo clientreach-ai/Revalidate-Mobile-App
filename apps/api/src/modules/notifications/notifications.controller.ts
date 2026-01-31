@@ -36,13 +36,13 @@ export const listNotifications = asyncHandler(
 
       const data = Array.isArray(rows)
         ? rows.map((r: any) => ({
-            id: r.id,
-            title: r.title,
-            body: r.message,
-            type: r.type,
-            createdAt: r.created_at,
-            isRead: Boolean(r.is_read),
-          }))
+          id: r.id,
+          title: r.title,
+          body: r.message,
+          type: r.type,
+          createdAt: r.created_at,
+          isRead: Boolean(r.is_read),
+        }))
         : [];
 
       return res.json({ success: true, data });
@@ -63,13 +63,13 @@ export const listNotifications = asyncHandler(
 
         const data = Array.isArray(rows)
           ? rows.map((r: any) => ({
-              id: r.id,
-              title: r.title,
-              body: r.message,
-              type: r.type,
-              createdAt: r.created_at,
-              isRead: false,
-            }))
+            id: r.id,
+            title: r.title,
+            body: r.message,
+            type: r.type,
+            createdAt: r.created_at,
+            isRead: false,
+          }))
           : [];
 
         return res.json({ success: true, data });
@@ -163,6 +163,37 @@ export const markAllNotificationsRead = asyncHandler(
       return res
         .status(500)
         .json({ success: false, error: 'Failed to mark notifications read' });
+    }
+  }
+);
+
+export const getUnreadCount = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ success: false, error: 'Authentication required' });
+    }
+
+    try {
+      const pool = getMySQLPool();
+      const userId = req.user.userId;
+
+      const [rows] = (await pool.execute(
+        `SELECT COUNT(*) as count
+       FROM notifications n
+       LEFT JOIN notification_reads nr
+         ON nr.notification_id = n.id AND nr.user_id = ?
+       WHERE n.user_id = ? AND nr.read_at IS NULL`,
+        [userId, userId]
+      )) as any;
+
+      const count = rows[0]?.count || 0;
+      return res.json({ success: true, data: { count } });
+    } catch (err: any) {
+      console.warn('Error getting unread count:', err);
+      // If table doesn't exist yet, return 0
+      return res.json({ success: true, data: { count: 0 } });
     }
   }
 );

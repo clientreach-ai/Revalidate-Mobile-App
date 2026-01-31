@@ -99,6 +99,7 @@ export const API_ENDPOINTS = {
   NOTIFICATIONS: {
     LIST: '/api/v1/notifications',
     MARK_READ: '/api/v1/notifications',
+    UNREAD_COUNT: '/api/v1/notifications/unread-count',
   },
   APPRAISALS: {
     LIST: '/api/v1/appraisals',
