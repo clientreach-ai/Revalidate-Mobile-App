@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,7 +25,10 @@ import { API_CONFIG } from '@revalidation-tracker/constants';
 import { showToast } from '@/utils/toast';
 import { setSubscriptionInfo } from '@/utils/subscription';
 import { usePremium } from '@/hooks/usePremium';
-import { DiscoveryModal, useDiscoveryModal } from '@/features/auth/DiscoveryModal';
+import {
+  DiscoveryModal,
+  useDiscoveryModal,
+} from '@/features/auth/DiscoveryModal';
 import '../../global.css';
 
 interface UserData {
@@ -86,7 +89,9 @@ export default function DashboardScreen() {
   });
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
-  const [localProfileImage, setLocalProfileImage] = useState<string | null>(null);
+  const [localProfileImage, setLocalProfileImage] = useState<string | null>(
+    null
+  );
 
   // Work Session Form State
   const [showWorkForm, setShowWorkForm] = useState(false);
@@ -157,7 +162,7 @@ export default function DashboardScreen() {
             animated: true,
           });
           currentIndex = next;
-        } catch (e) { }
+        } catch (e) {}
       }
     }, 3500) as any;
   };
@@ -206,6 +211,13 @@ export default function DashboardScreen() {
     loadAllData();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadNotificationsCount();
+      loadRecentActivities();
+    }, [])
+  );
+
   useEffect(() => {
     if (activeSession && activeSession.isActive) {
       if (isPaused) {
@@ -238,7 +250,6 @@ export default function DashboardScreen() {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, [activeSession, isPaused, totalPausedTime, pausedAt, lastPausedTimer]);
-
 
   const updateTimerFromSession = () => {
     if (!activeSession || !activeSession.isActive || isPaused) return;
@@ -273,7 +284,10 @@ export default function DashboardScreen() {
         if (session.isPaused && session.pausedAt) {
           const startTime = new Date(session.startTime);
           const pauseTime = new Date(session.pausedAt);
-          const diffMs = pauseTime.getTime() - startTime.getTime() - (session.totalPausedMs || 0);
+          const diffMs =
+            pauseTime.getTime() -
+            startTime.getTime() -
+            (session.totalPausedMs || 0);
           const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
           const h = Math.floor(totalSeconds / 3600);
           const m = Math.floor((totalSeconds % 3600) / 60);
@@ -301,7 +315,6 @@ export default function DashboardScreen() {
       }
     }
   };
-
 
   const handleStartSession = async () => {
     try {
@@ -708,7 +721,9 @@ export default function DashboardScreen() {
         }
         // Load local profile image from AsyncStorage
         try {
-          const key = data.id ? `profile_image_uri_${data.id}` : 'profile_image_uri';
+          const key = data.id
+            ? `profile_image_uri_${data.id}`
+            : 'profile_image_uri';
           const localImg = await AsyncStorage.getItem(key);
           if (localImg && isMounted.current) {
             setLocalProfileImage(localImg);
@@ -872,7 +887,7 @@ export default function DashboardScreen() {
               totalEarnings =
                 onboarding.data.earned_current_financial_year || 0;
           }
-        } catch (e) { }
+        } catch (e) {}
       }
       let cpdHours = 0;
       try {
@@ -881,7 +896,7 @@ export default function DashboardScreen() {
           data: { totalHours: number };
         }>('/api/v1/cpd-hours/stats/total', token);
         cpdHours = cpd?.data?.totalHours || 0;
-      } catch (e) { }
+      } catch (e) {}
       let reflectionsCount = 0;
       try {
         const ref = await apiService.get<{ pagination: { total: number } }>(
@@ -889,7 +904,7 @@ export default function DashboardScreen() {
           token
         );
         reflectionsCount = ref?.pagination?.total || 0;
-      } catch (e) { }
+      } catch (e) {}
       let appraisalsCount = 0;
       try {
         const appr = await apiService.get<{ pagination: { total: number } }>(
@@ -897,7 +912,7 @@ export default function DashboardScreen() {
           token
         );
         appraisalsCount = appr?.pagination?.total || 0;
-      } catch (e) { }
+      } catch (e) {}
 
       if (isMounted.current) {
         setStats({
@@ -922,12 +937,24 @@ export default function DashboardScreen() {
         token
       );
       if (res?.data) {
-        const unread = res.data.filter(
-          (n) => n.status === '0' || n.isRead === false
-        ).length;
+        const unread = res.data.filter((n) => {
+          const isRead =
+            n.isRead === true ||
+            n.isRead === 1 ||
+            n.isRead === '1' ||
+            n.status === 1 ||
+            n.status === '1';
+          const isExplicitUnread =
+            n.isRead === false ||
+            n.isRead === 0 ||
+            n.isRead === '0' ||
+            n.status === 0 ||
+            n.status === '0';
+          return isExplicitUnread || !isRead;
+        }).length;
         if (isMounted.current) setUnreadNotifications(unread);
       }
-    } catch (e) { }
+    } catch (e) {}
   };
 
   const formatTimeAgo = (iso?: string) => {
@@ -949,8 +976,10 @@ export default function DashboardScreen() {
       );
       if (res?.data) {
         const mapped = res.data.map((it: any) => ({
+          id: String(it.id ?? ''),
+          type: it.type,
           title: it.title || 'Notification',
-          subtitle: it.message || '',
+          subtitle: it.body || it.message || '',
           time: formatTimeAgo(it.createdAt),
           icon: it.icon || 'notifications',
           iconColor: '#2B5F9E',
@@ -958,7 +987,7 @@ export default function DashboardScreen() {
         }));
         if (isMounted.current) setRecentActivities(mapped);
       }
-    } catch (e) { }
+    } catch (e) {}
   };
 
   const loadSlides = async () => {
@@ -1008,11 +1037,11 @@ export default function DashboardScreen() {
                   JSON.stringify(cached)
                 );
               }
-            } catch (e) { }
+            } catch (e) {}
           }
-        } catch (e) { }
+        } catch (e) {}
       })();
-    } catch (e) { }
+    } catch (e) {}
   };
 
   const onRefresh = async () => {
@@ -1134,7 +1163,7 @@ export default function DashboardScreen() {
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
               <View className="w-12 h-12 rounded-full border-2 border-white/30 items-center justify-center bg-white/20 relative">
-                {(localProfileImage || userData?.image) ? (
+                {localProfileImage || userData?.image ? (
                   <Image
                     source={{ uri: localProfileImage || userData?.image || '' }}
                     className="w-full h-full rounded-full"
@@ -1161,7 +1190,7 @@ export default function DashboardScreen() {
               {unreadNotifications > 0 && (
                 <View className="absolute -top-1 -right-1 bg-red-500 w-5 h-5 rounded-full items-center justify-center border border-white">
                   <Text className="text-white text-[10px] font-bold">
-                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    {Math.min(unreadNotifications, 99)}
                   </Text>
                 </View>
               )}
@@ -1374,8 +1403,22 @@ export default function DashboardScreen() {
               </View>
             ) : (
               activities.map((a, idx) => (
-                <View
+                <Pressable
                   key={idx}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(tabs)/notifications',
+                      params: a.id
+                        ? {
+                            notificationId: String(a.id),
+                            notificationTitle: String(a.title ?? ''),
+                            notificationBody: String(a.subtitle ?? ''),
+                            notificationTime: String(a.time ?? ''),
+                            notificationType: String(a.type ?? ''),
+                          }
+                        : {},
+                    })
+                  }
                   className={`p-4 rounded-2xl border mb-3 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}
                 >
                   <View className="flex-row items-center">
@@ -1397,7 +1440,7 @@ export default function DashboardScreen() {
                       </Text>
                       <Text
                         className="text-xs text-slate-500"
-                        numberOfLines={1}
+                        numberOfLines={2}
                       >
                         {a.subtitle}
                       </Text>
@@ -1406,7 +1449,7 @@ export default function DashboardScreen() {
                       {a.time}
                     </Text>
                   </View>
-                </View>
+                </Pressable>
               ))
             )}
           </View>
