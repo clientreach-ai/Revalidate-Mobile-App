@@ -10,8 +10,8 @@ export const formatTimeAgo = (iso?: string) => {
 export const buildActivityRoute = (activity: any) => {
     const type = String(activity?.type || '');
     const [kind, id] = type.split(':');
-    if ((kind === 'calendar_invite' || kind === 'calendar_response') && id) {
-        return `/(tabs)/calendar/event/${id}`;
+    if ((kind === 'calendar_invite' || kind === 'calendar_response' || kind === 'event') && id) {
+        return `/(tabs)/calendar/${id}`;
     }
     if (kind === 'document') {
         return `/(tabs)/gallery`;
@@ -23,7 +23,10 @@ export const buildActivityRoute = (activity: any) => {
         return `/(tabs)/appraisal/${id}`;
     }
     if (kind === 'work_hours' || kind === 'work_hour') {
-        return `/(tabs)/home`;
+        return id ? `/(tabs)/workinghours/${id}` : `/(tabs)/workinghours/index`;
+    }
+    if (kind === 'cpd' && id) {
+        return `/(tabs)/cpdhourstracking/${id}`;
     }
     return '/(tabs)/home';
 };

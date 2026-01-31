@@ -18,19 +18,26 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
     const setStartTime = useTimerStore(s => s.setStartTime);
     const setAccumulatedMs = useTimerStore(s => s.setAccumulatedMs);
     const setElapsedMs = useTimerStore(s => s.setElapsedMs);
-    const storePause = useTimerStore(s => s.pause);
     const storeResume = useTimerStore(s => s.resume);
     const resetStore = useTimerStore(s => s.reset);
 
     const isMounted = useRef(true);
     const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+    // State from persistent store
+    const activeSession = useTimerStore(s => s.activeSession);
+    const storeStatus = useTimerStore(s => s.status);
+    const storeStartTime = useTimerStore(s => s.startTime);
+    const storeAccumulatedMs = useTimerStore(s => s.accumulatedMs);
+    const storePausedAt = useTimerStore(s => s.pausedAt);
+
+    // Mapped helpers
+    const isPaused = storeStatus === 'paused';
+    const totalPausedTime = storeAccumulatedMs;
+    const pausedAt = storePausedAt ? new Date(storePausedAt) : null;
+
     const [activeSessionLoaded, setActiveSessionLoaded] = useState(false);
     const [timer, setTimer] = useState({ hours: 0, minutes: 0, seconds: 0 });
-    const [isPaused, setIsPaused] = useState(false);
-    const [pausedAt, setPausedAt] = useState<Date | null>(null);
-    const [totalPausedTime, setTotalPausedTime] = useState(0);
 
     useEffect(() => {
         isMounted.current = true;
@@ -44,14 +51,17 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
         session: ActiveSession | null = activeSession,
         pausedMs: number = totalPausedTime
     ) => {
-        if (!session || !session.isActive || session.isPaused) return;
-        const elapsedMs = TimerService.calculateElapsed(session.startTime, pausedMs);
+        if (!session || !session.isActive) return;
+
+        const elapsedMs = session.isPaused
+            ? TimerService.calculateElapsedBetween(session.startTime, session.pausedAt || new Date().toISOString(), pausedMs)
+            : TimerService.calculateElapsed(session.startTime, pausedMs);
+
         const totalSeconds = Math.floor(elapsedMs / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
 
-        // Use functional update to avoid unnecessary re-renders if values are the same
         setTimer(prev => {
             if (prev.hours === hours && prev.minutes === minutes && prev.seconds === seconds) return prev;
             return { hours, minutes, seconds };
@@ -64,11 +74,6 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
                 if (isMounted.current) {
-                    setActiveSession(null);
-                    setTimer({ hours: 0, minutes: 0, seconds: 0 });
-                    setIsPaused(false);
-                    setPausedAt(null);
-                    setTotalPausedTime(0);
                     resetStore();
                     setActiveSessionLoaded(true);
                 }
@@ -85,33 +90,22 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 const sessionId = session.id.toString();
 
                 if (storeActiveSessionId === sessionId) {
-                    console.log('[useActiveSession] Local store is authoritative. Ignoring server time data.');
-                    // Only sync metadata if needed, but for now we trust local completely for timer.
-                    setActiveSession(session);
-                    // Do NOT overwrite local timer state (isPaused, pausedAt etc) from server.
-                    // Instead, we might want to sync local state FROM store if they drifted?
-                    // Actually, if store is authoritative, we should just let the store drive.
+                    console.log('[useActiveSession] Local store is authoritative. Updating metadata only.');
+                    // Update metadata but keep the timer state (store is authoritative)
+                    useTimerStore.getState().setActiveSession(session);
                 } else {
-                    console.log('[useActiveSession] Hydrating from server data (New Session/Restart)');
-                    setActiveSession(session);
-                    setIsPaused(session.isPaused || false);
-                    setTotalPausedTime(session.totalPausedMs || 0);
-                    setPausedAt(session.pausedAt ? new Date(TimerService.parseSafeDate(session.pausedAt)) : null);
-
+                    console.log('[useActiveSession] Hydrating from server data (New Session/Different Session)');
                     setSessionData({
                         id: sessionId,
                         startTime: session.startTime,
                         accumulatedMs: session.totalPausedMs || 0,
                         pausedAt: session.pausedAt,
-                        status: session.isPaused ? 'paused' : 'running'
+                        status: session.isPaused ? 'paused' : 'running',
+                        activeSession: session
                     });
                 }
             } else {
                 if (isMounted.current) {
-                    setActiveSession(null);
-                    setIsPaused(false);
-                    setPausedAt(null);
-                    setTotalPausedTime(0);
                     resetStore();
                 }
             }
@@ -132,10 +126,6 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 }
                 if (isMounted.current) {
                     setTimer({ hours: 0, minutes: 0, seconds: 0 });
-                    setIsPaused(false);
-                    setPausedAt(null);
-                    setTotalPausedTime(0);
-                    resetStore();
                 }
             }
             return;
@@ -149,10 +139,11 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 timerIntervalRef.current = null;
             }
 
+            const effectivePausedAt = storePausedAt || activeSession.pausedAt || new Date().toISOString();
             const elapsedMs = TimerService.calculateElapsedBetween(
                 activeSession.startTime,
-                pausedAt ? pausedAt.toISOString() : (activeSession.pausedAt || Date.now()),
-                totalPausedTime // Use local referenced total time
+                effectivePausedAt,
+                totalPausedTime
             );
 
             const totalSeconds = Math.floor(elapsedMs / 1000);
@@ -165,10 +156,8 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 return { hours: h, minutes: m, seconds: s };
             });
 
-            // Critical: Only update store if elapsedMs changed significantly (e.g. > 100ms) 
-            // to avoid minor fluctuations triggering re-renders
             setElapsedMs(elapsedMs);
-            setStatus('paused');
+            if (storeStatus !== 'paused') setStatus('paused');
         } else {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
 
@@ -191,8 +180,9 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 }
             };
 
-            setStatus('running');
-            setStartTime(activeSession.startTime);
+            if (storeStatus !== 'running') setStatus('running');
+            if (storeStartTime !== activeSession.startTime) setStartTime(activeSession.startTime);
+
             updateTick();
             timerIntervalRef.current = setInterval(updateTick, 1000) as any;
         }
@@ -203,7 +193,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 timerIntervalRef.current = null;
             }
         };
-    }, [activeSession, activeSessionLoaded, isPaused, totalPausedTime, setStatus, setStartTime, setElapsedMs, resetStore]);
+    }, [activeSession, activeSessionLoaded, isPaused, storePausedAt, totalPausedTime, storeStatus, storeStartTime, setStatus, setStartTime, setElapsedMs]);
 
     const handleStartSession = async () => {
         try {
@@ -223,17 +213,17 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 token
             );
             if (response?.data) {
+                const session = response.data;
                 if (isMounted.current) {
-                    setActiveSession(response.data);
-                    setIsPaused(false);
-                    setPausedAt(null);
-                    setTotalPausedTime(0);
-
-                    setStatus('running');
-                    setStartTime(response.data.startTime);
-                    setAccumulatedMs(0);
+                    setSessionData({
+                        id: session.id.toString(),
+                        startTime: session.startTime,
+                        accumulatedMs: 0,
+                        status: 'running',
+                        activeSession: session
+                    });
                 }
-                updateTimerFromSession(response.data, 0);
+                updateTimerFromSession(session, 0);
                 showToast.success('Clinical session started', 'Success');
             }
         } catch (error: any) {
@@ -245,16 +235,14 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
     const handlePauseSession = async () => {
         if (!activeSession || isPaused) return;
 
-        // Optimistic Update
-        const pauseTime = new Date();
-        const prevIsPaused = isPaused;
+        const pauseTime = new Date().toISOString();
+        const prevStatus = storeStatus;
         const prevAccumulatedMs = totalPausedTime;
 
-        // Immediately update local state & Store
-        setIsPaused(true);
-        setPausedAt(pauseTime);
-        setActiveSession(prev => prev ? { ...prev, isPaused: true, pausedAt: pauseTime.toISOString() } : null);
-        storePause(); // Update Global Store
+        // Optimistic update to store
+        useTimerStore.getState().pause(); // This sets status to 'paused' and pausedAt to now
+        useTimerStore.getState().setActiveSession({ ...activeSession, isPaused: true, pausedAt: pauseTime });
+
         showToast.info('Session paused', 'Paused');
 
         try {
@@ -264,17 +252,14 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
             await apiService.post<{
                 success: boolean;
                 data: ActiveSession;
-            }>(API_ENDPOINTS.WORK_HOURS.PAUSE, { paused_at: pauseTime.toISOString() }, token);
-
-            // STRICT CLIENT AUTHORITY:
-            // Server response is ignored for UI state. We trust our optimistic update.
+            }>(API_ENDPOINTS.WORK_HOURS.PAUSE, { paused_at: pauseTime }, token);
         } catch (error: any) {
-            // Revert optimistic update on failure
+            // Revert on failure
             if (isMounted.current) {
-                setIsPaused(prevIsPaused);
-                setPausedAt(null);
-                setTotalPausedTime(prevAccumulatedMs);
-                setStatus('running');
+                setStatus(prevStatus);
+                setAccumulatedMs(prevAccumulatedMs);
+                useTimerStore.getState().setStartTime(activeSession.startTime);
+                useTimerStore.getState().setActiveSession(activeSession);
             }
             showToast.error(error?.message || 'Failed to pause session');
         }
@@ -283,25 +268,20 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
     const handleResumeSession = async () => {
         if (!activeSession || !isPaused || !pausedAt) return;
 
-        // Optimistic Update
         const resumeTime = new Date();
-        // Calculate pending pause duration to add to total
         const currentPauseDuration = Math.max(0, resumeTime.getTime() - pausedAt.getTime());
         const prevTotalPaused = totalPausedTime;
-        const prevPausedAt = pausedAt;
+        const prevStatus = storeStatus;
 
-        // Immediately update local state & Store
-        setIsPaused(false);
-        setPausedAt(null); // Clear pausedAt
-        setTotalPausedTime(prev => prev + currentPauseDuration);
-        setActiveSession(prev => prev ? {
-            ...prev,
+        // Optimistic update to store
+        storeResume();
+        useTimerStore.getState().setActiveSession({
+            ...activeSession,
             isPaused: false,
             pausedAt: null,
-            totalPausedMs: (prev.totalPausedMs || 0) + currentPauseDuration
-        } : null);
+            totalPausedMs: (activeSession.totalPausedMs || 0) + currentPauseDuration
+        });
 
-        storeResume(); // Update Global Store
         showToast.info('Session resumed', 'Resumed');
 
         try {
@@ -312,17 +292,13 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                 success: boolean;
                 data: ActiveSession;
             }>(API_ENDPOINTS.WORK_HOURS.RESUME, { resumed_at: resumeTime.toISOString() }, token);
-
-            // STRICT CLIENT AUTHORITY:
-            // Server response is ignored for UI state. We trust our optimistic update.
         } catch (error: any) {
-            // Revert optimistic update
+            // Revert
             if (isMounted.current) {
-                setIsPaused(true);
-                setPausedAt(prevPausedAt);
-                setTotalPausedTime(prevTotalPaused);
-                setStatus('paused');
+                setStatus(prevStatus);
                 setAccumulatedMs(prevTotalPaused);
+                useTimerStore.getState().setStartTime(activeSession.startTime);
+                useTimerStore.getState().setActiveSession(activeSession);
             }
             showToast.error(error?.message || 'Failed to resume session');
         }
@@ -354,17 +330,13 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                             if (response?.data) {
                                 if (isMounted.current) {
                                     setTimer({ hours: 0, minutes: 0, seconds: 0 });
-                                    setActiveSession(response.data);
-                                    setIsPaused(false);
-                                    setPausedAt(null);
-                                    setTotalPausedTime(0);
-
                                     setSessionData({
                                         id: response.data.id.toString(),
                                         startTime: response.data.startTime,
                                         accumulatedMs: 0,
                                         pausedAt: null,
-                                        status: 'running'
+                                        status: 'running',
+                                        activeSession: response.data
                                     });
                                 }
                                 showToast.success('Session restarted', 'Success');
@@ -403,7 +375,6 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                                 token
                             );
                             if (isMounted.current) {
-                                setActiveSession(null);
                                 resetStore();
                             }
                             showToast.success('Session ended');
@@ -434,6 +405,6 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
         handleResumeSession,
         handleRestartSession,
         handleStopSession,
-        setActiveSession,
+        setActiveSession: (s: ActiveSession | null) => useTimerStore.getState().setActiveSession(s),
     };
 };
