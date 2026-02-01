@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useSubscriptionStore } from '@/features/subscription/subscription.store';
@@ -17,7 +17,6 @@ import { useStripe } from '@/services/stripe';
 let isStripeAvailable = Platform.OS !== 'web';
 
 export default function SubscriptionScreen() {
-  const router = useRouter();
   const { isDark } = useThemeStore();
   const [isPremium, setIsPremium] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('free');

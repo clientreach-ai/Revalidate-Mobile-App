@@ -19,7 +19,7 @@ export const CategoryCard = ({ category, isDark, onPress, fullWidth = false }: C
             style={{ width: fullWidth ? '100%' : '47%' }}
         >
             {isGeneralFullWidth ? (
-                <View className="flex-row justify-center items-center">
+                <View className="flex-row justify-start items-center">
                     <View className={`w-12 h-12 rounded-2xl ${category.iconBgColor} items-center justify-center`}>
                         <MaterialIcons
                             name={category.icon}
