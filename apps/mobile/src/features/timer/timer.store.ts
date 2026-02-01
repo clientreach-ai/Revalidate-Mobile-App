@@ -34,8 +34,8 @@ interface TimerStore {
   setElapsedMs: (ms: number) => void;
   setActiveSession: (session: ActiveSession | null) => void;
 
-  pause: () => void;
-  resume: () => void;
+  pause: (pausedAt?: string) => void;
+  resume: (resumedAt?: string) => void;
   reset: () => void;
 }
 
@@ -71,28 +71,32 @@ export const useTimerStore = create<TimerStore>()(
       setElapsedMs: (elapsedMs) => set({ elapsedMs }),
       setActiveSession: (activeSession) => set({ activeSession }),
 
-      pause: () => {
-        const { status } = get();
-        if (status !== 'running') return;
+      pause: (pausedAt) => {
+        const { status, startTime, activeSessionId } = get();
+        if (status === 'paused') return;
+        if (!startTime && !activeSessionId) return;
 
         set({
           status: 'paused',
-          pausedAt: new Date().toISOString(),
+          pausedAt: pausedAt ?? new Date().toISOString(),
         });
       },
 
-      resume: () => {
+      resume: (resumedAt) => {
         const { status, pausedAt, accumulatedMs } = get();
-        if (status !== 'paused' || !pausedAt) return;
+        if (status !== 'paused') return;
 
-        const now = Date.now();
-        const pauseStart = new Date(pausedAt).getTime();
-        const pauseDuration = Math.max(0, now - pauseStart);
+        const resumeTs = resumedAt ? new Date(resumedAt).getTime() : Date.now();
+        const pauseStart = pausedAt ? new Date(pausedAt).getTime() : NaN;
+        const pauseDuration = Number.isFinite(pauseStart)
+          ? Math.max(0, resumeTs - pauseStart)
+          : 0;
+        const safeAccum = Number.isFinite(accumulatedMs) ? accumulatedMs : 0;
 
         set({
           status: 'running',
           pausedAt: null,
-          accumulatedMs: accumulatedMs + pauseDuration,
+          accumulatedMs: safeAccum + pauseDuration,
         });
       },
 

@@ -142,6 +142,24 @@ export const useWorkSessionForm = (activeSession: ActiveSession | null, onSucces
             return;
         }
 
+        const hoursTrimmed = hours.trim();
+        let durationMinutes = 0;
+
+        if (hoursTrimmed.includes(':')) {
+            const [hStr, mStr] = hoursTrimmed.split(':');
+            const h = Number(hStr);
+            const m = Number(mStr);
+            durationMinutes = Math.round((Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0));
+        } else {
+            const h = parseFloat(hoursTrimmed);
+            durationMinutes = Math.round((Number.isFinite(h) ? h : 0) * 60);
+        }
+
+        if (durationMinutes <= 0) {
+            showToast.error('Duration must be greater than 0');
+            return;
+        }
+
         try {
             if (isMounted.current) setIsSavingWork(true);
             const token = await AsyncStorage.getItem('authToken');
@@ -156,7 +174,7 @@ export const useWorkSessionForm = (activeSession: ActiveSession | null, onSucces
                 start_time: startTimeDate.toISOString(),
                 location: selectedHospital.name,
                 shift_type: workingMode,
-                duration_minutes: Math.round(parseFloat(hours) * 60),
+                duration_minutes: durationMinutes,
                 hourly_rate: parseFloat(rate),
                 work_description: description,
                 work_setting: workSetting,
@@ -183,7 +201,15 @@ export const useWorkSessionForm = (activeSession: ActiveSession | null, onSucces
     }, [selectedHospital, hours, workSetting, scope, rate, activeSession, selectedDate, workingMode, description, documents, onSuccess]);
 
     const openFormWithDefaults = useCallback((timerHours: string) => {
-        setHours(timerHours);
+        if (timerHours.includes(':')) {
+            const [hStr, mStr] = timerHours.split(':');
+            const h = Number(hStr);
+            const m = Number(mStr);
+            const decimal = (Number.isFinite(h) ? h : 0) + (Number.isFinite(m) ? m : 0) / 60;
+            setHours(decimal.toFixed(2));
+        } else {
+            setHours(timerHours);
+        }
         setWorkingMode('Full time');
         setSelectedDate(new Date());
         setShowWorkForm(true);

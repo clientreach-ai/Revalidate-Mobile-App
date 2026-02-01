@@ -240,7 +240,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
         const prevAccumulatedMs = totalPausedTime;
 
         // Optimistic update to store
-        useTimerStore.getState().pause(); // This sets status to 'paused' and pausedAt to now
+        useTimerStore.getState().pause(pauseTime); // This sets status to 'paused' and pausedAt to now
         useTimerStore.getState().setActiveSession({ ...activeSession, isPaused: true, pausedAt: pauseTime });
 
         showToast.info('Session paused', 'Paused');
@@ -266,15 +266,18 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
     };
 
     const handleResumeSession = async () => {
-        if (!activeSession || !isPaused || !pausedAt) return;
+        if (!activeSession || !isPaused) return;
+
+        const pausedAtIso = useTimerStore.getState().pausedAt || activeSession.pausedAt;
+        if (!pausedAtIso) return;
 
         const resumeTime = new Date();
-        const currentPauseDuration = Math.max(0, resumeTime.getTime() - pausedAt.getTime());
+        const currentPauseDuration = Math.max(0, resumeTime.getTime() - new Date(pausedAtIso).getTime());
         const prevTotalPaused = totalPausedTime;
         const prevStatus = storeStatus;
 
         // Optimistic update to store
-        storeResume();
+        useTimerStore.getState().resume(resumeTime.toISOString());
         useTimerStore.getState().setActiveSession({
             ...activeSession,
             isPaused: false,

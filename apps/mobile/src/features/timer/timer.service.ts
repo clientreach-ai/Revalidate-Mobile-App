@@ -139,10 +139,11 @@ export const TimerService = {
   },
 
   calculateElapsedBetween(startTime: string | null, endTime: string | number | null, accumulatedMs: number): number {
-    if (!startTime) return accumulatedMs;
+    if (!startTime) return Number.isFinite(accumulatedMs) ? accumulatedMs : 0;
     const start = this.parseSafeDate(startTime);
     const end = typeof endTime === 'number' ? endTime : this.parseSafeDate(endTime);
-    return Math.max(0, end - start - accumulatedMs);
+    const safeAccum = Number.isFinite(accumulatedMs) ? accumulatedMs : 0;
+    return Math.max(0, end - start - safeAccum);
   },
 
   calculateElapsed(startTime: string | null, accumulatedMs: number): number {
