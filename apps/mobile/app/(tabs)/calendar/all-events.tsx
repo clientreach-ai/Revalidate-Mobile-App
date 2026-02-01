@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useCalendar } from '@/hooks/useCalendar';
 import { searchUsers } from '@/features/users/users.api';
@@ -16,6 +16,18 @@ export default function AllEventsScreen() {
   const { isDark } = useThemeStore();
   const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, inviteAttendees } = useCalendar();
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
+
+  // Refresh when screen comes into focus
+  const hasRefreshedOnFocus = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (hasRefreshedOnFocus.current) {
+        refresh();
+      } else {
+        hasRefreshedOnFocus.current = true;
+      }
+    }, [refresh])
+  );
 
   // Modal State
   const [showAddEventModal, setShowAddEventModal] = useState(false);
@@ -109,6 +121,8 @@ export default function AllEventsScreen() {
       endTime: event.endTime || '',
       type: event.type,
       date: new Date(event.date),
+      createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
     }))
     .filter((event) => {
       if (activeFilter === 'all') return true;
@@ -117,11 +131,16 @@ export default function AllEventsScreen() {
       return true;
     })
     .sort((a, b) => {
-      // Sort by date descending (latest date first)
+      // Sort by created date descending (newest created first)
+      const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (createdA !== createdB) return createdB - createdA;
+
+      // Fallback to event date descending
       const dateDiff = b.date.getTime() - a.date.getTime();
       if (dateDiff !== 0) return dateDiff;
 
-      // If dates are same, sort by startTime descending (latest time first)
+      // If dates are same, sort by startTime descending
       const timeA = a.startTime || '';
       const timeB = b.startTime || '';
       return timeB.localeCompare(timeA);

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { useSubscriptionStore } from '@/features/subscription/subscription.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
-import { setSubscriptionInfo } from '@/utils/subscription';
+import { setSubscriptionInfo, clearSubscriptionCache } from '@/utils/subscription';
 import '../../global.css';
 
 import { useStripe } from '@/services/stripe';
@@ -23,6 +24,7 @@ export default function SubscriptionScreen() {
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,6 +34,7 @@ export default function SubscriptionScreen() {
     expMonth: number;
     expYear: number;
   } | null>(null);
+  const setSubscriptionInfoStore = useSubscriptionStore((state) => state.setSubscriptionInfo);
 
   const stripe = useStripe();
   const initPaymentSheet = stripe?.initPaymentSheet || (async () => ({ error: { message: "Stripe not available" } }));
@@ -79,7 +82,7 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const loadSubscriptionStatus = async () => {
+  const loadSubscriptionStatus = async (forceRefresh: boolean = false) => {
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
@@ -94,7 +97,7 @@ export default function SubscriptionScreen() {
           subscriptionStatus: string | null;
           trialEndsAt: string | null;
         };
-      }>(API_ENDPOINTS.USERS.ME, token);
+      }>(API_ENDPOINTS.USERS.ME, token, forceRefresh);
 
       if (response?.data) {
         const isPremiumUser = response.data.subscriptionTier === 'premium';
@@ -102,12 +105,15 @@ export default function SubscriptionScreen() {
         setSubscriptionStatus(response.data.subscriptionStatus || 'free');
         setTrialEndsAt(response.data.trialEndsAt || null);
 
-        await setSubscriptionInfo({
+        const info = {
           subscriptionTier: (response.data.subscriptionTier || 'free') as 'free' | 'premium',
           subscriptionStatus: (response.data.subscriptionStatus || 'active') as 'active' | 'trial' | 'expired' | 'cancelled',
           isPremium: isPremiumUser,
           canUseOffline: isPremiumUser,
-        });
+        };
+
+        await setSubscriptionInfo(info);
+        setSubscriptionInfoStore(info as any);
       }
     } catch (error) {
       console.error('Error loading subscription status:', error);
@@ -129,7 +135,10 @@ export default function SubscriptionScreen() {
       if (error) {
         showToast.error(error.message || "Failed to initialize payment", "Error");
         setIsProcessingPayment(false);
+        return;
       }
+
+      setIsProcessingPayment(false);
     } catch (error: any) {
       showToast.error(error.message || "Failed to initialize payment", "Error");
       setIsProcessingPayment(false);
@@ -171,6 +180,7 @@ export default function SubscriptionScreen() {
       if (paymentResponse?.data?.clientSecret) {
         setPaymentIntentId(paymentResponse.data.paymentIntentId || paymentResponse.data.subscriptionId || null);
         setClientSecret(paymentResponse.data.clientSecret);
+        setIsProcessingPayment(false);
         // Payment sheet will be initialized via useEffect
       } else {
         throw new Error("Failed to create payment intent");
@@ -237,6 +247,9 @@ export default function SubscriptionScreen() {
         : "Payment processing failed. Please try again.";
       showToast.error(errorMessage, "Payment Error");
       setIsProcessingPayment(false);
+      return;
+    } finally {
+      setIsProcessingPayment(false);
     }
   }, [clientSecret, paymentIntentId, presentPaymentSheet]);
 
@@ -253,13 +266,47 @@ export default function SubscriptionScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await loadSubscriptionStatus();
+      await loadSubscriptionStatus(true);
     } catch (error) {
       console.error('Error refreshing subscription:', error);
     } finally {
       setRefreshing(false);
     }
   };
+
+  const openBillingPortal = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      if (!token) {
+        showToast.error('Please log in again', 'Error');
+        return;
+      }
+
+      const response = await apiService.post<{
+        success: boolean;
+        data: { url: string } | null;
+        message?: string;
+      }>(API_ENDPOINTS.PAYMENT.PORTAL, {}, token);
+
+      const url = response?.data?.url;
+      if (!url) {
+        showToast.info(response?.message || 'No billing portal available', 'Info');
+        return;
+      }
+
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        showToast.error('Unable to open billing portal', 'Error');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error
+        ? error.message
+        : 'Failed to open billing portal';
+      showToast.error(errorMessage, 'Error');
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -635,7 +682,7 @@ export default function SubscriptionScreen() {
               </Text>
               <View className="gap-3">
                 <Pressable
-                  onPress={() => showToast.info("Feature to update payment method coming soon", "Coming Soon")}
+                  onPress={openBillingPortal}
                   className={`flex-row items-center justify-between p-4 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-50"
                     }`}
                 >
@@ -657,7 +704,7 @@ export default function SubscriptionScreen() {
                   <MaterialIcons name="chevron-right" size={20} color={isDark ? "#64748B" : "#94A3B8"} />
                 </Pressable>
                 <Pressable
-                  onPress={() => showToast.info("Billing history coming soon", "Coming Soon")}
+                  onPress={openBillingPortal}
                   className={`flex-row items-center justify-between p-4 rounded-xl ${isDark ? "bg-slate-700" : "bg-slate-50"
                     }`}
                 >
@@ -670,15 +717,58 @@ export default function SubscriptionScreen() {
                   <MaterialIcons name="chevron-right" size={20} color={isDark ? "#64748B" : "#94A3B8"} />
                 </Pressable>
                 <Pressable
-                  onPress={async () => {
-                    // TODO: Implement cancel subscription API call
-                    showToast.info("Cancel subscription feature coming soon", "Info");
+                  onPress={() => {
+                    Alert.alert(
+                      'Cancel Subscription',
+                      'Are you sure you want to cancel your subscription? Your premium access will end immediately.',
+                      [
+                        { text: 'Keep Subscription', style: 'cancel' },
+                        {
+                          text: 'Cancel',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              setIsCancelling(true);
+                              const token = await AsyncStorage.getItem('authToken');
+                              if (!token) {
+                                showToast.error('Please log in again', 'Error');
+                                return;
+                              }
+
+                              await apiService.post(
+                                API_ENDPOINTS.PAYMENT.CANCEL_SUBSCRIPTION,
+                                {},
+                                token
+                              );
+
+                              await clearSubscriptionCache();
+                              setSubscriptionInfoStore({
+                                subscriptionTier: 'free',
+                                subscriptionStatus: 'cancelled',
+                                isPremium: false,
+                                canUseOffline: false,
+                              });
+                              showToast.success('Subscription cancelled', 'Success');
+                              await loadSubscriptionStatus(true);
+                            } catch (error: unknown) {
+                              const errorMessage = error instanceof Error
+                                ? error.message
+                                : 'Failed to cancel subscription';
+                              showToast.error(errorMessage, 'Error');
+                            } finally {
+                              setIsCancelling(false);
+                            }
+                          },
+                        },
+                      ]
+                    );
                   }}
-                  className="flex-row items-center justify-between p-4 bg-red-50 rounded-xl"
+                  disabled={isCancelling}
+                  className={`flex-row items-center justify-between p-4 rounded-xl ${isCancelling ? 'bg-red-100' : 'bg-red-50'}`}
                 >
                   <View className="flex-row items-center gap-3">
                     <MaterialIcons name="cancel" size={24} color="#DC2626" />
-                    <Text className="text-red-600 font-medium">Cancel Subscription</Text>
+                    <Text className="text-red-600 font-medium">{isCancelling ? 'Cancelling...' : 'Cancel Subscription'}</Text>
                   </View>
                   <MaterialIcons name="chevron-right" size={20} color="#DC2626" />
                 </Pressable>

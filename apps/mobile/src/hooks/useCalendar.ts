@@ -127,6 +127,12 @@ export function useCalendar() {
     }
   }, []);
 
+  const refresh = useCallback(
+    (params?: { startDate?: string; endDate?: string; type?: 'official' | 'personal' }) =>
+      fetchEvents(params, false, true),
+    [fetchEvents]
+  );
+
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
@@ -135,7 +141,7 @@ export function useCalendar() {
     events,
     isLoading,
     isRefreshing,
-    refresh: (params?: { startDate?: string; endDate?: string; type?: 'official' | 'personal' }) => fetchEvents(params, false, true),
+    refresh,
     createEvent,
     updateEvent,
     deleteEvent: removeEvent,

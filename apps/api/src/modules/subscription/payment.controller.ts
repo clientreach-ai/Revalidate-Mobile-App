@@ -104,8 +104,18 @@ export const confirmPaymentHandler = asyncHandler(async (req: Request, res: Resp
     }
 
     // Update user subscription based on subscription status
-    const status = subscription.status === 'active' || subscription.status === 'trialing' ? 'active' : 'inactive';
-    await updateUsersWithFallback(parseInt(req.user.userId), { subscription_tier: 'premium', subscription_status: status as any }, false);
+    const status = subscription.status === 'trialing'
+      ? 'trial'
+      : subscription.status === 'active'
+        ? 'active'
+        : subscription.status === 'canceled'
+          ? 'cancelled'
+          : 'expired';
+    await updateUsersWithFallback(
+      parseInt(req.user.userId),
+      { subscription_tier: 'premium', subscription_status: status as any },
+      false
+    );
 
     res.json({
       success: true,
@@ -298,6 +308,135 @@ export const getPaymentDetails = asyncHandler(async (req: Request, res: Response
       last4: defaultMethod.card?.last4,
       expMonth: defaultMethod.card?.exp_month,
       expYear: defaultMethod.card?.exp_year,
+    },
+  });
+});
+
+/**
+ * Create Stripe customer portal session
+ * POST /api/v1/payment/portal
+ */
+export const createCustomerPortalSessionHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  if (!stripe) {
+    throw new ApiError(500, 'Stripe is not initialized');
+  }
+
+  const returnUrl = process.env.STRIPE_PORTAL_RETURN_URL || process.env.API_BASE_URL || '';
+  if (!returnUrl) {
+    throw new ApiError(500, 'Stripe portal return URL is not configured');
+  }
+
+  const { prisma } = await import('../../lib/prisma');
+  const user = await prisma.users.findUnique({
+    where: { id: parseInt(req.user.userId) },
+    select: { email: true },
+  });
+
+  if (!user?.email) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  const customers = await stripe.customers.list({
+    email: user.email,
+    limit: 1,
+  });
+
+  if (customers.data.length === 0) {
+    return res.json({
+      success: true,
+      data: null,
+      message: 'No customer found',
+    });
+  }
+
+  const customer = customers.data[0];
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customer.id,
+    return_url: returnUrl,
+  });
+
+  res.json({
+    success: true,
+    data: {
+      url: session.url,
+    },
+  });
+});
+
+/**
+ * Cancel subscription
+ * POST /api/v1/payment/cancel-subscription
+ */
+export const cancelSubscriptionHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new ApiError(401, 'Authentication required');
+  }
+
+  if (!stripe) {
+    throw new ApiError(500, 'Stripe is not initialized');
+  }
+
+  const { prisma } = await import('../../lib/prisma');
+  const user = await prisma.users.findUnique({
+    where: { id: parseInt(req.user.userId) },
+    select: { email: true },
+  });
+
+  if (!user?.email) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  const customers = await stripe.customers.list({
+    email: user.email,
+    limit: 1,
+  });
+
+  if (customers.data.length === 0) {
+    await updateUsersWithFallback(parseInt(req.user.userId), { subscription_tier: 'free', subscription_status: 'cancelled' as any }, false);
+    return res.json({
+      success: true,
+      data: {
+        cancelled: false,
+        message: 'No active subscription found',
+      },
+    });
+  }
+
+  const customer = customers.data[0];
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customer.id,
+    status: 'all',
+    limit: 10,
+  });
+
+  const activeSubscription = subscriptions.data.find(s =>
+    s.status === 'active' || s.status === 'trialing' || s.status === 'past_due'
+  );
+
+  if (!activeSubscription) {
+    await updateUsersWithFallback(parseInt(req.user.userId), { subscription_tier: 'free', subscription_status: 'cancelled' as any }, false);
+    return res.json({
+      success: true,
+      data: {
+        cancelled: false,
+        message: 'No active subscription found',
+      },
+    });
+  }
+
+  const cancelled = await stripe.subscriptions.cancel(activeSubscription.id);
+  await updateUsersWithFallback(parseInt(req.user.userId), { subscription_tier: 'free', subscription_status: 'cancelled' as any }, false);
+
+  res.json({
+    success: true,
+    data: {
+      cancelled: true,
+      subscriptionId: cancelled.id,
+      status: cancelled.status,
     },
   });
 });

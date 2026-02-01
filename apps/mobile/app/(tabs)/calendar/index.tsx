@@ -177,6 +177,16 @@ export default function CalendarScreen() {
     })
     .filter((row): row is { event: CalendarEvent; attendee: any } => row !== null);
 
+  const eventDateKeys = React.useMemo(() => {
+    const keys = new Set<string>();
+    events.forEach((event) => {
+      if (!event?.date) return;
+      const key = String(event.date).split('T')[0];
+      if (key) keys.add(key);
+    });
+    return keys;
+  }, [events]);
+
   useEffect(() => {
     if (showInvitesModal && !isLoading) {
       refresh();
@@ -275,6 +285,7 @@ export default function CalendarScreen() {
           currentDate={currentDate}
           selectedDate={selectedDate}
           calendarDays={calendarDaysProps}
+          eventDateKeys={eventDateKeys}
           isDark={isDark}
           onDateSelect={setSelectedDate}
           onPrevMonth={() => navigateMonth('prev')}

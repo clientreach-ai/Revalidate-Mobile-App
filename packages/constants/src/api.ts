@@ -68,6 +68,8 @@ export const API_ENDPOINTS = {
     CONFIRM: '/api/v1/payment/confirm',
     CREATE_SESSION: '/api/v1/payment/create-session',
     STATUS: '/api/v1/payment/status',
+    CANCEL_SUBSCRIPTION: '/api/v1/payment/cancel-subscription',
+    PORTAL: '/api/v1/payment/portal',
     METHODS: '/api/v1/payment/methods',
   },
   WORK_HOURS: {

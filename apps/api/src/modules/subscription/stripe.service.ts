@@ -261,7 +261,13 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         const subscription = event.data.object as Stripe.Subscription;
         const subUserId = subscription.metadata?.userId;
         if (subUserId) {
-          const status = subscription.status === 'active' || subscription.status === 'trialing' ? 'active' : 'inactive';
+          const status = subscription.status === 'trialing'
+            ? 'trial'
+            : subscription.status === 'active'
+              ? 'active'
+              : subscription.status === 'canceled'
+                ? 'cancelled'
+                : 'expired';
           await updateUsersWithFallback(parseInt(subUserId), { subscription_tier: 'premium', subscription_status: status as any }, false);
           logger.info(`User ${subUserId} subscription ${subscription.status} - subscription ${subscription.id}`);
         }

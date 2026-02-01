@@ -6,6 +6,8 @@ import {
   handleWebhook,
   getPaymentStatus,
   getPaymentDetails,
+  cancelSubscriptionHandler,
+  createCustomerPortalSessionHandler,
 } from '../modules/subscription/payment.controller';
 import { authenticateToken } from '../modules/auth/auth.middleware';
 
@@ -21,5 +23,7 @@ router.post('/confirm', authenticateToken, confirmPaymentHandler);
 router.post('/create-session', authenticateToken, createCheckoutSessionHandler);
 router.get('/status/:paymentIntentId', authenticateToken, getPaymentStatus);
 router.get('/methods', authenticateToken, getPaymentDetails);
+router.post('/portal', authenticateToken, createCustomerPortalSessionHandler);
+router.post('/cancel-subscription', authenticateToken, cancelSubscriptionHandler);
 
 export default router;

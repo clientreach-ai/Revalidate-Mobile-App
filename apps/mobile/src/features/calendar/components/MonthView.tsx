@@ -6,6 +6,7 @@ interface MonthViewProps {
     currentDate: Date;
     selectedDate: Date;
     calendarDays: Array<{ date: Date; isCurrentMonth: boolean }>;
+    eventDateKeys?: Set<string>;
     isDark: boolean;
     onDateSelect: (date: Date) => void;
     onPrevMonth: () => void;
@@ -19,6 +20,13 @@ const monthNames = [
 
 const dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
+const toDateKey = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
 const isSameDay = (date1: Date, date2: Date) => {
     return (
         date1.getDate() === date2.getDate() &&
@@ -31,6 +39,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
     currentDate,
     selectedDate,
     calendarDays,
+    eventDateKeys,
     isDark,
     onDateSelect,
     onPrevMonth,
@@ -78,6 +87,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
                     {calendarDays.map((day, index) => {
                         const isSelected = isSameDay(day.date, selectedDate);
                         const isCurrentMonth = day.isCurrentMonth;
+                        const hasEvent = eventDateKeys ? eventDateKeys.has(toDateKey(day.date)) : false;
 
                         return (
                             <Pressable
@@ -96,14 +106,21 @@ export const MonthView: React.FC<MonthViewProps> = ({
                                             <View className="absolute -bottom-1 w-1 h-1 bg-[#2B5F9E] rounded-full" />
                                         </>
                                     ) : (
-                                        <Text
-                                            className={`text-sm font-medium ${isCurrentMonth
-                                                ? (isDark ? 'text-white' : 'text-slate-800')
-                                                : (isDark ? 'text-gray-500' : 'text-slate-300')
-                                                }`}
-                                        >
-                                            {day.date.getDate()}
-                                        </Text>
+                                        <>
+                                            <Text
+                                                className={`text-sm font-medium ${isCurrentMonth
+                                                    ? (isDark ? 'text-white' : 'text-slate-800')
+                                                    : (isDark ? 'text-gray-500' : 'text-slate-300')
+                                                    }`}
+                                            >
+                                                {day.date.getDate()}
+                                            </Text>
+                                            {hasEvent && (
+                                                <View
+                                                    className={`absolute -bottom-1 w-1 h-1 rounded-full ${isDark ? 'bg-slate-400' : 'bg-[#2B5F9E]'}`}
+                                                />
+                                            )}
+                                        </>
                                     )}
                                 </View>
                             </Pressable>

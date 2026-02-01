@@ -24,6 +24,32 @@ import { sendOTPEmail } from './email.service';
 import { getMySQLPool } from '../../config/database';
 import { getRegistrationProgress } from '../users/user.service';
 
+async function getUserByEmailSafe(email: string) {
+  const normalizedEmail = email.toLowerCase().trim();
+  try {
+    return await prisma.users.findFirst({
+      where: { email: normalizedEmail },
+      select: { id: true, email: true, status: true },
+    });
+  } catch (dbError: any) {
+    logger.warn('Prisma user lookup failed, falling back to raw SQL', { error: dbError });
+    const pool = getMySQLPool();
+    const [rows] = await pool.execute(
+      `SELECT id, email, status 
+       FROM users 
+       WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) 
+       LIMIT 1`,
+      [normalizedEmail]
+    ) as any[];
+    if (!rows || rows.length === 0) return null;
+    return {
+      id: rows[0].id,
+      email: rows[0].email,
+      status: rows[0].status as any,
+    };
+  }
+}
+
 function serializeBigInt(obj: any): any {
   if (obj === null || obj === undefined) {
     return obj;
@@ -102,10 +128,7 @@ function generateToken(payload: JwtPayload): string {
 export const register = asyncHandler(async (req: Request, res: Response) => {
   const validated = registerSchema.parse(req.body);
 
-  const existingUser = await prisma.users.findFirst({
-    where: { email: validated.email },
-    select: { id: true, status: true },
-  });
+  const existingUser = await getUserByEmailSafe(validated.email);
 
   // If user exists and is already verified, they should login instead
   if (existingUser && existingUser.status === 'one') {
@@ -294,43 +317,8 @@ export const requestPasswordReset = asyncHandler(async (req: Request, res: Respo
 
     logger.debug(`Password reset requested for email: ${emailInput}`);
 
-    // Check if user exists and is registered
-    // Use case-insensitive search since MySQL email lookups can be case-sensitive
-    // Try exact match first (faster)
-    let user;
-    try {
-      user = await prisma.users.findFirst({
-        where: { email: emailInput },
-        select: { id: true, email: true, status: true },
-      });
-    } catch (dbError: any) {
-      // Log warning but allow fallback to raw SQL (needed for users with invalid enum values like '')
-      logger.warn('Prisma user lookup failed, falling back to raw SQL', { error: dbError });
-      user = null;
-    }
-
-    // If not found with exact match, try case-insensitive using raw SQL
-    if (!user) {
-      try {
-        const emailLower = emailInput.toLowerCase();
-        const result = await prisma.$queryRaw<Array<{ id: bigint; email: string; status: string }>>`
-          SELECT id, email, status 
-          FROM users 
-          WHERE LOWER(TRIM(email)) = LOWER(TRIM(${emailLower}))
-          LIMIT 1
-        `;
-        if (result && result.length > 0) {
-          user = {
-            id: result[0].id,
-            email: result[0].email,
-            status: result[0].status as any,
-          };
-        }
-      } catch (dbError: any) {
-        logger.error('Database error during case-insensitive user lookup', dbError);
-        throw new ApiError(500, 'Database connection error. Please try again later.');
-      }
-    }
+    // Use safe lookup to avoid Prisma enum errors
+    const user = await getUserByEmailSafe(emailInput);
 
     if (!user) {
       logger.debug(`User not found for email: ${emailInput}`);
@@ -455,10 +443,7 @@ export const verifyEmailOTP = asyncHandler(async (req: Request, res: Response) =
   }
 
   // Find the user
-  const user = await prisma.users.findFirst({
-    where: { email: validated.email },
-    select: { id: true, status: true },
-  });
+  const user = await getUserByEmailSafe(validated.email);
 
   if (!user) {
     throw new ApiError(404, 'User not found');
@@ -477,10 +462,7 @@ export const resendOTP = asyncHandler(async (req: Request, res: Response) => {
   const validated = resendOTPSchema.parse(req.body) as ResendOTPRequest;
 
   // Check if user exists
-  const user = await prisma.users.findFirst({
-    where: { email: validated.email },
-    select: { id: true, status: true },
-  });
+  const user = await getUserByEmailSafe(validated.email);
 
   if (!user) {
     throw new ApiError(404, 'User not found. Please register first.');
@@ -530,10 +512,7 @@ export const resetPasswordWithOTP = asyncHandler(async (req: Request, res: Respo
   }
 
   // Find the user
-  const user = await prisma.users.findFirst({
-    where: { email: validated.email },
-    select: { id: true, status: true },
-  });
+  const user = await getUserByEmailSafe(validated.email);
 
   if (!user) {
     throw new ApiError(404, 'User not found');
