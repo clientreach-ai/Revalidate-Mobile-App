@@ -31,7 +31,10 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         >
             <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
-                    <View className="w-12 h-12 rounded-full border-2 border-white/30 items-center justify-center bg-white/20 relative">
+                    <Pressable
+                        onPress={() => router.push('/(tabs)/profile')}
+                        className="w-12 h-12 rounded-full border-2 border-white/30 items-center justify-center bg-white/20 relative"
+                    >
                         {localProfileImage || userData?.image ? (
                             <Image
                                 source={{ uri: localProfileImage || userData?.image || '' }}
@@ -41,7 +44,7 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                             <MaterialIcons name="person" size={24} color="#FFFFFF" />
                         )}
                         <View className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white" />
-                    </View>
+                    </Pressable>
                     <View>
                         <Text className="text-white/80 text-xs font-semibold uppercase tracking-wide">
                             {getGreeting()}

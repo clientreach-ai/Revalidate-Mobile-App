@@ -7,8 +7,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
+import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
+import { downloadAndShareFile, isImageFile } from '@/utils/document';
 
 import '../../global.css';
 
@@ -39,6 +42,8 @@ export default function FeedbackDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
 
     const [feedback, setFeedback] = useState<FeedbackDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -66,6 +71,8 @@ export default function FeedbackDetailScreen() {
     const [fileUri, setFileUri] = useState<string | null>(null);
     const [attachment, setAttachment] = useState<{ name: string, type: string } | null>(null);
     const [hasExistingAttachment, setHasExistingAttachment] = useState(false);
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -188,24 +195,33 @@ export default function FeedbackDetailScreen() {
 
     const handleViewDocument = async (docId: number) => {
         try {
-            const token = await AsyncStorage.getItem('authToken');
-            if (!token) return;
+            let url = attachmentUrl;
+            if (!url) {
+                const token = await AsyncStorage.getItem('authToken');
+                if (!token) return;
+                const response = await apiService.get<{ success: boolean, data: { document: string } }>(
+                    `${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${docId}`,
+                    token
+                );
+                url = response?.data?.document;
+            }
 
-            const response = await apiService.get<{ success: boolean, data: { document: string } }>(
-                `${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${docId}`,
-                token
-            );
+            if (url) {
+                let fullUrl = url;
+                if (!fullUrl.startsWith('http') || fullUrl.includes('localhost') || fullUrl.includes('127.0.0.1')) {
+                    const pathPart = fullUrl.startsWith('http')
+                        ? fullUrl.replace(/^https?:\/\/[^\/]+/, '')
+                        : fullUrl;
 
-            if (response?.data?.document) {
-                let url = response.data.document;
-                if (!url.startsWith('http')) {
-                    url = apiService.baseUrl + (url.startsWith('/') ? '' : '/') + url;
+                    const apiBase = apiService.baseUrl;
+                    fullUrl = `${apiBase}${pathPart.startsWith('/') ? '' : '/'}${pathPart}`;
                 }
-                const canOpen = await Linking.canOpenURL(url);
-                if (canOpen) {
-                    await Linking.openURL(url);
+
+                if (isImageFile(fullUrl)) {
+                    setViewerUrl(fullUrl);
+                    setViewerVisible(true);
                 } else {
-                    showToast.error('Cannot open document URL', 'Error');
+                    await downloadAndShareFile(fullUrl, feedback?.id ? `feedback-${feedback.id}` : 'document');
                 }
             } else {
                 showToast.error('Document URL not found', 'Error');
@@ -401,7 +417,7 @@ export default function FeedbackDetailScreen() {
                 </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadFeedbackDetail(); }} />}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadFeedbackDetail(); }} tintColor={isDark ? accentColor : '#2B5F9E'} colors={[accentColor, '#2B5F9E']} />}>
 
                 {/* Main Card */}
                 <View className={`p-5 rounded-2xl border shadow-sm mb-6 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
@@ -626,6 +642,11 @@ export default function FeedbackDetailScreen() {
                     </Pressable>
                 </Pressable>
             </Modal>
+            <ImageViewerModal
+                isVisible={viewerVisible}
+                imageUrl={viewerUrl}
+                onClose={() => setViewerVisible(false)}
+            />
         </SafeAreaView>
     );
 }

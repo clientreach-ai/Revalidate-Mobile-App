@@ -137,7 +137,7 @@ export const useWorkSessionForm = (activeSession: ActiveSession | null, onSucces
     }, []);
 
     const handleSaveWorkSession = useCallback(async () => {
-        if (!selectedHospital || !hours || !workSetting || !scope || !rate) {
+        if (!selectedHospital || !workSetting || !scope || !rate) {
             showToast.error('Please fill all required fields');
             return;
         }
@@ -155,11 +155,6 @@ export const useWorkSessionForm = (activeSession: ActiveSession | null, onSucces
             durationMinutes = Math.round((Number.isFinite(h) ? h : 0) * 60);
         }
 
-        if (durationMinutes <= 0) {
-            showToast.error('Duration must be greater than 0');
-            return;
-        }
-
         try {
             if (isMounted.current) setIsSavingWork(true);
             const token = await AsyncStorage.getItem('authToken');
@@ -169,18 +164,21 @@ export const useWorkSessionForm = (activeSession: ActiveSession | null, onSucces
             const startTimeDate = new Date(activeSession!.startTime);
             startTimeDate.setFullYear(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
 
-            const payload = {
+            const payload: any = {
                 end_time: endTime,
                 start_time: startTimeDate.toISOString(),
                 location: selectedHospital.name,
                 shift_type: workingMode,
-                duration_minutes: durationMinutes,
                 hourly_rate: parseFloat(rate),
                 work_description: description,
                 work_setting: workSetting,
                 scope_of_practice: scope,
                 document_ids: documents.map((d) => d.id),
             };
+
+            if (durationMinutes > 0) {
+                payload.duration_minutes = durationMinutes;
+            }
 
             await apiService.put(`${API_ENDPOINTS.WORK_HOURS.UPDATE}/${activeSession!.id}`, payload, token);
 
@@ -202,13 +200,30 @@ export const useWorkSessionForm = (activeSession: ActiveSession | null, onSucces
 
     const openFormWithDefaults = useCallback((timerHours: string) => {
         if (timerHours.includes(':')) {
-            const [hStr, mStr] = timerHours.split(':');
-            const h = Number(hStr);
-            const m = Number(mStr);
-            const decimal = (Number.isFinite(h) ? h : 0) + (Number.isFinite(m) ? m : 0) / 60;
-            setHours(decimal.toFixed(2));
+            const parts = timerHours.split(':').map((p) => Number(p));
+            if (parts.length >= 2) {
+                const [hRaw, mRaw, sRaw] = parts;
+                const h = Number.isFinite(hRaw) ? hRaw : 0;
+                const m = Number.isFinite(mRaw) ? mRaw : 0;
+                const s = Number.isFinite(sRaw) ? sRaw : 0;
+                const totalSeconds = Math.floor(h * 3600 + m * 60 + s);
+                const outH = Math.floor(totalSeconds / 3600);
+                const outM = Math.floor((totalSeconds % 3600) / 60);
+                const outS = totalSeconds % 60;
+                setHours(`${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')}:${String(outS).padStart(2, '0')}`);
+            } else {
+                setHours(`${timerHours}:00`);
+            }
         } else {
-            setHours(timerHours);
+            const val = parseFloat(timerHours);
+            if (Number.isFinite(val)) {
+                const totalMinutes = Math.round(val * 60);
+                const outH = Math.floor(totalMinutes / 60);
+                const outM = totalMinutes % 60;
+                setHours(`${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')}:00`);
+            } else {
+                setHours(timerHours);
+            }
         }
         setWorkingMode('Full time');
         setSelectedDate(new Date());

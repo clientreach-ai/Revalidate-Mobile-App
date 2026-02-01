@@ -10,6 +10,7 @@ interface EventListProps {
     selectedDate: Date;
     activeFilter: 'all' | 'official' | 'personal';
     isDark: boolean;
+    isPremium: boolean;
     onFilterChange: (filter: 'all' | 'official' | 'personal') => void;
     onAddEvent: () => void;
     onSeeAllPress: () => void;
@@ -39,6 +40,7 @@ export const EventList: React.FC<EventListProps> = ({
     selectedDate,
     activeFilter,
     isDark,
+    isPremium,
     onFilterChange,
     onAddEvent,
     onSeeAllPress,
@@ -60,7 +62,7 @@ export const EventList: React.FC<EventListProps> = ({
                     <Pressable
                         onPress={() => onFilterChange('all')}
                         className={`px-5 py-2.5 rounded-full ${activeFilter === 'all'
-                            ? 'bg-[#2B5F9E]'
+                            ? (isPremium ? 'bg-[#D4AF37]' : 'bg-[#2B5F9E]')
                             : isDark
                                 ? 'bg-slate-800 border border-slate-700'
                                 : 'bg-white border border-slate-100'
@@ -76,7 +78,7 @@ export const EventList: React.FC<EventListProps> = ({
                     <Pressable
                         onPress={() => onFilterChange('official')}
                         className={`px-5 py-2.5 rounded-full ${activeFilter === 'official'
-                            ? 'bg-[#2B5F9E]'
+                            ? (isPremium ? 'bg-[#D4AF37]' : 'bg-[#2B5F9E]')
                             : isDark
                                 ? 'bg-slate-800 border border-slate-700'
                                 : 'bg-white border-slate-100'
@@ -92,7 +94,7 @@ export const EventList: React.FC<EventListProps> = ({
                     <Pressable
                         onPress={() => onFilterChange('personal')}
                         className={`px-5 py-2.5 rounded-full ${activeFilter === 'personal'
-                            ? 'bg-[#2B5F9E]'
+                            ? (isPremium ? 'bg-[#D4AF37]' : 'bg-[#2B5F9E]')
                             : isDark
                                 ? 'bg-slate-800 border border-slate-700'
                                 : 'bg-white border-slate-100'
@@ -184,12 +186,7 @@ export const EventList: React.FC<EventListProps> = ({
                         <Text className={`mt-4 text-center ${isDark ? "text-gray-400" : "text-slate-400"}`}>
                             No events scheduled for this date
                         </Text>
-                        <Pressable
-                            onPress={onAddEvent}
-                            className="mt-6 bg-[#2B5F9E] px-6 py-3 rounded-xl shadow-sm active:opacity-90"
-                        >
-                            <Text className="text-white font-bold">Add New Event</Text>
-                        </Pressable>
+                        
                     </View>
                 )}
 

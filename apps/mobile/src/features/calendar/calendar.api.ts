@@ -30,13 +30,13 @@ export async function getCalendarEvents(params?: {
   return apiService.get<CalendarEventsResponse>(endpoint, token, forceRefresh);
 }
 
-export async function getCalendarEventById(eventId: string): Promise<CalendarEventResponse> {
+export async function getCalendarEventById(eventId: string, forceRefresh: boolean = false): Promise<CalendarEventResponse> {
   const token = await AsyncStorage.getItem('authToken');
   if (!token) {
     throw new Error('No authentication token found');
   }
 
-  return apiService.get<CalendarEventResponse>(`${API_ENDPOINTS.CALENDAR.GET_BY_ID}/${eventId}`, token);
+  return apiService.get<CalendarEventResponse>(`${API_ENDPOINTS.CALENDAR.GET_BY_ID}/${eventId}`, token, forceRefresh);
 }
 
 export async function createCalendarEvent(data: CreateCalendarEvent): Promise<CalendarEventResponse> {

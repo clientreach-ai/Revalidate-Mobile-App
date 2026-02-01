@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { useCalendar } from '@/hooks/useCalendar';
 import { searchUsers } from '@/features/users/users.api';
 import { CreateCalendarEvent } from '@/features/calendar/calendar.types';
@@ -14,6 +15,7 @@ type EventType = 'all' | 'official' | 'personal';
 export default function AllEventsScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
   const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, inviteAttendees } = useCalendar();
   const [activeFilter, setActiveFilter] = useState<EventType>('all');
 
@@ -219,6 +221,7 @@ export default function AllEventsScreen() {
 
   const headerBgColor = isDark ? "bg-background-dark" : "bg-background-light";
   const headerTextColor = isDark ? "text-white" : "text-slate-800";
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
 
   return (
     <SafeAreaView className={`flex-1 ${headerBgColor}`} edges={['top']}>
@@ -255,7 +258,7 @@ export default function AllEventsScreen() {
           className={`w-10 h-10 rounded-full shadow-sm items-center justify-center border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
             }`}
         >
-          <MaterialIcons name="add" size={24} color={isDark ? "#D4AF37" : "#2B5F9E"} />
+          <MaterialIcons name="add" size={24} color={isDark ? accentColor : "#2B5F9E"} />
         </Pressable>
       </View>
 
@@ -268,7 +271,9 @@ export default function AllEventsScreen() {
             onPress={() => setActiveFilter(filter)}
             className={`px-4 py-2 rounded-full ${activeFilter === filter
               ? isDark
-                ? 'bg-[#D4AF37]'
+                ? isPremium
+                  ? 'bg-[#D4AF37]'
+                  : 'bg-[#2B5F9E]'
                 : 'bg-[#2B5F9E]'
               : isDark
                 ? 'bg-slate-700'
@@ -298,14 +303,14 @@ export default function AllEventsScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+            tintColor={isDark ? accentColor : '#2B5F9E'}
+            colors={[accentColor, '#2B5F9E']}
           />
         }
       >
         {isLoading ? (
           <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+            <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
             <Text className={`mt-4 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
               Loading events...
             </Text>

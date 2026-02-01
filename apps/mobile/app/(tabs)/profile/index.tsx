@@ -238,6 +238,7 @@ export default function ProfileScreen() {
   const borderColor = isDark ? 'border-slate-800' : 'border-slate-200';
   const textColor = isDark ? 'text-white' : 'text-slate-800';
   const secondaryTextColor = isDark ? 'text-gray-400' : 'text-slate-600';
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
 
   return (
     <SafeAreaView className={`flex-1 ${backgroundColor}`} edges={['top']}>
@@ -249,8 +250,8 @@ export default function ProfileScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+            tintColor={isDark ? accentColor : '#2B5F9E'}
+            colors={[accentColor, '#2B5F9E']}
           />
         }
       >
@@ -258,7 +259,7 @@ export default function ProfileScreen() {
           <View className="flex-1 items-center justify-center py-20">
             <ActivityIndicator
               size="large"
-              color={isDark ? '#D4AF37' : '#2B5F9E'}
+              color={isDark ? accentColor : '#2B5F9E'}
             />
             <Text className={`mt-4 ${secondaryTextColor}`}>
               Loading profile...

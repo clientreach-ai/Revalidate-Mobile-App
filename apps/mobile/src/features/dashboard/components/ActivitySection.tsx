@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { usePremium } from '@/hooks/usePremium';
 import { RecentActivity } from '../dashboard.types';
 import { buildActivityRoute } from '../dashboard.utils';
 
@@ -17,6 +18,8 @@ export const ActivitySection: React.FC<ActivitySectionProps> = ({
     isActivitiesLoading,
 }) => {
     const router = useRouter();
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2563EB';
 
     return (
         <View className="mt-2">
@@ -28,7 +31,7 @@ export const ActivitySection: React.FC<ActivitySectionProps> = ({
                     Recent Activity
                 </Text>
                 <Pressable onPress={() => router.push('/(tabs)/notifications')}>
-                    <Text className="text-sm font-semibold text-blue-600">View All</Text>
+                    <Text className="text-sm font-semibold" style={{ color: accentColor }}>View All</Text>
                 </Pressable>
             </View>
 

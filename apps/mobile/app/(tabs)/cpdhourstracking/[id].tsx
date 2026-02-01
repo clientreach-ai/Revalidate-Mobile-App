@@ -1,12 +1,14 @@
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiService } from '@/services/api';
+import { apiService, API_ENDPOINTS } from '@/services/api';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { showToast } from '@/utils/toast';
+import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
+import { downloadAndShareFile, isImageFile } from '@/utils/document';
 import '../../global.css';
 
 interface CPDDetail {
@@ -31,10 +33,36 @@ export default function CPDDetailScreen() {
     const { isDark } = useThemeStore();
     const [loading, setLoading] = useState(true);
     const [activity, setActivity] = useState<CPDDetail | null>(null);
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+    const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
 
     useEffect(() => {
         loadActivity();
     }, [id]);
+
+    useEffect(() => {
+        if (activity?.documentIds && activity.documentIds.length > 0) {
+            checkAttachment(activity.documentIds[0]);
+        }
+    }, [activity]);
+
+    const checkAttachment = async (docId: number) => {
+        try {
+            const token = await AsyncStorage.getItem('authToken');
+            if (!token) return;
+            const res = await apiService.get<{ data: { document: string } }>(`${API_ENDPOINTS.DOCUMENTS.GET_BY_ID}/${docId}`, token);
+            if (res?.data?.document) {
+                let url = res.data.document;
+                if (!url.startsWith('http')) {
+                    url = apiService.baseUrl + (url.startsWith('/') ? '' : '/') + url;
+                }
+                setAttachmentUrl(url);
+            }
+        } catch (e) {
+            console.warn('Failed to load attachment info', e);
+        }
+    };
 
     const loadActivity = async () => {
         try {
@@ -62,7 +90,7 @@ export default function CPDDetailScreen() {
                     linkToStandard: d.linkToStandard || d.link_to_standard,
                     linkToStandardProficiency: d.linkToStandardProficiency || d.link_to_standard_proficiency,
                     documentIds: d.documentIds || d.document_ids || [],
-                    // If documents are expanded in response, good, otherwise we rely on IDs
+                    documents: d.documents || d.document || d.docs || [],
                     createdAt: d.createdAt,
                     updatedAt: d.updatedAt
                 });
@@ -101,6 +129,12 @@ export default function CPDDetailScreen() {
     }
 
     const isParticipatory = activity.activityType === 'participatory';
+    const evidenceDoc = activity.documents?.[0];
+    const evidenceUrl = evidenceDoc?.url || attachmentUrl || '';
+    const isImageEvidence = !!evidenceUrl && (
+        (evidenceDoc?.type && evidenceDoc.type.startsWith('image/')) ||
+        isImageFile(evidenceUrl)
+    );
 
     return (
         <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
@@ -192,24 +226,60 @@ export default function CPDDetailScreen() {
                     {activity.documentIds && activity.documentIds.length > 0 && (
                         <View>
                             <Text className={`text-xs font-bold uppercase tracking-widest mb-3 ${isDark ? "text-gray-500" : "text-slate-400"}`}>Evidence</Text>
-                            <View className={`p-4 rounded-2xl border flex-row items-center justify-between ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}>
-                                <View className="flex-row items-center gap-3">
-                                    <View className="w-10 h-10 rounded-xl bg-purple-100 items-center justify-center">
-                                        <MaterialIcons name="attach-file" size={20} color="#7C3AED" />
+                            {isImageEvidence && evidenceUrl ? (
+                                <Pressable
+                                    onPress={() => {
+                                        setViewerUrl(evidenceUrl);
+                                        setViewerVisible(true);
+                                    }}
+                                    className={`p-4 rounded-2xl border flex-row items-center justify-between ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}
+                                >
+                                    <View className="flex-row items-center gap-3">
+                                        <Image source={{ uri: evidenceUrl }} style={{ width: 40, height: 40, borderRadius: 8 }} />
+                                        <View>
+                                            <Text className={`font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Attached Image</Text>
+                                            <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-500"}`} numberOfLines={1}>
+                                                {evidenceDoc?.name || `ID: ${activity.documentIds[0]}`}
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <View>
-                                        <Text className={`font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Attached Document</Text>
-                                        <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-500"}`}>ID: {activity.documentIds[0]}</Text>
+                                    <MaterialIcons name="open-in-full" size={22} color="#7C3AED" />
+                                </Pressable>
+                            ) : (
+                                <Pressable
+                                    onPress={async () => {
+                                        if (!evidenceUrl) return;
+                                        try {
+                                            await downloadAndShareFile(evidenceUrl, activity.id ? `cpd-${activity.id}` : 'document');
+                                        } catch (e) {
+                                            showToast.error('Failed to open document', 'Error');
+                                        }
+                                    }}
+                                    className={`p-4 rounded-2xl border flex-row items-center justify-between ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"}`}
+                                >
+                                    <View className="flex-row items-center gap-3">
+                                        <View className="w-10 h-10 rounded-xl bg-purple-100 items-center justify-center">
+                                            <MaterialIcons name="attach-file" size={20} color="#7C3AED" />
+                                        </View>
+                                        <View>
+                                            <Text className={`font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Attached Document</Text>
+                                            <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-500"}`}>ID: {activity.documentIds[0]}</Text>
+                                        </View>
                                     </View>
-                                </View>
-                                <MaterialIcons name="download" size={24} color="#7C3AED" />
-                            </View>
+                                    <MaterialIcons name="download" size={24} color="#7C3AED" />
+                                </Pressable>
+                            )}
                         </View>
                     )}
                 </View>
 
                 <View style={{ height: 100 }} />
             </ScrollView>
+            <ImageViewerModal
+                isVisible={viewerVisible}
+                imageUrl={viewerUrl}
+                onClose={() => setViewerVisible(false)}
+            />
         </SafeAreaView>
     );
 }

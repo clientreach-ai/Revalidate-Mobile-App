@@ -5,6 +5,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import * as DocumentPicker from 'expo-document-picker';
@@ -21,6 +22,8 @@ interface WorkSession {
   workDescription: string | null;
   location?: string;
   shiftType?: string;
+  hourlyRate?: number | null;
+  totalEarnings?: number | null;
   documentIds: number[];
   isActive: boolean;
   createdAt: string;
@@ -32,6 +35,8 @@ export default function WorkHistoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [session, setSession] = useState<WorkSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -312,8 +317,30 @@ export default function WorkHistoryDetailScreen() {
 
   const dateInfo = formatDate(session.startTime);
   const hours = session.durationMinutes ? session.durationMinutes / 60 : 0;
-  const avgHourlyRate = 35; // Should come from user settings
-  const earnings = hours * avgHourlyRate;
+  const avgHourlyRate = session.hourlyRate ?? 0;
+  const earnings = session.totalEarnings ?? (hours * avgHourlyRate);
+
+  const formatDuration = (minutes: number | null, start: string, end?: string | null) => {
+    let totalSeconds = 0;
+    if (end) {
+      const startMs = new Date(start).getTime();
+      const endMs = new Date(end).getTime();
+      if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+        totalSeconds = Math.floor((endMs - startMs) / 1000);
+      }
+    }
+
+    if (!totalSeconds && minutes) {
+      totalSeconds = Math.round(minutes * 60);
+    }
+
+    if (!totalSeconds) return '0h 0m 0s';
+
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${h}h ${m}m ${s}s`;
+  };
 
   // Extract location and shift type from description or use defaults
   const descriptionLines = session.workDescription?.split('\n') || [];
@@ -378,7 +405,7 @@ export default function WorkHistoryDetailScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); loadWorkSession(); }}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
+            tintColor={isDark ? accentColor : '#2B5F9E'}
           />
         }
       >
@@ -440,7 +467,7 @@ export default function WorkHistoryDetailScreen() {
           />
           <DetailRow
             label="Hours Worked"
-            value={`${hours.toFixed(1)} hours`}
+            value={formatDuration(session.durationMinutes, session.startTime, session.endTime)}
             icon="access-time"
           />
           <DetailRow

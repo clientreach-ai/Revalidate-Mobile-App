@@ -62,7 +62,8 @@ function SettingItem({
 export default function SettingsScreen() {
   const router = useRouter();
   const { isDark, toggleTheme } = useThemeStore();
-  const { isPremium } = usePremium();
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -104,8 +105,8 @@ export default function SettingsScreen() {
               setRefreshing(true);
               setTimeout(() => setRefreshing(false), 1000);
             }}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+              tintColor={isDark ? accentColor : '#2B5F9E'}
+              colors={[accentColor, '#2B5F9E']}
           />
         }
       >

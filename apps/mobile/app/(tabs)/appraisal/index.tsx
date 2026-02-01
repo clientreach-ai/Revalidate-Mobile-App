@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback } from 'react';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { useAppraisalData } from '@/features/appraisal/hooks/useAppraisalData';
 import { AppraisalCard } from '@/features/appraisal/components/AppraisalCard';
 import { AddAppraisalModal } from '@/features/appraisal/components/AddAppraisalModal';
@@ -13,6 +14,9 @@ export default function AppraisalScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+    const accentSoft = isPremium ? '#D4AF37' : '#2B5F9E';
     const [showAddModal, setShowAddModal] = useState(false);
 
     const {
@@ -29,7 +33,7 @@ export default function AppraisalScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            loadAppraisals();
+            loadAppraisals(true);
             loadHospitals();
         }, [loadAppraisals, loadHospitals])
     );
@@ -50,9 +54,10 @@ export default function AppraisalScreen() {
                     </View>
                     <Pressable
                         onPress={() => setShowAddModal(true)}
-                        className="w-10 h-10 rounded-full bg-[#2B5F9E]/10 items-center justify-center"
+                        className="w-10 h-10 rounded-full items-center justify-center"
+                        style={{ backgroundColor: `${accentSoft}1A` }}
                     >
-                        <MaterialIcons name="add-task" size={20} color="#2B5F9E" />
+                        <MaterialIcons name="add-task" size={20} color={accentColor} />
                     </Pressable>
                 </View>
             </View>
@@ -65,14 +70,14 @@ export default function AppraisalScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-                        colors={['#D4AF37', '#2B5F9E']}
+                        tintColor={isDark ? accentColor : '#2B5F9E'}
+                        colors={[accentColor, '#2B5F9E']}
                     />
                 }
             >
                 {loading && !refreshing ? (
                     <View className="flex-1 items-center justify-center py-20">
-                        <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+                        <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
                         <Text className={`mt-4 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
                             Loading appraisals...
                         </Text>
@@ -118,7 +123,8 @@ export default function AppraisalScreen() {
             >
                 <Pressable
                     onPress={() => setShowAddModal(true)}
-                    className="w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center active:opacity-80"
+                    className="w-14 h-14 rounded-full shadow-lg items-center justify-center active:opacity-80"
+                    style={{ backgroundColor: accentColor }}
                 >
                     <MaterialIcons name="add" size={32} color="#FFFFFF" />
                 </Pressable>

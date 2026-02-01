@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import { ImageViewerModal } from '@/features/documents/components/ImageViewerModal';
@@ -24,6 +25,8 @@ export default function GeneralGalleryScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerUrl, setViewerUrl] = useState<string | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -141,14 +144,14 @@ export default function GeneralGalleryScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-                        colors={['#D4AF37', '#2B5F9E']}
+                        tintColor={isDark ? accentColor : '#2B5F9E'}
+                        colors={[accentColor, '#2B5F9E']}
                     />
                 }
             >
                 {loading && !refreshing ? (
                     <View className="flex-1 items-center justify-center py-20">
-                        <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+                        <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
                     </View>
                 ) : (
                     <View className="flex-row flex-wrap" style={{ gap: GAP, marginTop: 16 }}>

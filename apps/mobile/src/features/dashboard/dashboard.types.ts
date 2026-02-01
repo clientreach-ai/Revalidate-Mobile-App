@@ -22,6 +22,7 @@ export interface ActiveSession {
 export interface DashboardStats {
     totalHours: number;
     totalEarnings: number;
+    workSessionsCount: number;
     cpdHours: number;
     reflectionsCount: number;
     appraisalsCount: number;

@@ -4,15 +4,19 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback } from 'react';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { useGalleryData } from '@/features/gallery/hooks/useGalleryData';
 import { CategoryCard } from '@/features/gallery/components/CategoryCard';
 import { AddDocumentModal } from '@/features/gallery/components/AddDocumentModal';
+import { Category } from '@/features/gallery/gallery.types';
 import '../../global.css';
 
 export default function GalleryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [showAddModal, setShowAddModal] = useState(false);
 
   const {
@@ -39,8 +43,8 @@ export default function GalleryScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+            tintColor={isDark ? accentColor : '#2B5F9E'}
+            colors={[accentColor, '#2B5F9E']}
           />
         }
       >
@@ -54,18 +58,13 @@ export default function GalleryScreen() {
                 UK Revalidation Portfolio
               </Text>
             </View>
-            <Pressable
-              onPress={() => setShowAddModal(true)}
-              className="w-10 h-10 rounded-full bg-[#2B5F9E]/10 items-center justify-center"
-            >
-              <MaterialIcons name="cloud-upload" size={20} color="#2B5F9E" />
-            </Pressable>
+        
           </View>
         </View>
 
         {loading && !refreshing && (
           <View className="flex-1 items-center justify-center py-20">
-            <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+            <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
             <Text className={`mt-4 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
               Loading documents...
             </Text>
@@ -75,11 +74,27 @@ export default function GalleryScreen() {
         {!loading && (
           <View className="px-6 mt-2">
             <View className="flex-row flex-wrap" style={{ gap: 16 }}>
-              {categories.map((category) => (
+              {(isPremium
+                ? ([
+                    {
+                      id: 'premium-earnings-finance',
+                      title: 'Earnings & Finance',
+                      documentCount: '0',
+                      updated: '',
+                      icon: 'payments',
+                      iconBgColor: 'bg-amber-100',
+                      iconColor: '#D4AF37',
+                      dotColor: '#D4AF37',
+                      route: '/(tabs)/earings',
+                    },
+                  ] as Category[]).concat(categories)
+                : categories
+              ).map((category) => (
                 <CategoryCard
                   key={category.id}
                   category={category}
                   isDark={isDark}
+                  fullWidth={isPremium && category.title === 'General Gallery'}
                   onPress={() => category.route && router.push(category.route as any)}
                 />
               ))}

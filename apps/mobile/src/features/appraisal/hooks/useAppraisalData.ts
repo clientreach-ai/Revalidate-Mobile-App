@@ -12,7 +12,7 @@ export const useAppraisalData = () => {
     const [appraisals, setAppraisals] = useState<Appraisal[]>([]);
     const [hospitals, setHospitals] = useState<Hospital[]>([]);
 
-    const loadAppraisals = useCallback(async () => {
+    const loadAppraisals = useCallback(async (forceRefresh: boolean = false) => {
         try {
             setLoading(true);
             const token = await AsyncStorage.getItem('authToken');
@@ -24,7 +24,7 @@ export const useAppraisalData = () => {
             const response = await apiService.get<{
                 success: boolean;
                 data: ApiAppraisal[];
-            }>(`${API_ENDPOINTS.APPRAISALS.LIST}?limit=100`, token);
+            }>(`${API_ENDPOINTS.APPRAISALS.LIST}?limit=100`, token, forceRefresh);
 
             if (response.success && response.data) {
                 const mapped = response.data.map(api => ({
@@ -93,7 +93,7 @@ export const useAppraisalData = () => {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await loadAppraisals();
+        await loadAppraisals(true);
     }, [loadAppraisals]);
 
     return {

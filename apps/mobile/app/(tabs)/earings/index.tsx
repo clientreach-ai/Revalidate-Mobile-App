@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import '../../global.css';
@@ -36,6 +37,7 @@ interface EarningsEntry {
   status: 'paid' | 'pending';
   icon: keyof typeof MaterialIcons.glyphMap;
   startTime: string;
+  createdAt?: string;
 }
 
 interface MonthGroup {
@@ -47,12 +49,29 @@ interface MonthGroup {
 export default function EarningsScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState<EarningsEntry[]>([]);
   const [hourlyRate, setHourlyRate] = useState(35); // Default hourly rate
   const [isRateModalVisible, setIsRateModalVisible] = useState(false);
   const [isUpdatingRate, setIsUpdatingRate] = useState(false);
+  const [showShiftTypePicker, setShowShiftTypePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [tempStartHour, setTempStartHour] = useState('09');
+  const [tempStartMinute, setTempStartMinute] = useState('00');
+  const [tempEndHour, setTempEndHour] = useState('17');
+  const [tempEndMinute, setTempEndMinute] = useState('00');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // New session state
   const [newSession, setNewSession] = useState({
@@ -69,7 +88,7 @@ export default function EarningsScreen() {
   });
 
   // Load work hours and calculate earnings
-  const loadEarnings = async () => {
+  const loadEarnings = async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
@@ -83,7 +102,7 @@ export default function EarningsScreen() {
         const userResponse = await apiService.get<{
           success: boolean;
           data: { hourlyRate?: number };
-        }>(API_ENDPOINTS.USERS.ME, token);
+        }>(API_ENDPOINTS.USERS.ME, token, forceRefresh);
         if (userResponse?.data?.hourlyRate) {
           setHourlyRate(userResponse.data.hourlyRate);
         }
@@ -96,16 +115,23 @@ export default function EarningsScreen() {
         success: boolean;
         data: WorkSession[];
         pagination: { total: number };
-      }>(API_ENDPOINTS.WORK_HOURS.LIST, token);
+      }>(API_ENDPOINTS.WORK_HOURS.LIST, token, forceRefresh);
 
       if (response.success && response.data) {
-        // Filter out active sessions and convert to earnings entries
-        const completedSessions = response.data.filter(session =>
-          !session.isActive && session.endTime && session.durationMinutes
+        const sessions = response.data.filter(session =>
+          (session.isActive || session.endTime || session.durationMinutes)
         );
 
-        const earningsEntries: EarningsEntry[] = completedSessions.map((session) => {
-          const hours = session.durationMinutes ? session.durationMinutes / 60 : 0;
+        const earningsEntries: EarningsEntry[] = sessions.map((session) => {
+          let durationMinutes = session.durationMinutes || 0;
+          if (!durationMinutes) {
+            const start = new Date(session.startTime).getTime();
+            const end = session.endTime ? new Date(session.endTime).getTime() : Date.now();
+            if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+              durationMinutes = Math.floor((end - start) / 60000);
+            }
+          }
+          const hours = durationMinutes / 60;
           const rate = session.hourlyRate || hourlyRate;
           const amountValue = session.totalEarnings || (hours * rate);
           const startDate = new Date(session.startTime);
@@ -122,9 +148,11 @@ export default function EarningsScreen() {
             icon = 'verified-user';
           }
 
-          // Determine status: if session is older than 7 days, consider it paid
-          const daysSinceEnd = (new Date().getTime() - new Date(session.endTime!).getTime()) / (1000 * 60 * 60 * 24);
-          const status: 'paid' | 'pending' = daysSinceEnd > 7 ? 'paid' : 'pending';
+          // Determine status: active sessions are pending; else paid if older than 7 days
+          const daysSinceEnd = session.endTime
+            ? (new Date().getTime() - new Date(session.endTime).getTime()) / (1000 * 60 * 60 * 24)
+            : 0;
+          const status: 'paid' | 'pending' = session.isActive ? 'pending' : (daysSinceEnd > 7 ? 'paid' : 'pending');
 
           return {
             id: String(session.id),
@@ -136,13 +164,16 @@ export default function EarningsScreen() {
             status,
             icon,
             startTime: session.startTime,
+            createdAt: session.createdAt,
           };
         });
 
         // Sort by date (newest first)
-        earningsEntries.sort((a, b) =>
-          new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-        );
+        earningsEntries.sort((a, b) => {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.startTime).getTime();
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.startTime).getTime();
+          return bTime - aTime;
+        });
 
         setEarnings(earningsEntries);
       }
@@ -259,9 +290,81 @@ export default function EarningsScreen() {
     }));
   };
 
+  const syncTempTimes = () => {
+    const [sh = '09', sm = '00'] = (newSession.startTime || '09:00').split(':');
+    const [eh = '17', em = '00'] = (newSession.endTime || '17:00').split(':');
+    setTempStartHour(sh.padStart(2, '0'));
+    setTempStartMinute(sm.padStart(2, '0'));
+    setTempEndHour(eh.padStart(2, '0'));
+    setTempEndMinute(em.padStart(2, '0'));
+  };
+
+  const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
+  const formatYMD = (year: number, month: number, day: number) => {
+    const m = String(month + 1).padStart(2, '0');
+    const d = String(day).padStart(2, '0');
+    return `${year}-${m}-${d}`;
+  };
+
+  const handleDateSelect = (day: number) => {
+    const iso = formatYMD(selectedYear, selectedMonth, day);
+    setNewSession(prev => ({ ...prev, date: iso }));
+    setShowDatePicker(false);
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      if (selectedMonth === 0) {
+        setSelectedMonth(11);
+        setSelectedYear(selectedYear - 1);
+      } else {
+        setSelectedMonth(selectedMonth - 1);
+      }
+    } else {
+      if (selectedMonth === 11) {
+        setSelectedMonth(0);
+        setSelectedYear(selectedYear + 1);
+      } else {
+        setSelectedMonth(selectedMonth + 1);
+      }
+    }
+  };
+
+  const renderCalendar = () => {
+    const daysInMonth = getDaysInMonth(selectedMonth, selectedYear);
+    const firstDay = getFirstDayOfMonth(selectedMonth, selectedYear);
+    const nodes: any[] = [];
+    for (let i = 0; i < firstDay; i++) nodes.push(<View key={`empty-${i}`} className="w-10 h-10" />);
+    for (let day = 1; day <= daysInMonth; day++) {
+      const isSelected = newSession.date === formatYMD(selectedYear, selectedMonth, day);
+      nodes.push(
+        <Pressable
+          key={day}
+          onPress={() => handleDateSelect(day)}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? '' : isDark ? 'bg-slate-700/50' : 'bg-transparent'}`}
+          style={isSelected ? { backgroundColor: accentColor } : undefined}
+        >
+          <Text className={`text-sm font-medium ${isSelected ? 'text-white' : isDark ? 'text-white' : 'text-gray-900'}`}>{day}</Text>
+        </Pressable>
+      );
+    }
+    return nodes;
+  };
+
   useEffect(() => {
     loadEarnings();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadEarnings(true);
+      const intervalId = setInterval(() => {
+        loadEarnings(true);
+      }, 30000);
+      return () => clearInterval(intervalId);
+    }, [])
+  );
 
   // Group earnings by month
   const groupedEarnings: MonthGroup[] = earnings.reduce((acc: MonthGroup[], entry) => {
@@ -313,8 +416,8 @@ export default function EarningsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={loadEarnings}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+            tintColor={isDark ? accentColor : '#2B5F9E'}
+            colors={[accentColor, '#2B5F9E']}
           />
         }
       >
@@ -329,10 +432,11 @@ export default function EarningsScreen() {
               });
               setIsRateModalVisible(true);
             }}
-            className="flex-1 flex-row items-center justify-center gap-2 px-4 h-11 bg-[#2B5E9C]/10 rounded-lg"
+            className="flex-1 flex-row items-center justify-center gap-2 px-4 h-11 rounded-lg"
+            style={{ backgroundColor: `${accentColor}1A` }}
           >
-            <MaterialIcons name="add" size={20} color="#2B5E9C" />
-            <Text className="text-[#2B5E9C] font-semibold text-sm">
+            <MaterialIcons name="add" size={20} color={accentColor} />
+            <Text className="font-semibold text-sm" style={{ color: accentColor }}>
               Add Session
             </Text>
           </Pressable>
@@ -342,7 +446,7 @@ export default function EarningsScreen() {
         {/* Loading State */}
         {loading && earnings.length === 0 && (
           <View className="flex-1 items-center justify-center py-20">
-            <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+            <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
             <Text className={`mt-4 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
               Loading earnings...
             </Text>
@@ -372,7 +476,7 @@ export default function EarningsScreen() {
                     {group.month} {group.year}
                   </Text>
                   <Pressable onPress={() => router.push('/(tabs)/gallery')}>
-                    <Text className="text-[#2B5E9C] text-sm font-semibold">See all</Text>
+                    <Text className="text-sm font-semibold" style={{ color: accentColor }}>See all</Text>
                   </Pressable>
                 </View>
 
@@ -387,8 +491,8 @@ export default function EarningsScreen() {
                         }`}
                     >
                       <View className="flex-row items-start flex-1 min-w-0" style={{ gap: 16 }}>
-                        <View className="text-[#2B5E9C] items-center justify-center rounded-lg bg-[#2B5E9C]/10 shrink-0 w-12 h-12">
-                          <MaterialIcons name={entry.icon} size={24} color="#2B5E9C" />
+                        <View className="items-center justify-center rounded-lg shrink-0 w-12 h-12" style={{ backgroundColor: `${accentColor}1A` }}>
+                          <MaterialIcons name={entry.icon} size={24} color={accentColor} />
                         </View>
                         <View className="flex-1 flex-col justify-center min-w-0">
                           <Text className={`text-base font-semibold mb-1 ${isDark ? "text-white" : "text-[#121417]"}`} numberOfLines={1}>
@@ -453,23 +557,28 @@ export default function EarningsScreen() {
                 <View className="flex-row gap-4">
                   <View className="flex-1">
                     <Text className={`text-sm font-bold mb-2 ml-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Shift Type</Text>
-                    <View className={`h-14 rounded-2xl border-2 justify-center px-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-                      <TextInput
-                        value={newSession.shiftType}
-                        onChangeText={(t) => setNewSession(prev => ({ ...prev, shiftType: t }))}
-                        className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}
-                      />
-                    </View>
+                    <Pressable
+                      onPress={() => setShowShiftTypePicker(true)}
+                      className={`h-14 rounded-2xl border-2 justify-center px-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}
+                    >
+                      <Text className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{newSession.shiftType}</Text>
+                    </Pressable>
                   </View>
                   <View className="flex-1">
                     <Text className={`text-sm font-bold mb-2 ml-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Date</Text>
-                    <View className={`h-14 rounded-2xl border-2 justify-center px-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-                      <TextInput
-                        value={newSession.date}
-                        onChangeText={(t) => setNewSession(prev => ({ ...prev, date: t }))}
-                        className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}
-                      />
-                    </View>
+                    <Pressable
+                      onPress={() => {
+                        const parts = newSession.date.split('-').map(Number);
+                        if (parts.length === 3) {
+                          setSelectedYear(parts[0]);
+                          setSelectedMonth(parts[1] - 1);
+                        }
+                        setShowDatePicker(true);
+                      }}
+                      className={`h-14 rounded-2xl border-2 justify-center px-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}
+                    >
+                      <Text className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{newSession.date}</Text>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -477,23 +586,27 @@ export default function EarningsScreen() {
                 <View className="flex-row gap-4">
                   <View className="flex-1">
                     <Text className={`text-sm font-bold mb-2 ml-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Start Time</Text>
-                    <View className={`h-14 rounded-2xl border-2 justify-center px-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-                      <TextInput
-                        value={newSession.startTime}
-                        onChangeText={(t) => setNewSession(prev => ({ ...prev, startTime: t }))}
-                        className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}
-                      />
-                    </View>
+                    <Pressable
+                      onPress={() => {
+                        syncTempTimes();
+                        setShowStartTimePicker(true);
+                      }}
+                      className={`h-14 rounded-2xl border-2 justify-center px-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}
+                    >
+                      <Text className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{newSession.startTime}</Text>
+                    </Pressable>
                   </View>
                   <View className="flex-1">
                     <Text className={`text-sm font-bold mb-2 ml-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>End Time</Text>
-                    <View className={`h-14 rounded-2xl border-2 justify-center px-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-                      <TextInput
-                        value={newSession.endTime}
-                        onChangeText={(t) => setNewSession(prev => ({ ...prev, endTime: t }))}
-                        className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}
-                      />
-                    </View>
+                    <Pressable
+                      onPress={() => {
+                        syncTempTimes();
+                        setShowEndTimePicker(true);
+                      }}
+                      className={`h-14 rounded-2xl border-2 justify-center px-4 ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}
+                    >
+                      <Text className={`text-base font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{newSession.endTime}</Text>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -603,7 +716,8 @@ export default function EarningsScreen() {
               <Pressable
                 onPress={handleSetRate}
                 disabled={isUpdatingRate}
-                className="flex-[2] h-14 items-center justify-center bg-[#2B5E9C] rounded-2xl shadow-xl shadow-blue-500/30"
+                className="flex-[2] h-14 items-center justify-center rounded-2xl shadow-xl"
+                style={{ backgroundColor: accentColor, shadowColor: accentColor }}
               >
                 {isUpdatingRate ? (
                   <ActivityIndicator color="white" />
@@ -614,6 +728,182 @@ export default function EarningsScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Shift Type Picker */}
+      <Modal visible={showShiftTypePicker} transparent animationType="fade">
+        <Pressable className="flex-1 bg-black/50 justify-center items-center" onPress={() => setShowShiftTypePicker(false)}>
+          <View className={`w-[80%] rounded-3xl p-6 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            <Text className={`text-lg font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-800'}`}>Shift Type</Text>
+            {['Day', 'Night', 'Evening', 'Weekend', 'On-call', 'Locum', 'Other'].map((type) => (
+              <Pressable
+                key={type}
+                onPress={() => {
+                  setNewSession(prev => ({ ...prev, shiftType: type }));
+                  setShowShiftTypePicker(false);
+                }}
+                className={`p-3 rounded-lg mb-2 ${newSession.shiftType === type ? '' : ''}`}
+                style={newSession.shiftType === type ? { backgroundColor: accentColor } : undefined}
+              >
+                <Text className={`${newSession.shiftType === type ? 'text-white' : isDark ? 'text-white' : 'text-slate-800'}`}>{type}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Date Picker */}
+      <Modal visible={showDatePicker} transparent animationType="fade">
+        <Pressable className="flex-1 bg-black/50 justify-center items-center" onPress={() => setShowDatePicker(false)}>
+          <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-t-3xl p-6 w-[90%]`}>
+            <View className="flex-row items-center justify-between mb-4">
+              <Pressable onPress={() => navigateMonth('prev')} className="p-2 rounded-full">
+                <MaterialIcons name="chevron-left" size={24} color={isDark ? '#D1D5DB' : '#4B5563'} />
+              </Pressable>
+              <View className="flex-row items-center gap-2">
+                <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{monthNames[selectedMonth]}</Text>
+                <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{selectedYear}</Text>
+              </View>
+              <Pressable onPress={() => navigateMonth('next')} className="p-2 rounded-full">
+                <MaterialIcons name="chevron-right" size={24} color={isDark ? '#D1D5DB' : '#4B5563'} />
+              </Pressable>
+            </View>
+
+            <View className="flex-row justify-between mb-3">
+              {dayNames.map((day) => (
+                <View key={day} className="w-10 items-center">
+                  <Text className={`text-xs font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{day}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View className="flex-row flex-wrap justify-between mb-6">{renderCalendar()}</View>
+
+            <View className="flex-row gap-3">
+              <Pressable onPress={() => setShowDatePicker(false)} className={`flex-1 py-3 rounded-xl ${isDark ? 'bg-slate-700' : 'bg-gray-100'}`}>
+                <Text className={`text-center font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Cancel</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Start Time Picker */}
+      <Modal visible={showStartTimePicker} transparent animationType="fade">
+        <Pressable className="flex-1 bg-black/50 justify-center items-center" onPress={() => setShowStartTimePicker(false)}>
+          <View className={`w-[80%] rounded-3xl p-6 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            <Text className={`text-lg font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-800'}`}>Start Time</Text>
+            <View className="flex-row gap-6">
+              <View className="flex-1">
+                <Text className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Hour</Text>
+                <ScrollView className="max-h-56">
+                  {Array.from({ length: 24 }).map((_, h) => {
+                    const hour = h.toString().padStart(2, '0');
+                    const selected = tempStartHour === hour;
+                    return (
+                      <Pressable
+                        key={hour}
+                        onPress={() => setTempStartHour(hour)}
+                        className="p-2 rounded-lg mb-1"
+                        style={selected ? { backgroundColor: accentColor } : undefined}
+                      >
+                        <Text className={`${selected ? 'text-white' : isDark ? 'text-white' : 'text-slate-800'}`}>{hour}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+              <View className="flex-1">
+                <Text className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Minute</Text>
+                <ScrollView className="max-h-56">
+                  {Array.from({ length: 60 }).map((_, m) => {
+                    const minute = m.toString().padStart(2, '0');
+                    const selected = tempStartMinute === minute;
+                    return (
+                      <Pressable
+                        key={minute}
+                        onPress={() => setTempStartMinute(minute)}
+                        className="p-2 rounded-lg mb-1"
+                        style={selected ? { backgroundColor: accentColor } : undefined}
+                      >
+                        <Text className={`${selected ? 'text-white' : isDark ? 'text-white' : 'text-slate-800'}`}>{minute}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => {
+                setNewSession(prev => ({ ...prev, startTime: `${tempStartHour}:${tempStartMinute}` }));
+                setShowStartTimePicker(false);
+              }}
+              className="mt-4 py-3 rounded-xl items-center"
+              style={{ backgroundColor: accentColor }}
+            >
+              <Text className="text-white font-semibold">Set Time</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* End Time Picker */}
+      <Modal visible={showEndTimePicker} transparent animationType="fade">
+        <Pressable className="flex-1 bg-black/50 justify-center items-center" onPress={() => setShowEndTimePicker(false)}>
+          <View className={`w-[80%] rounded-3xl p-6 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
+            <Text className={`text-lg font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-800'}`}>End Time</Text>
+            <View className="flex-row gap-6">
+              <View className="flex-1">
+                <Text className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Hour</Text>
+                <ScrollView className="max-h-56">
+                  {Array.from({ length: 24 }).map((_, h) => {
+                    const hour = h.toString().padStart(2, '0');
+                    const selected = tempEndHour === hour;
+                    return (
+                      <Pressable
+                        key={hour}
+                        onPress={() => setTempEndHour(hour)}
+                        className="p-2 rounded-lg mb-1"
+                        style={selected ? { backgroundColor: accentColor } : undefined}
+                      >
+                        <Text className={`${selected ? 'text-white' : isDark ? 'text-white' : 'text-slate-800'}`}>{hour}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+              <View className="flex-1">
+                <Text className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>Minute</Text>
+                <ScrollView className="max-h-56">
+                  {Array.from({ length: 60 }).map((_, m) => {
+                    const minute = m.toString().padStart(2, '0');
+                    const selected = tempEndMinute === minute;
+                    return (
+                      <Pressable
+                        key={minute}
+                        onPress={() => setTempEndMinute(minute)}
+                        className="p-2 rounded-lg mb-1"
+                        style={selected ? { backgroundColor: accentColor } : undefined}
+                      >
+                        <Text className={`${selected ? 'text-white' : isDark ? 'text-white' : 'text-slate-800'}`}>{minute}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => {
+                setNewSession(prev => ({ ...prev, endTime: `${tempEndHour}:${tempEndMinute}` }));
+                setShowEndTimePicker(false);
+              }}
+              className="mt-4 py-3 rounded-xl items-center"
+              style={{ backgroundColor: accentColor }}
+            >
+              <Text className="text-white font-semibold">Set Time</Text>
+            </Pressable>
+          </View>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );

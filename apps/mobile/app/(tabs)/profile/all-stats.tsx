@@ -47,10 +47,12 @@ export default function AllStatsScreen() {
   const router = useRouter();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     practiceHours: 0,
+    workSessionsCount: 0,
     cpdHours: 0,
     reflectionsCount: 0,
     feedbackCount: 0,
@@ -58,7 +60,7 @@ export default function AllStatsScreen() {
     earnings: 0,
   });
 
-  const loadStats = async () => {
+  const loadStats = async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
@@ -70,18 +72,29 @@ export default function AllStatsScreen() {
       // Fetch Work Hours Stats
       let practiceHours = 0;
       let earnings = 0;
+      let workSessionsCount = 0;
       try {
-        const workStats = await apiService.get<any>(API_ENDPOINTS.WORK_HOURS.STATS_TOTAL, token);
+        const workStats = await apiService.get<any>(API_ENDPOINTS.WORK_HOURS.STATS_TOTAL, token, forceRefresh);
         if (workStats?.data) {
           practiceHours = workStats.data.totalHours || 0;
           earnings = workStats.data.totalEarnings || 0;
         }
       } catch (e) { console.log('Work stats failed', e); }
 
+      // Fetch Work Sessions Count
+      try {
+        const workSessions = await apiService.get<{ pagination?: { total?: number } }>(
+          `${API_ENDPOINTS.WORK_HOURS.LIST}?limit=1`,
+          token,
+          forceRefresh
+        );
+        workSessionsCount = workSessions?.pagination?.total || 0;
+      } catch (e) { console.log('Work sessions count failed', e); }
+
       // Fetch CPD Stats
       let cpdHours = 0;
       try {
-        const cpdStats = await apiService.get<any>('/api/v1/cpd-hours/stats/total', token);
+        const cpdStats = await apiService.get<any>('/api/v1/cpd-hours/stats/total', token, forceRefresh);
         if (cpdStats?.data) {
           cpdHours = cpdStats.data.totalHours || 0;
         }
@@ -90,26 +103,26 @@ export default function AllStatsScreen() {
       // Fetch Counts via Lists
       let reflectionsCount = 0;
       try {
-        const reflections = await apiService.get<{ pagination: { total: number } }>(`${API_ENDPOINTS.REFLECTIONS.LIST}?limit=1`, token);
+        const reflections = await apiService.get<{ pagination: { total: number } }>(`${API_ENDPOINTS.REFLECTIONS.LIST}?limit=1`, token, forceRefresh);
         reflectionsCount = reflections?.pagination?.total || 0;
       } catch (e) { console.log('Reflections count failed', e); }
 
       let feedbackCount = 0;
       try {
-        const feedback = await apiService.get<{ pagination: { total: number } }>(`${API_ENDPOINTS.FEEDBACK.LIST}?limit=1`, token);
+        const feedback = await apiService.get<{ pagination: { total: number } }>(`${API_ENDPOINTS.FEEDBACK.LIST}?limit=1`, token, forceRefresh);
         feedbackCount = feedback?.pagination?.total || 0;
       } catch (e) { console.log('Feedback count failed', e); }
 
       let documentsCount = 0;
       try {
-        const documents = await apiService.get<{ data: any[] }>(API_ENDPOINTS.DOCUMENTS.LIST, token);
+        const documents = await apiService.get<{ data: any[] }>(API_ENDPOINTS.DOCUMENTS.LIST, token, forceRefresh);
         documentsCount = documents?.data?.length || 0;
       } catch (e) { console.log('Documents count failed', e); }
 
       // Fetch Onboarding Data for Earnings fallback if 0
       if (earnings === 0) {
         try {
-          const onboarding = await apiService.get<{ data: any }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token);
+          const onboarding = await apiService.get<{ data: any }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token, forceRefresh);
           if (onboarding?.data) {
             earnings = onboarding.data.earned_current_financial_year || 0;
             if (practiceHours === 0) practiceHours = onboarding.data.work_hours_completed_already || 0;
@@ -119,6 +132,7 @@ export default function AllStatsScreen() {
 
       setStats({
         practiceHours,
+        workSessionsCount,
         cpdHours,
         reflectionsCount,
         feedbackCount,
@@ -141,7 +155,7 @@ export default function AllStatsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadStats();
+    await loadStats(true);
   };
 
   const practiceHoursTarget = 450;
@@ -182,6 +196,17 @@ export default function AllStatsScreen() {
     },
   ];
 
+  const formatHours = (value: number) => {
+    if (!Number.isFinite(value)) return '0';
+    if (value <= 0) return '0';
+    return String(Math.round(value));
+  };
+
+  const formatNumber = (value: number) => {
+    if (!Number.isFinite(value)) return '0';
+    return String(Math.round(value));
+  };
+
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
       <ScrollView
@@ -192,8 +217,8 @@ export default function AllStatsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+            tintColor={isDark ? accentColor : '#2B5F9E'}
+            colors={[accentColor, '#2B5F9E']}
           />
         }
       >
@@ -208,31 +233,21 @@ export default function AllStatsScreen() {
           <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
             All Stats
           </Text>
-          {isPremium ? (
-            <Pressable
-              onPress={() => showToast.info('PDF Export feature is coming in the next update', 'Coming Soon')}
-              className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
-                }`}
-            >
-              <MaterialIcons name="picture-as-pdf" size={20} color="#EF4444" />
-            </Pressable>
-          ) : (
-            <View className="w-10" />
-          )}
+         
         </View>
 
         {loading && !refreshing ? (
           <View className="py-20 items-center">
-            <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+            <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
           </View>
         ) : (
           <View className="px-6" style={{ gap: 16 }}>
             <View className="flex-row" style={{ gap: 12 }}>
               <View className="flex-1">
                 <StatCard
-                  title="Practice Hours"
-                  value={stats.practiceHours.toString()}
-                  subtitle="Hours completed"
+                  title="Work Sessions"
+                  value={stats.workSessionsCount.toString()}
+                  subtitle="Total sessions"
                   icon="access-time"
                   iconColor="#2563EB"
                   bgColor="bg-blue-50"
@@ -242,7 +257,7 @@ export default function AllStatsScreen() {
               <View className="flex-1">
                 <StatCard
                   title="CPD Hours"
-                  value={stats.cpdHours.toString()}
+                  value={formatHours(stats.cpdHours)}
                   subtitle="Hours completed"
                   icon="school"
                   iconColor="#10B981"
@@ -292,7 +307,7 @@ export default function AllStatsScreen() {
               <View className="flex-1">
                 <StatCard
                   title="Earnings"
-                  value={`£${stats.earnings}`}
+                  value={`£${formatNumber(stats.earnings)}`}
                   subtitle="This year"
                   icon="account-balance-wallet"
                   iconColor="#14B8A6"

@@ -13,6 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import { useNotificationStore } from '@/features/notifications/notification.store';
@@ -58,6 +59,8 @@ export default function NotificationsScreen() {
     notificationType?: string;
   }>();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const refreshUnreadCount = useNotificationStore((state) => state.refreshUnreadCount);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -648,7 +651,7 @@ export default function NotificationsScreen() {
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator
             size="large"
-            color={isDark ? '#D4AF37' : '#2B5F9E'}
+            color={isDark ? accentColor : '#2B5F9E'}
           />
           <Text
             className={`mt-4 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}
@@ -667,8 +670,8 @@ export default function NotificationsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-              colors={['#D4AF37', '#2B5F9E']}
+              tintColor={isDark ? accentColor : '#2B5F9E'}
+              colors={[accentColor, '#2B5F9E']}
             />
           }
         >

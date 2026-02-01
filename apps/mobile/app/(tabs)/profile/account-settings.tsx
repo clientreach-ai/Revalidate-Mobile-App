@@ -18,6 +18,16 @@ export default function AccountSettingsScreen() {
   const { profile, refresh: refreshProfile } = useProfile();
   const { isPremium } = usePremium();
 
+  const premiumGold = '#D4AF37';
+  const premiumGoldDark = '#B8860B';
+  const accentColor = isPremium ? premiumGold : '#2B5E9C';
+  const accentStrong = isPremium ? premiumGoldDark : '#2563EB';
+  const accentSoftLight = isPremium ? 'rgba(212, 175, 55, 0.15)' : 'rgba(59, 130, 246, 0.1)';
+  const accentSoftDark = isPremium ? 'rgba(212, 175, 55, 0.2)' : 'rgba(30, 58, 138, 0.2)';
+  const selectedTextColor = isPremium ? (isDark ? '#F4DFA6' : '#B8860B') : (isDark ? '#60A5FA' : '#2563EB');
+  const iconAccentColor = isPremium ? premiumGold : (isDark ? '#D4AF37' : '#2B5E9C');
+  const refreshTint = isPremium ? premiumGold : '#2B5F9E';
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -365,7 +375,8 @@ export default function AccountSettingsScreen() {
         <Pressable
           key={day}
           onPress={() => handleDateSelect(day)}
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#2563EB]' : isDark ? 'bg-slate-700/50' : 'bg-transparent'}`}
+          className="w-10 h-10 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: isSelected ? accentStrong : (isDark ? 'rgba(51, 65, 85, 0.5)' : 'transparent') }}
         >
           <Text className={`text-sm font-medium ${isSelected ? 'text-white' : isDark ? 'text-white' : 'text-gray-900'}`}>{day}</Text>
         </Pressable>
@@ -384,7 +395,7 @@ export default function AccountSettingsScreen() {
 
   const SectionHeader = ({ icon, title }: { icon: keyof typeof MaterialIcons.glyphMap; title: string }) => (
     <View className="flex-row items-center mb-2 mt-4 px-1" style={{ gap: 8 }}>
-      <MaterialIcons name={icon} size={20} color={isDark ? "#D4AF37" : "#2B5E9C"} />
+      <MaterialIcons name={icon} size={20} color={iconAccentColor} />
       <Text className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-gray-400" : "text-slate-500"}`}>
         {title}
       </Text>
@@ -425,6 +436,21 @@ export default function AccountSettingsScreen() {
     </View>
   );
 
+  const SectionSaveButton = ({ label }: { label: string }) => (
+    <Pressable
+      onPress={handleSave}
+      disabled={isSaving}
+      className="rounded-2xl p-3 items-center shadow-sm"
+      style={{ backgroundColor: isSaving ? '#9CA3AF' : accentColor }}
+    >
+      {isSaving ? (
+        <ActivityIndicator color="white" />
+      ) : (
+        <Text className="text-white font-semibold text-base">{label}</Text>
+      )}
+    </Pressable>
+  );
+
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-slate-50"}`} edges={['top']}>
       <ScrollView
@@ -435,8 +461,8 @@ export default function AccountSettingsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+            tintColor={refreshTint}
+            colors={[refreshTint]}
           />
         }
       >
@@ -447,7 +473,7 @@ export default function AccountSettingsScreen() {
               <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
             </Pressable>
             <Text className={`text-lg font-bold flex-1 text-center ${isDark ? "text-white" : "text-[#121417]"}`}>
-              Account Sett ings
+              Account Settings
             </Text>
             <View className="w-12" />
           </View>
@@ -455,7 +481,7 @@ export default function AccountSettingsScreen() {
 
         {loading && !refreshing && !profile ? (
           <View className="flex-1 items-center justify-center py-20">
-            <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+            <ActivityIndicator size="large" color={refreshTint} />
           </View>
         ) : (
           <View className="px-6 pb-8" style={{ gap: 24 }}>
@@ -467,15 +493,16 @@ export default function AccountSettingsScreen() {
                   {profileImage ? (
                     <Image source={{ uri: profileImage }} className="w-full h-full" />
                   ) : (
-                    <View className="w-full h-full bg-[#2B5E9C]/20 items-center justify-center">
-                      <MaterialIcons name="person" size={64} color="#2B5E9C" />
+                    <View className="w-full h-full items-center justify-center" style={{ backgroundColor: isPremium ? 'rgba(212, 175, 55, 0.2)' : 'rgba(43, 94, 156, 0.2)' }}>
+                      <MaterialIcons name="person" size={64} color={accentColor} />
                     </View>
                   )}
                 </View>
                 <Pressable
                   onPress={handleImagePick}
-                  className={`absolute bottom-1 right-1 bg-[#2B5E9C] p-2 rounded-full border-2 shadow-lg ${isDark ? "border-slate-800" : "border-slate-200"
+                  className={`absolute bottom-1 right-1 p-2 rounded-full border-2 shadow-lg ${isDark ? "border-slate-800" : "border-slate-200"
                     }`}
+                  style={{ backgroundColor: accentColor }}
                 >
                   <MaterialIcons name="camera-alt" size={16} color="#FFFFFF" />
                 </Pressable>
@@ -497,6 +524,7 @@ export default function AccountSettingsScreen() {
                   Role is set during onboarding and affects requirements.
                 </Text>
               </View>
+              <SectionSaveButton label="Save Personal Details" />
             </View>
 
             {/* Professional Details */}
@@ -516,6 +544,7 @@ export default function AccountSettingsScreen() {
                 onPress={() => setShowRegistrationsModal(true)}
                 placeholder="Select registrations"
               />
+              <SectionSaveButton label="Save Professional Details" />
             </View>
 
             {/* Practice Settings */}
@@ -533,6 +562,7 @@ export default function AccountSettingsScreen() {
                 onPress={() => setShowScopeModal(true)}
                 placeholder="Select scope of practice"
               />
+              <SectionSaveButton label="Save Practice Settings" />
             </View>
 
             {/* Financial Details */}
@@ -540,6 +570,7 @@ export default function AccountSettingsScreen() {
               <SectionHeader icon="payments" title="Financial Details" />
               <InputField label="Hourly Rate (£)" value={hourlyRate} onChangeText={setHourlyRate} placeholder="e.g. 50" keyboardType="numeric" />
               <InputField label="Earned This Financial Year (£)" value={earningsCurrentYear} onChangeText={setEarningsCurrentYear} placeholder="e.g. 0" keyboardType="numeric" />
+              <SectionSaveButton label="Save Financial Details" />
             </View>
 
             {/* Work Load */}
@@ -547,6 +578,7 @@ export default function AccountSettingsScreen() {
               <SectionHeader icon="history" title="Work Load History" />
               <InputField label="Work Hours Already Completed" value={workHoursCompleted} onChangeText={setWorkHoursCompleted} placeholder="e.g. 450" keyboardType="numeric" />
               <InputField label="Training Hours Already Completed" value={trainingHoursCompleted} onChangeText={setTrainingHoursCompleted} placeholder="e.g. 35" keyboardType="numeric" />
+              <SectionSaveButton label="Save Work Load" />
             </View>
 
             {/* Notes */}
@@ -554,6 +586,7 @@ export default function AccountSettingsScreen() {
               <SectionHeader icon="notes" title="Additional Information" />
               <InputField label="Brief Description of Work" value={workDescription} onChangeText={setWorkDescription} placeholder="Describe your current role..." multiline />
               <InputField label="Notepad" value={notepad} onChangeText={setNotepad} placeholder="Personal notes..." multiline />
+              <SectionSaveButton label="Save Additional Info" />
             </View>
 
             {/* Reset Data Section - Premium Only */}
@@ -608,14 +641,17 @@ export default function AccountSettingsScreen() {
             <Pressable
               onPress={handleSave}
               disabled={isSaving}
-              className={`rounded-2xl p-4 items-center shadow-md mt-6 ${isSaving ? "bg-gray-400" : "bg-[#2B5E9C]"}`}
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-                elevation: 8,
-              }}
+              className="rounded-2xl p-4 items-center shadow-md mt-6"
+              style={[
+                { backgroundColor: isSaving ? '#9CA3AF' : accentColor },
+                {
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                  elevation: 8,
+                },
+              ]}
             >
               {isSaving ? (
                 <ActivityIndicator color="white" />
@@ -696,18 +732,31 @@ export default function AccountSettingsScreen() {
                     <Pressable
                       key={opt.value}
                       onPress={() => toggleRegistration(opt.value)}
-                      className={`flex-row items-center p-4 rounded-2xl border ${isSelected ? (isDark ? 'bg-blue-900/20 border-blue-500' : 'bg-blue-50 border-blue-500') : (isDark ? 'bg-slate-700 border-slate-600' : 'bg-white border-gray-200')}`}
+                      className={`flex-row items-center p-4 rounded-2xl border ${isSelected ? '' : (isDark ? 'bg-slate-700 border-slate-600' : 'bg-white border-gray-200')}`}
+                      style={isSelected ? {
+                        backgroundColor: isDark ? accentSoftDark : accentSoftLight,
+                        borderColor: accentStrong,
+                      } : undefined}
                     >
                       <View className="flex-1">
-                        <Text className={`text-base font-medium ${isSelected ? (isDark ? 'text-blue-400' : '#2563EB') : (isDark ? 'text-white' : 'text-gray-800')}`}>{opt.label}</Text>
+                        <Text
+                          className={`text-base font-medium ${isSelected ? '' : (isDark ? 'text-white' : 'text-gray-800')}`}
+                          style={isSelected ? { color: selectedTextColor } : undefined}
+                        >
+                          {opt.label}
+                        </Text>
                       </View>
-                      {isSelected && <MaterialIcons name="check-circle" size={20} color="#2563EB" />}
+                      {isSelected && <MaterialIcons name="check-circle" size={20} color={accentStrong} />}
                     </Pressable>
                   );
                 })}
               </View>
             </ScrollView>
-            <Pressable onPress={() => setShowRegistrationsModal(false)} className={`py-4 rounded-2xl items-center bg-[#2563EB]`}>
+            <Pressable
+              onPress={() => setShowRegistrationsModal(false)}
+              className="py-4 rounded-2xl items-center"
+              style={{ backgroundColor: accentStrong }}
+            >
               <Text className="text-white font-bold text-base">Done</Text>
             </Pressable>
           </View>

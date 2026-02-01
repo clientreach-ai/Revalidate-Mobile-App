@@ -8,6 +8,7 @@ interface MonthViewProps {
     calendarDays: Array<{ date: Date; isCurrentMonth: boolean }>;
     eventDateKeys?: Set<string>;
     isDark: boolean;
+    isPremium: boolean;
     onDateSelect: (date: Date) => void;
     onPrevMonth: () => void;
     onNextMonth: () => void;
@@ -41,6 +42,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
     calendarDays,
     eventDateKeys,
     isDark,
+    isPremium,
     onDateSelect,
     onPrevMonth,
     onNextMonth,
@@ -88,6 +90,8 @@ export const MonthView: React.FC<MonthViewProps> = ({
                         const isSelected = isSameDay(day.date, selectedDate);
                         const isCurrentMonth = day.isCurrentMonth;
                         const hasEvent = eventDateKeys ? eventDateKeys.has(toDateKey(day.date)) : false;
+                        const isToday = isSameDay(day.date, new Date());
+                        const selectedAccent = isPremium ? '#D4AF37' : '#2B5F9E';
 
                         return (
                             <Pressable
@@ -98,12 +102,12 @@ export const MonthView: React.FC<MonthViewProps> = ({
                                 <View className="relative items-center justify-center">
                                     {isSelected ? (
                                         <>
-                                            <View className="w-8 h-8 rounded-full border-2 border-[#2B5F9E] items-center justify-center">
-                                                <Text className="text-[#2B5F9E] font-bold text-sm">
+                                            <View className="w-8 h-8 rounded-full border-2 items-center justify-center" style={{ borderColor: selectedAccent }}>
+                                                <Text className="font-bold text-sm" style={{ color: selectedAccent }}>
                                                     {day.date.getDate()}
                                                 </Text>
                                             </View>
-                                            <View className="absolute -bottom-1 w-1 h-1 bg-[#2B5F9E] rounded-full" />
+                                            <View className="absolute -bottom-1 w-1 h-1 rounded-full" style={{ backgroundColor: selectedAccent }} />
                                         </>
                                     ) : (
                                         <>
@@ -112,12 +116,16 @@ export const MonthView: React.FC<MonthViewProps> = ({
                                                     ? (isDark ? 'text-white' : 'text-slate-800')
                                                     : (isDark ? 'text-gray-500' : 'text-slate-300')
                                                     }`}
+                                                style={isPremium && isToday ? { color: '#D4AF37' } : undefined}
                                             >
                                                 {day.date.getDate()}
                                             </Text>
+                                            {isPremium && isToday && (
+                                                <View className="absolute -bottom-1 w-6 h-6 rounded-full border" style={{ borderColor: '#D4AF37' }} />
+                                            )}
                                             {hasEvent && (
                                                 <View
-                                                    className={`absolute -bottom-1 w-1 h-1 rounded-full ${isDark ? 'bg-slate-400' : 'bg-[#2B5F9E]'}`}
+                                                    className={`absolute -bottom-1 w-1 h-1 rounded-full ${isPremium ? 'bg-[#D4AF37]' : (isDark ? 'bg-slate-400' : 'bg-[#2B5F9E]')}`}
                                                 />
                                             )}
                                         </>

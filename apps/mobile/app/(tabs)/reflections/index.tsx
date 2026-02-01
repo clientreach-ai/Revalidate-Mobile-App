@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import '../../global.css';
@@ -33,6 +34,8 @@ export default function ReflectionsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'category' | 'evidence'>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -60,7 +63,7 @@ export default function ReflectionsScreen() {
     loadReflections();
   }, []);
 
-  const loadReflections = async () => {
+  const loadReflections = async (forceRefresh = false) => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
@@ -73,7 +76,7 @@ export default function ReflectionsScreen() {
         success: boolean;
         data: ApiReflection[];
         pagination: { total: number };
-      }>(API_ENDPOINTS.REFLECTIONS.LIST, token);
+      }>(API_ENDPOINTS.REFLECTIONS.LIST, token, forceRefresh);
 
       if (response?.data) {
         const mappedReflections: Reflection[] = response.data.map((r) => {
@@ -183,7 +186,7 @@ export default function ReflectionsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadReflections();
+    await loadReflections(true);
   };
 
   const handleFileSelect = async (source: 'gallery' | 'camera' | 'files') => {
@@ -261,7 +264,7 @@ export default function ReflectionsScreen() {
       setShowAddModal(false);
       setFileUri(null);
       setAttachment(null);
-      loadReflections();
+      loadReflections(true);
       setNewReflection({
         date: new Date().toISOString().split('T')[0],
         text: '',
@@ -335,7 +338,7 @@ export default function ReflectionsScreen() {
       {/* Loading State */}
       {loading && !refreshing && (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+          <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
           <Text className={`mt-4 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
             Loading reflections...
           </Text>
@@ -352,8 +355,8 @@ export default function ReflectionsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-              colors={['#D4AF37', '#2B5F9E']}
+              tintColor={isDark ? accentColor : '#2B5F9E'}
+              colors={[accentColor, '#2B5F9E']}
             />
           }
         >

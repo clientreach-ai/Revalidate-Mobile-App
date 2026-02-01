@@ -11,6 +11,7 @@ import { showToast } from '@/utils/toast';
 import { Image } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import '../../global.css';
 
 interface CPDActivity {
@@ -33,6 +34,8 @@ export default function CPDHoursTrackingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [refreshing, setRefreshing] = useState(false);
 
   // CPD Data (fetched from API)
@@ -54,6 +57,7 @@ export default function CPDHoursTrackingScreen() {
     linkToStandardProficiency: '',
   });
   const [cpdSubmitting, setCpdSubmitting] = useState(false);
+  const [cpdFormErrors, setCpdFormErrors] = useState<{ trainingName?: string; activityDate?: string; durationMinutes?: string }>({});
   const [fileUri, setFileUri] = useState<string | null>(null);
   const [cpdFile, setCpdFile] = useState<{ name: string; size: string; type: string } | null>(null);
   const [showCpdDatePicker, setShowCpdDatePicker] = useState(false);
@@ -103,6 +107,9 @@ export default function CPDHoursTrackingScreen() {
   const handleCpdDateSelect = (day: number) => {
     const iso = formatYMD(selectedYear, selectedMonth, day);
     setCpdForm({ ...cpdForm, activityDate: iso });
+    if (cpdFormErrors.activityDate) {
+      setCpdFormErrors((prev) => ({ ...prev, activityDate: undefined }));
+    }
     setShowCpdDatePicker(false);
   };
 
@@ -117,7 +124,8 @@ export default function CPDHoursTrackingScreen() {
         <Pressable
           key={day}
           onPress={() => handleCpdDateSelect(day)}
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? 'bg-[#2563EB]' : isDark ? 'bg-slate-700/50' : 'bg-transparent'}`}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected ? '' : isDark ? 'bg-slate-700/50' : 'bg-transparent'}`}
+          style={isSelected ? { backgroundColor: accentColor } : undefined}
         >
           <Text className={`text-sm font-medium ${isSelected ? 'text-white' : isDark ? 'text-white' : 'text-gray-900'}`}>{day}</Text>
         </Pressable>
@@ -204,14 +212,14 @@ export default function CPDHoursTrackingScreen() {
     loadCpdActivities();
   }, []);
 
-  const loadCpdActivities = async () => {
+  const loadCpdActivities = async (forceRefresh = false) => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) return;
 
       // Fetch user's CPD entries
-      const resp = await apiService.get<{ success?: boolean; data: Array<any> }>(`/api/v1/cpd-hours?limit=100`, token);
+      const resp = await apiService.get<{ success?: boolean; data: Array<any> }>(`/api/v1/cpd-hours?limit=100`, token, forceRefresh);
       const items = Array.isArray(resp?.data) ? resp.data : [];
 
       const mapped: CPDActivity[] = items.map((it: any) => ({
@@ -263,8 +271,8 @@ export default function CPDHoursTrackingScreen() {
               setRefreshing(true);
               setTimeout(() => setRefreshing(false), 1000);
             }}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+            tintColor={isDark ? accentColor : '#2B5F9E'}
+            colors={[accentColor, '#2B5F9E']}
           />
         }
       >
@@ -298,7 +306,7 @@ export default function CPDHoursTrackingScreen() {
               <View className={`flex-1 p-4 rounded-2xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-slate-50 border-slate-100"
                 }`}>
                 <View className="flex-row items-center mb-1" style={{ gap: 8 }}>
-                  <View className="w-2 h-2 rounded-full bg-[#2563EB]" />
+                  <View className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />
                   <Text className={`text-xs font-semibold uppercase ${isDark ? "text-gray-400" : "text-slate-500"
                     }`}>
                     Participatory
@@ -342,7 +350,7 @@ export default function CPDHoursTrackingScreen() {
             </Text>
             {allActivities.length > 5 && (
               <Pressable onPress={() => router.push('/(tabs)/cpdhourstracking/all-logs')}>
-                <Text className="text-[#2563EB] text-sm font-semibold">View All</Text>
+                <Text className="text-sm font-semibold" style={{ color: accentColor }}>View All</Text>
               </Pressable>
             )}
           </View>
@@ -382,9 +390,9 @@ export default function CPDHoursTrackingScreen() {
                         </Text>
                       </View>
                       {activity.hasCertificate && (
-                        <View className="flex-row items-center px-2 py-0.5 rounded-md bg-blue-50" style={{ gap: 4 }}>
-                          <MaterialIcons name="description" size={14} color="#2563EB" />
-                          <Text className="text-[10px] font-semibold text-[#2563EB]">
+                        <View className="flex-row items-center px-2 py-0.5 rounded-md" style={{ gap: 4, backgroundColor: isPremium ? 'rgba(212, 175, 55, 0.12)' : '#DBEAFE' }}>
+                          <MaterialIcons name="description" size={14} color={accentColor} />
+                          <Text className="text-[10px] font-semibold" style={{ color: accentColor }}>
                             Certificate
                           </Text>
                         </View>
@@ -413,7 +421,8 @@ export default function CPDHoursTrackingScreen() {
       >
         <Pressable
           onPress={() => setShowAddCpdModal(true)}
-          className="w-14 h-14 bg-[#2563EB] rounded-full shadow-lg items-center justify-center active:opacity-80"
+          className="w-14 h-14 rounded-full shadow-lg items-center justify-center active:opacity-80"
+          style={{ backgroundColor: accentColor }}
         >
           <MaterialIcons name="add" size={32} color="#FFFFFF" />
         </Pressable>
@@ -424,14 +433,20 @@ export default function CPDHoursTrackingScreen() {
         visible={showAddCpdModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowAddCpdModal(false)}
+        onRequestClose={() => {
+          setShowAddCpdModal(false);
+          setCpdFormErrors({});
+        }}
       >
         <View className="flex-1 bg-black/50 justify-end">
           <View className={`rounded-t-3xl max-h-[90%] flex-1 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
             <SafeAreaView edges={['bottom']} className="flex-1">
               <View className={`flex-row items-center justify-between px-6 pt-4 pb-4 border-b ${isDark ? 'border-slate-700' : 'border-slate-100'}`}>
                 <Text className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Add CPD Activity</Text>
-                <Pressable onPress={() => setShowAddCpdModal(false)}>
+                <Pressable onPress={() => {
+                  setShowAddCpdModal(false);
+                  setCpdFormErrors({});
+                }}>
                   <MaterialIcons name="close" size={24} color={isDark ? '#9CA3AF' : '#64748B'} />
                 </Pressable>
               </View>
@@ -442,11 +457,19 @@ export default function CPDHoursTrackingScreen() {
                     <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Topic *</Text>
                     <TextInput
                       value={cpdForm.trainingName}
-                      onChangeText={(t) => setCpdForm({ ...cpdForm, trainingName: t })}
+                      onChangeText={(t) => {
+                        setCpdForm({ ...cpdForm, trainingName: t });
+                        if (cpdFormErrors.trainingName && t.trim()) {
+                          setCpdFormErrors((prev) => ({ ...prev, trainingName: undefined }));
+                        }
+                      }}
                       placeholder="e.g. Clinical Assessment"
                       placeholderTextColor={isDark ? '#6B7280' : '#94A3B8'}
-                      className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-800 border-slate-200'}`}
+                      className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white' : 'bg-white text-slate-800'} ${cpdFormErrors.trainingName ? 'border-red-500' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
                     />
+                    {cpdFormErrors.trainingName ? (
+                      <Text className="text-xs text-red-500 mt-2">{cpdFormErrors.trainingName}</Text>
+                    ) : null}
                   </View>
 
                   <View>
@@ -456,7 +479,8 @@ export default function CPDHoursTrackingScreen() {
                         <Pressable
                           key={m}
                           onPress={() => setCpdForm({ ...cpdForm, learningMethod: m })}
-                          className={`px-4 py-2 rounded-xl border ${cpdForm.learningMethod === m ? 'bg-[#2563EB] border-[#2563EB]' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                          className={`px-4 py-2 rounded-xl border ${cpdForm.learningMethod === m ? '' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                          style={cpdForm.learningMethod === m ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
                         >
                           <Text className={`text-xs capitalize ${cpdForm.learningMethod === m ? 'text-white font-bold' : isDark ? 'text-gray-300' : 'text-slate-600'}`}>
                             {m}
@@ -473,7 +497,8 @@ export default function CPDHoursTrackingScreen() {
                         <Pressable
                           key={t}
                           onPress={() => setCpdForm({ ...cpdForm, cpdLearningType: t })}
-                          className={`px-4 py-2 rounded-xl border ${cpdForm.cpdLearningType === t ? 'bg-[#2563EB] border-[#2563EB]' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                          className={`px-4 py-2 rounded-xl border ${cpdForm.cpdLearningType === t ? '' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                          style={cpdForm.cpdLearningType === t ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
                         >
                           <Text className={`text-xs capitalize ${cpdForm.cpdLearningType === t ? 'text-white font-bold' : isDark ? 'text-gray-300' : 'text-slate-600'}`}>
                             {t}
@@ -487,7 +512,7 @@ export default function CPDHoursTrackingScreen() {
                     <View className="flex-row items-center justify-between mb-2">
                       <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Date *</Text>
                       <Pressable onPress={() => setShowHCPCInfo(true)}>
-                        <MaterialIcons name="info-outline" size={18} color="#2563EB" />
+                        <MaterialIcons name="info-outline" size={18} color={accentColor} />
                       </Pressable>
                     </View>
                     <Pressable
@@ -505,10 +530,13 @@ export default function CPDHoursTrackingScreen() {
                         }
                         setShowCpdDatePicker(true);
                       }}
-                      className={`border rounded-2xl px-4 py-3 ${isDark ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}`}
+                      className={`border rounded-2xl px-4 py-3 ${isDark ? 'bg-slate-700' : 'bg-white'} ${cpdFormErrors.activityDate ? 'border-red-500' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
                     >
                       <Text className={`${isDark ? 'text-white' : 'text-slate-800'}`}>{formatCpdDateDisplay(cpdForm.activityDate)}</Text>
                     </Pressable>
+                    {cpdFormErrors.activityDate ? (
+                      <Text className="text-xs text-red-500 mt-2">{cpdFormErrors.activityDate}</Text>
+                    ) : null}
                   </View>
 
                   <View className="flex-row items-center" style={{ gap: 12 }}>
@@ -516,26 +544,37 @@ export default function CPDHoursTrackingScreen() {
                       <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Number of Hours *</Text>
                       <TextInput
                         value={cpdForm.durationMinutes ? String(cpdForm.durationMinutes / 60) : ''}
-                        onChangeText={(t) => setCpdForm({ ...cpdForm, durationMinutes: Math.round(parseFloat(t || '0') * 60) })}
+                        onChangeText={(t) => {
+                          const minutes = Math.round(parseFloat(t || '0') * 60);
+                          setCpdForm({ ...cpdForm, durationMinutes: minutes });
+                          if (cpdFormErrors.durationMinutes && minutes > 0) {
+                            setCpdFormErrors((prev) => ({ ...prev, durationMinutes: undefined }));
+                          }
+                        }}
                         placeholder="e.g. 2.5"
                         keyboardType={Platform.OS === 'web' ? 'numeric' : 'decimal-pad'}
                         placeholderTextColor={isDark ? '#6B7280' : '#94A3B8'}
-                        className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-800 border-slate-200'}`}
+                        className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white' : 'bg-white text-slate-800'} ${cpdFormErrors.durationMinutes ? 'border-red-500' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
                       />
+                      {cpdFormErrors.durationMinutes ? (
+                        <Text className="text-xs text-red-500 mt-2">{cpdFormErrors.durationMinutes}</Text>
+                      ) : null}
                     </View>
                     <View className="flex-1">
                       <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Activity Type</Text>
                       <View className="flex-row items-center border rounded-2xl overflow-hidden" style={{ borderColor: isDark ? '#475569' : '#E2E8F0' }}>
                         <Pressable
                           onPress={() => setCpdForm({ ...cpdForm, activityType: 'participatory' })}
-                          className={`flex-1 py-3 items-center ${cpdForm.activityType === 'participatory' ? 'bg-[#2563EB]' : 'bg-transparent'}`}
+                          className={`flex-1 py-3 items-center ${cpdForm.activityType === 'participatory' ? '' : 'bg-transparent'}`}
+                          style={cpdForm.activityType === 'participatory' ? { backgroundColor: accentColor } : undefined}
                         >
                           <Text className={`text-[10px] font-bold ${cpdForm.activityType === 'participatory' ? 'text-white' : isDark ? 'text-gray-400' : 'text-slate-500'}`}>Part.</Text>
                         </Pressable>
                         <View className={`w-[1px] h-full ${isDark ? 'bg-slate-600' : 'bg-slate-200'}`} />
                         <Pressable
                           onPress={() => setCpdForm({ ...cpdForm, activityType: 'non-participatory' })}
-                          className={`flex-1 py-3 items-center ${cpdForm.activityType === 'non-participatory' ? 'bg-[#2563EB]' : 'bg-transparent'}`}
+                          className={`flex-1 py-3 items-center ${cpdForm.activityType === 'non-participatory' ? '' : 'bg-transparent'}`}
+                          style={cpdForm.activityType === 'non-participatory' ? { backgroundColor: accentColor } : undefined}
                         >
                           <Text className={`text-[10px] font-bold ${cpdForm.activityType === 'non-participatory' ? 'text-white' : isDark ? 'text-gray-400' : 'text-slate-500'}`}>Non-Part.</Text>
                         </Pressable>
@@ -545,20 +584,27 @@ export default function CPDHoursTrackingScreen() {
 
                   <View>
                     <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Link to code/standard</Text>
-                    <TextInput
-                      value={cpdForm.linkToStandard}
-                      onChangeText={(t) => setCpdForm({ ...cpdForm, linkToStandard: t })}
-                      placeholder="e.g. HCPC Standard 1"
-                      placeholderTextColor={isDark ? '#6B7280' : '#94A3B8'}
-                      className={`border rounded-2xl px-4 py-3 text-base ${isDark ? 'bg-slate-700 text-white border-slate-600' : 'bg-white text-slate-800 border-slate-200'}`}
-                    />
+                    <View className="flex-row flex-wrap" style={{ gap: 8 }}>
+                      {['HCPC Standard 1', 'HCPC Standard 2', 'HCPC Standard 3', 'HCPC Standard 4'].map((standard) => (
+                        <Pressable
+                          key={standard}
+                          onPress={() => setCpdForm({ ...cpdForm, linkToStandard: standard })}
+                          className={`px-4 py-2 rounded-xl border ${cpdForm.linkToStandard === standard ? '' : isDark ? 'border-slate-600' : 'border-slate-200'}`}
+                          style={cpdForm.linkToStandard === standard ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
+                        >
+                          <Text className={`text-xs ${cpdForm.linkToStandard === standard ? 'text-white font-bold' : isDark ? 'text-gray-300' : 'text-slate-600'}`}>
+                            {standard}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
                   </View>
 
                   <View>
                     <View className="flex-row items-center justify-between mb-2">
                       <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Link to standard proficiency</Text>
                       <Pressable onPress={() => setShowNMCInfo(true)}>
-                        <MaterialIcons name="help-outline" size={18} color="#D97706" />
+                        <MaterialIcons name="help-outline" size={18} color={accentColor} />
                       </Pressable>
                     </View>
                     <TextInput
@@ -573,7 +619,13 @@ export default function CPDHoursTrackingScreen() {
                   <View className="pt-2">
                     <Pressable
                       onPress={async () => {
-                        if (!cpdForm.trainingName.trim() || !cpdForm.activityDate || cpdForm.durationMinutes <= 0) {
+                        const errors: { trainingName?: string; activityDate?: string; durationMinutes?: string } = {};
+                        if (!cpdForm.trainingName.trim()) errors.trainingName = 'Please enter a topic.';
+                        if (!cpdForm.activityDate) errors.activityDate = 'Please select a date.';
+                        if (cpdForm.durationMinutes <= 0) errors.durationMinutes = 'Please enter hours.';
+
+                        if (Object.keys(errors).length > 0) {
+                          setCpdFormErrors(errors);
                           showToast.error('Please fill all required fields (*)', 'Missing Info');
                           return;
                         }
@@ -615,7 +667,7 @@ export default function CPDHoursTrackingScreen() {
                           }, token);
 
                           // reload
-                          await loadCpdActivities();
+                          await loadCpdActivities(true);
                           setShowAddCpdModal(false);
                           setCpdForm({
                             trainingName: '',
@@ -627,6 +679,7 @@ export default function CPDHoursTrackingScreen() {
                             linkToStandard: '',
                             linkToStandardProficiency: '',
                           });
+                          setCpdFormErrors({});
                           setCpdFile(null);
                           setFileUri(null);
                         } catch (err) {
@@ -636,7 +689,8 @@ export default function CPDHoursTrackingScreen() {
                           setCpdSubmitting(false);
                         }
                       }}
-                      className={`px-6 py-3 rounded-2xl items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-[#2563EB]'}`}
+                      className={`px-6 py-3 rounded-2xl items-center justify-center ${isDark ? 'bg-slate-700' : ''}`}
+                      style={!isDark ? { backgroundColor: accentColor } : undefined}
                       disabled={cpdSubmitting}
                     >
                       {cpdSubmitting ? (
@@ -734,7 +788,7 @@ export default function CPDHoursTrackingScreen() {
           <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-8 w-full max-w-sm`}>
             <View className="flex-row items-center mb-6">
               <View className="w-12 h-12 rounded-2xl bg-blue-100 items-center justify-center mr-4">
-                <MaterialIcons name="info" size={28} color="#2563EB" />
+                <MaterialIcons name="info" size={28} color={accentColor} />
               </View>
               <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>HCPC Standards</Text>
             </View>
@@ -767,7 +821,8 @@ export default function CPDHoursTrackingScreen() {
 
             <Pressable
               onPress={() => setShowHCPCInfo(false)}
-              className="mt-8 bg-[#2563EB] py-4 rounded-2xl items-center"
+              className="mt-8 py-4 rounded-2xl items-center"
+              style={{ backgroundColor: accentColor }}
             >
               <Text className="text-white font-bold">Close</Text>
             </Pressable>
@@ -786,7 +841,7 @@ export default function CPDHoursTrackingScreen() {
           <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-8 w-full max-w-sm`}>
             <View className="flex-row items-center mb-6">
               <View className="w-12 h-12 rounded-2xl bg-amber-100 items-center justify-center mr-4">
-                <MaterialIcons name="help" size={28} color="#D97706" />
+                <MaterialIcons name="help" size={28} color={accentColor} />
               </View>
               <Text className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Standard Proficiency</Text>
             </View>
@@ -800,7 +855,8 @@ export default function CPDHoursTrackingScreen() {
 
             <Pressable
               onPress={() => setShowNMCInfo(false)}
-              className="mt-8 bg-[#2563EB] py-4 rounded-2xl items-center"
+              className="mt-8 py-4 rounded-2xl items-center"
+              style={{ backgroundColor: accentColor }}
             >
               <Text className="text-white font-bold">Got it</Text>
             </Pressable>

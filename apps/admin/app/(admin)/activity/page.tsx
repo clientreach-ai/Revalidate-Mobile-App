@@ -382,13 +382,18 @@ export default function ActivityPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Link to code/standard
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.linkToStandard}
                     onChange={(e) => setFormData({ ...formData, linkToStandard: e.target.value })}
-                    placeholder="e.g. HCPC Standard 1"
-                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium"
+                  >
+                    <option value="">Select HCPC Standard</option>
+                    <option value="HCPC Standard 1">HCPC Standard 1</option>
+                    <option value="HCPC Standard 2">HCPC Standard 2</option>
+                    <option value="HCPC Standard 3">HCPC Standard 3</option>
+                    <option value="HCPC Standard 4">HCPC Standard 4</option>
+                    <option value="HCPC Standard 5">HCPC Standard 5</option>
+                  </select>
                 </div>
 
                 <div>

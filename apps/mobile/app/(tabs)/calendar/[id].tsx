@@ -3,6 +3,7 @@ import { View, Text, ScrollView, ActivityIndicator, Pressable, TextInput, Modal 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCalendarEventById } from '@/features/calendar/calendar.api';
 import { searchUsers } from '@/features/users/users.api';
@@ -14,6 +15,8 @@ export default function EventDetail() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +40,7 @@ export default function EventDetail() {
     (async () => {
       setLoading(true);
       try {
-        const res = await getCalendarEventById(String(id));
+        const res = await getCalendarEventById(String(id), true);
         if (mounted) {
           setEvent(res.data);
 
@@ -136,7 +139,7 @@ export default function EventDetail() {
       }
 
       // Refresh event
-      const res = await getCalendarEventById(String(id));
+      const res = await getCalendarEventById(String(id), true);
       setEvent(res.data);
 
       // Update current attendee status
@@ -177,7 +180,7 @@ export default function EventDetail() {
     return (
       <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background-light'}`}>
         <View className="items-center justify-center flex-1">
-          <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+          <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
         </View>
       </SafeAreaView>
     );
@@ -193,6 +196,35 @@ export default function EventDetail() {
     );
   }
 
+  const normalizeText = (value?: string | null) => {
+    if (!value) return '';
+    const trimmed = String(value).trim();
+    if (!trimmed || trimmed === '—' || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'undefined') {
+      return '';
+    }
+    return trimmed;
+  };
+
+  const descriptionText =
+    normalizeText(event?.description) ||
+    normalizeText(event?.invite) ||
+    normalizeText(event?.notes) ||
+    normalizeText(event?.details) ||
+    normalizeText(event?.summary) ||
+    '';
+
+  if (!descriptionText) {
+    console.log('[EventDetail] Description empty', {
+      id: event?.id,
+      description: event?.description,
+      invite: event?.invite,
+      notes: event?.notes,
+      details: event?.details,
+      summary: event?.summary,
+      rawEvent: event,
+    });
+  }
+
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-background-dark' : 'bg-background-light'}`}>
       <Modal
@@ -203,7 +235,7 @@ export default function EventDetail() {
       >
         <View className="flex-1 bg-black/60 items-center justify-center p-6">
           <View className={`w-full max-w-sm rounded-[32px] p-8 ${isDark ? 'bg-slate-800 border border-slate-700' : 'bg-white'}`}>
-            <View className="w-16 h-16 rounded-full bg-blue-100 items-center justify-center mb-6 mx-auto">
+            <View className="w-16 h-16 rounded-full items-center justify-center mb-6 mx-auto" style={{ backgroundColor: isPremium ? 'rgba(212, 175, 55, 0.15)' : '#DBEAFE' }}>
               <Text style={{ fontSize: 32 }}>📅</Text>
             </View>
             <Text className={`text-xl font-bold text-center mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Event Invitation</Text>
@@ -213,7 +245,8 @@ export default function EventDetail() {
             <View className="mb-8 p-4 rounded-2xl bg-slate-50 flex-row items-center" style={{ gap: 12 }}>
               <Pressable
                 onPress={() => setAddToCpd(!addToCpd)}
-                className={`w-6 h-6 rounded border items-center justify-center ${addToCpd ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}
+                className={`w-6 h-6 rounded border items-center justify-center ${addToCpd ? '' : 'border-slate-300 bg-white'}`}
+                style={addToCpd ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
               >
                 {addToCpd && <Text style={{ color: 'white', fontSize: 14, fontWeight: 'bold' }}>✓</Text>}
               </Pressable>
@@ -227,7 +260,8 @@ export default function EventDetail() {
               <Pressable
                 onPress={() => handleResponse('accepted')}
                 disabled={isResponding}
-                className="w-full py-4 rounded-2xl bg-blue-600 items-center justify-center active:opacity-90"
+                className="w-full py-4 rounded-2xl items-center justify-center active:opacity-90"
+                style={{ backgroundColor: accentColor }}
               >
                 {isResponding ? <ActivityIndicator size="small" color="white" /> : <Text className="text-white font-bold text-base">Accept Invitation</Text>}
               </Pressable>
@@ -260,13 +294,14 @@ export default function EventDetail() {
         {currentAttendee && (currentAttendee.status === 'pending' || currentAttendee.status === 'invited') && !showAcceptModal && (
           <Pressable
             onPress={() => setShowAcceptModal(true)}
-            className={`mb-6 p-4 rounded-3xl border flex-row items-center justify-between ${isDark ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-100'}`}
+            className="mb-6 p-4 rounded-3xl border flex-row items-center justify-between"
+            style={isDark ? { backgroundColor: isPremium ? 'rgba(212, 175, 55, 0.12)' : 'rgba(30, 58, 138, 0.2)', borderColor: isPremium ? '#D4AF37' : '#1E40AF' } : { backgroundColor: isPremium ? 'rgba(212, 175, 55, 0.12)' : '#DBEAFE', borderColor: isPremium ? 'rgba(212, 175, 55, 0.4)' : '#BFDBFE' }}
           >
             <View className="flex-1">
-              <Text className={`font-bold ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>Invitation Pending</Text>
-              <Text className={`text-xs ${isDark ? 'text-blue-200/80' : 'text-blue-600'}`}>Tap to respond to this invite</Text>
+              <Text className={`font-bold ${isDark ? (isPremium ? 'text-[#F4DFA6]' : 'text-blue-300') : (isPremium ? 'text-[#B8860B]' : 'text-blue-800')}`}>Invitation Pending</Text>
+              <Text className={`text-xs ${isDark ? (isPremium ? 'text-[#EAD48A]' : 'text-blue-200/80') : (isPremium ? 'text-[#B8860B]' : 'text-blue-600')}`}>Tap to respond to this invite</Text>
             </View>
-            <View className="bg-blue-600 px-4 py-2 rounded-xl">
+            <View className="px-4 py-2 rounded-xl" style={{ backgroundColor: accentColor }}>
               <Text className="text-white text-xs font-bold">Review</Text>
             </View>
           </Pressable>
@@ -291,13 +326,13 @@ export default function EventDetail() {
 
         <View className="mb-4">
           <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Description</Text>
-          <Text className={`${isDark ? 'text-white' : 'text-slate-800'}`}>{event.description || '—'}</Text>
+          <Text className={`${isDark ? 'text-white' : 'text-slate-800'}`}>{descriptionText || '—'}</Text>
         </View>
 
-        <View className="mb-4">
+        {/* <View className="mb-4">
           <Text className={`text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Invite / Notes</Text>
           <Text className={`${isDark ? 'text-white' : 'text-slate-800'}`}>{event.invite || '—'}</Text>
-        </View>
+        </View> */}
 
         <View className="mb-6">
           <Text className={`text-sm font-semibold mb-2 ${isDark ? 'text-gray-300' : 'text-slate-700'}`}>Invite Users</Text>
@@ -356,7 +391,7 @@ export default function EventDetail() {
               try {
                 const attendees = selectedUsers.map(u => ({ userId: u.id }));
                 await inviteAttendees(event.id, attendees);
-                const res = await getCalendarEventById(String(event.id));
+                const res = await getCalendarEventById(String(event.id), true);
                 setEvent(res.data);
                 setSelectedUsers([]);
               } catch (e) {
@@ -366,7 +401,8 @@ export default function EventDetail() {
               }
             }}
             disabled={isInviting || selectedUsers.length === 0}
-            className={`mt-3 rounded-2xl p-3 items-center ${isInviting || selectedUsers.length === 0 ? 'bg-[#2B5F9E]/50' : 'bg-[#2B5F9E]'}`}
+            className="mt-3 rounded-2xl p-3 items-center"
+            style={{ backgroundColor: isInviting || selectedUsers.length === 0 ? `${accentColor}80` : accentColor }}
           >
             {isInviting ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold">Send Invites</Text>}
           </Pressable>
@@ -393,7 +429,7 @@ export default function EventDetail() {
           )}
         </View>
 
-        <Pressable onPress={() => router.back()} className="py-3 px-4 rounded-xl bg-[#2B5F9E] items-center">
+        <Pressable onPress={() => router.back()} className="py-3 px-4 rounded-xl items-center" style={{ backgroundColor: accentColor }}>
           <Text className="text-white font-semibold">Back</Text>
         </Pressable>
       </ScrollView>

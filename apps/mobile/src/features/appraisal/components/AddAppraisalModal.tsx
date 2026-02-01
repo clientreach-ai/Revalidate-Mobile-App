@@ -9,6 +9,7 @@ import { showToast } from '@/utils/toast';
 import { Hospital } from '../appraisal.types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import { usePremium } from '@/hooks/usePremium';
 
 interface AddAppraisalModalProps {
     visible: boolean;
@@ -37,6 +38,8 @@ export const AddAppraisalModal = ({
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showHospitalPicker, setShowHospitalPicker] = useState(false);
     const [hospitalSearch, setHospitalSearch] = useState('');
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2B5E9C';
 
     const [form, setForm] = useState({
         hospital_id: null as number | null,
@@ -249,9 +252,10 @@ export const AddAppraisalModal = ({
                                                 key={type}
                                                 onPress={() => setForm({ ...form, appraisal_type: type })}
                                                 className={`px-4 py-2 rounded-full border ${form.appraisal_type === type
-                                                    ? (isDark ? "bg-[#2B5E9C] border-[#2B5E9C]" : "bg-[#2B5E9C] border-[#2B5E9C]")
+                                                    ? ''
                                                     : (isDark ? "bg-slate-700 border-slate-600" : "bg-white border-slate-200")
                                                     }`}
+                                                style={form.appraisal_type === type ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
                                             >
                                                 <Text className={`text-sm ${form.appraisal_type === type ? "text-white font-semibold" : (isDark ? "text-gray-400" : "text-slate-600")}`}>
                                                     {type}
@@ -270,9 +274,10 @@ export const AddAppraisalModal = ({
                                                 key={option}
                                                 onPress={() => setForm({ ...form, discussion_with: option })}
                                                 className={`px-4 py-2 rounded-full border ${form.discussion_with === option
-                                                    ? (isDark ? "bg-emerald-600 border-emerald-600" : "bg-emerald-600 border-emerald-600")
+                                                    ? ''
                                                     : (isDark ? "bg-slate-700 border-slate-600" : "bg-white border-slate-200")
                                                     }`}
+                                                style={form.discussion_with === option ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}
                                             >
                                                 <Text className={`text-sm ${form.discussion_with === option ? "text-white font-semibold" : (isDark ? "text-gray-400" : "text-slate-600")}`}>
                                                     {option}
@@ -346,7 +351,8 @@ export const AddAppraisalModal = ({
                                 <Pressable
                                     onPress={handleAddAppraisal}
                                     disabled={isUploading}
-                                    className={`rounded-2xl p-4 items-center shadow-sm mt-4 ${isUploading ? "bg-gray-400" : "bg-[#2B5E9C]"}`}
+                                    className={`rounded-2xl p-4 items-center shadow-sm mt-4 ${isUploading ? "bg-gray-400" : ""}`}
+                                    style={!isUploading ? { backgroundColor: accentColor } : undefined}
                                 >
                                     {isUploading ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-base">Save Appraisal</Text>}
                                 </Pressable>

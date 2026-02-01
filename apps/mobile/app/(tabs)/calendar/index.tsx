@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { getProfile } from '@/features/profile/profile.api';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { useCalendar } from '@/hooks/useCalendar';
 import { respondToInvite as apiRespondToInvite } from '@/features/calendar/calendar.api';
 import { CalendarEvent, CreateCalendarEvent, UpdateCalendarEvent } from '@/features/calendar/calendar.types';
@@ -26,6 +27,8 @@ export default function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const { events, isLoading, isRefreshing, refresh, createEvent, updateEvent, inviteAttendees } = useCalendar();
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
@@ -222,20 +225,16 @@ export default function CalendarScreen() {
         };
         const created = await createEvent(createData);
         if (selectedUsers && selectedUsers.length > 0) {
-          console.log('[DEBUG] Running logic V3 - Sending invites...');
-          showToast.error('DEBUG: Sending Invites V3'); // Visual confirmation
-          console.log('Sending invites (v2) to selected users:', selectedUsers);
           const attendees = selectedUsers.map(u => ({
             userId: u.id,
             user_id: u.id, // Snake case for backend compatibility
             email: u.email
           }));
-          console.log('INVITE PAYLOAD (v2):', JSON.stringify(attendees));
           try { // Added try-catch for inviteAttendees
             await inviteAttendees(created.id, attendees);
             await refresh(); // Force refresh to get updated attendees list from server
           } catch (e) {
-            console.error('Failed to send invites:', e);
+            // Ignore invite errors to avoid noisy debug alerts in UI
           }
         }
       }
@@ -267,8 +266,8 @@ export default function CalendarScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refresh}
-            tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-            colors={['#D4AF37', '#2B5F9E']}
+            tintColor={isDark ? accentColor : '#2B5F9E'}
+            colors={[accentColor, '#2B5F9E']}
           />
         }
       >
@@ -287,6 +286,7 @@ export default function CalendarScreen() {
           calendarDays={calendarDaysProps}
           eventDateKeys={eventDateKeys}
           isDark={isDark}
+          isPremium={isPremium}
           onDateSelect={setSelectedDate}
           onPrevMonth={() => navigateMonth('prev')}
           onNextMonth={() => navigateMonth('next')}
@@ -298,6 +298,7 @@ export default function CalendarScreen() {
           selectedDate={selectedDate}
           activeFilter={activeFilter}
           isDark={isDark}
+          isPremium={isPremium}
           onFilterChange={setActiveFilter}
           onAddEvent={() => {
             setEditingEventId(null);
@@ -317,7 +318,7 @@ export default function CalendarScreen() {
           // Set date to selected date when opening from FAB
           setShowAddEventModal(true);
         }}
-        className="absolute right-6 w-14 h-14 bg-[#2B5F9E] rounded-full shadow-lg items-center justify-center active:opacity-80"
+        className={`absolute right-6 w-14 h-14 rounded-full shadow-lg items-center justify-center active:opacity-80 ${isPremium ? 'bg-[#D4AF37]' : 'bg-[#2B5F9E]'}`}
         style={{ bottom: 80 + insets.bottom }}
       >
         <MaterialIcons name="add" size={32} color="#FFFFFF" />

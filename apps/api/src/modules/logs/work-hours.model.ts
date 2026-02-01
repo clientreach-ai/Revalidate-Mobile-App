@@ -334,8 +334,16 @@ export async function getTotalWorkHours(
 
   let query = `
     SELECT 
-      COALESCE(SUM(duration_minutes), 0) as total_minutes,
-      COALESCE(SUM(total_earnings), 0) as total_earnings
+      COALESCE(SUM(COALESCE(duration_minutes, TIMESTAMPDIFF(MINUTE, start_time, end_time))), 0) as total_minutes,
+      COALESCE(
+        SUM(
+          COALESCE(
+            total_earnings,
+            (COALESCE(duration_minutes, TIMESTAMPDIFF(MINUTE, start_time, end_time)) * COALESCE(hourly_rate, 0) / 60)
+          )
+        ),
+        0
+      ) as total_earnings
     FROM work_hours 
     WHERE user_id = ? AND is_active = 0
   `;
@@ -352,7 +360,7 @@ export async function getTotalWorkHours(
 
   const [results] = await pool.execute(query, params) as any[];
   return {
-    totalHours: Math.round(results[0].total_minutes / 60),
+    totalHours: Math.round((results[0].total_minutes / 60) * 10) / 10,
     totalEarnings: parseFloat(results[0].total_earnings || 0),
   };
 }

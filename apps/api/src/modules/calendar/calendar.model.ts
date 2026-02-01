@@ -99,6 +99,7 @@ export async function createCalendarEvent(
   }
 
   try {
+    const inviteValue = data.invite ?? data.description ?? null;
     const event = await prisma.user_calendars.create({
       data: {
         user_id: userBigInt,
@@ -109,7 +110,7 @@ export async function createCalendarEvent(
         start_time: data.startTime || null,
         end_time: data.endTime || null,
         venue: data.location || null,
-        invite: data.invite || null,
+        invite: inviteValue,
         status: 'one',
       },
     });
@@ -119,7 +120,7 @@ export async function createCalendarEvent(
       userId: event.user_id.toString(),
       type: mapEventType(event.type),
       title: event.title,
-      description: data.description ?? null,
+      description: inviteValue,
       date: event.date,
       endDate: event.end_date,
       startTime: event.start_time,
@@ -165,7 +166,7 @@ export async function getCalendarEventById(
     userId: event.user_id.toString(),
     type: mapEventType(event.type),
     title: event.title,
-    description: null,
+    description: event.invite ?? null,
     date: event.date,
     endDate: event.end_date,
     startTime: event.start_time,
@@ -249,7 +250,7 @@ export async function getUserCalendarEvents(
       userId: event.user_id.toString(),
       type: mapEventType(event.type),
       title: event.title,
-      description: null,
+      description: event.invite ?? null,
       date: event.date,
       endDate: event.end_date,
       startTime: event.start_time,
@@ -306,6 +307,8 @@ export async function updateCalendarEvent(
   }
   if (data.invite !== undefined) {
     updateData.invite = data.invite || null;
+  } else if (data.description !== undefined) {
+    updateData.invite = data.description || null;
   }
 
   updateData.updated_at = new Date();
@@ -320,7 +323,7 @@ export async function updateCalendarEvent(
     userId: updated.user_id.toString(),
     type: updated.type as 'official' | 'personal',
     title: updated.title,
-    description: null,
+    description: updated.invite ?? null,
     date: updated.date,
     endDate: updated.end_date,
     startTime: updated.start_time,
@@ -602,7 +605,7 @@ export async function copyCalendarEvent(
     userId: created.user_id.toString(),
     type: mapEventType(created.type),
     title: created.title,
-    description: null,
+    description: created.invite ?? null,
     date: created.date,
     endDate: created.end_date,
     startTime: created.start_time,

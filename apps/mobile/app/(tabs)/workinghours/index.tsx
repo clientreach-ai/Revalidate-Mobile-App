@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import '../../global.css';
@@ -23,6 +24,8 @@ interface WorkSession {
 export default function WorkingHoursScreen() {
     const router = useRouter();
     const { isDark } = useThemeStore();
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [sessions, setSessions] = useState<WorkSession[]>([]);
@@ -35,7 +38,7 @@ export default function WorkingHoursScreen() {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const loadSessions = async () => {
+    const loadSessions = async (forceRefresh: boolean = false) => {
         try {
             setLoading(true);
             const token = await AsyncStorage.getItem('authToken');
@@ -48,13 +51,16 @@ export default function WorkingHoursScreen() {
                 success: boolean;
                 data: WorkSession[];
                 pagination: { total: number };
-            }>(API_ENDPOINTS.WORK_HOURS.LIST, token);
+            }>(API_ENDPOINTS.WORK_HOURS.LIST, token, forceRefresh);
 
             if (response.success && response.data) {
-                // Sort by date (newest first)
-                const sorted = response.data.sort((a, b) =>
-                    new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-                );
+                // Sort by created date (newest first), fallback to start time
+                const sorted = response.data.sort((a, b) => {
+                    const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                    const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                    if (aCreated !== bCreated) return bCreated - aCreated;
+                    return new Date(b.startTime).getTime() - new Date(a.startTime).getTime();
+                });
                 setSessions(sorted);
             }
         } catch (error: any) {
@@ -70,9 +76,15 @@ export default function WorkingHoursScreen() {
         loadSessions();
     }, []);
 
+    useFocusEffect(
+        useCallback(() => {
+            loadSessions(true);
+        }, [])
+    );
+
     const onRefresh = async () => {
         setRefreshing(true);
-        await loadSessions();
+        await loadSessions(true);
     };
 
     const handleAddSession = async () => {
@@ -98,7 +110,7 @@ export default function WorkingHoursScreen() {
 
             showToast.success('Work session added', 'Success');
             setShowAddModal(false);
-            loadSessions();
+            loadSessions(true);
             setNewSession({
                 date: new Date().toISOString().split('T')[0],
                 startTime: '09:00',
@@ -129,11 +141,26 @@ export default function WorkingHoursScreen() {
         });
     };
 
-    const formatDuration = (minutes: number | null) => {
-        if (!minutes) return '0 hrs';
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return `${hours}h ${mins}m`;
+    const formatDuration = (minutes: number | null, startTime: string, endTime?: string | null) => {
+        let totalSeconds = 0;
+        if (endTime) {
+            const start = new Date(startTime).getTime();
+            const end = new Date(endTime).getTime();
+            if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+                totalSeconds = Math.floor((end - start) / 1000);
+            }
+        }
+
+        if (!totalSeconds && minutes) {
+            totalSeconds = Math.round(minutes * 60);
+        }
+
+        if (!totalSeconds) return '0h 0m 0s';
+
+        const hours = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+        return `${hours}h ${mins}m ${secs}s`;
     };
 
     return (
@@ -160,14 +187,14 @@ export default function WorkingHoursScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={isDark ? '#D4AF37' : '#2B5F9E'}
-                        colors={['#D4AF37', '#2B5F9E']}
+                        tintColor={isDark ? accentColor : '#2B5F9E'}
+                        colors={[accentColor, '#2B5F9E']}
                     />
                 }
             >
                 {loading && !refreshing ? (
                     <View className="py-20 items-center">
-                        <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+                        <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
                     </View>
                 ) : sessions.length === 0 ? (
                     <View className={`p-8 rounded-2xl border items-center ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-100"
@@ -219,7 +246,7 @@ export default function WorkingHoursScreen() {
                                         )}
                                     </View>
                                     <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                                        {formatDuration(session.durationMinutes)}
+                                        {formatDuration(session.durationMinutes, session.startTime, session.endTime)}
                                     </Text>
                                 </View>
                             </Pressable>

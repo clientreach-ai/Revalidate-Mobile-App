@@ -131,7 +131,7 @@ export default function DashboardScreen() {
               handleRestartSession={handleRestartSession}
               handlePauseSession={handlePauseSession}
               handleResumeSession={handleResumeSession}
-              handleStopSession={() => handleStopSession(() => workForm.openFormWithDefaults(`${timer.hours}:${timer.minutes}`))}
+              handleStopSession={() => handleStopSession(() => workForm.openFormWithDefaults(`${timer.hours}:${timer.minutes}:${timer.seconds}`))}
             />
           ) : (
             <View

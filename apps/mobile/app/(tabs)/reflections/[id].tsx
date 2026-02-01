@@ -2,9 +2,11 @@ import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, M
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import * as DocumentPicker from 'expo-document-picker';
@@ -36,6 +38,9 @@ export default function ReflectionDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+    const tabBarHeight = useBottomTabBarHeight();
 
     const [reflection, setReflection] = useState<ReflectionDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -259,7 +264,7 @@ export default function ReflectionDetailScreen() {
 
     if (loading) return (
         <SafeAreaView className={`flex-1 items-center justify-center ${isDark ? "bg-background-dark" : "bg-background-light"}`}>
-            <ActivityIndicator size="large" color="#2B5E9C" />
+            <ActivityIndicator size="large" color={accentColor} />
         </SafeAreaView>
     );
 
@@ -276,11 +281,11 @@ export default function ReflectionDetailScreen() {
                     <Text className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Reflection Details</Text>
                 </View>
                 <Pressable onPress={handleEditOpen} className={`p-2 rounded-full ${isDark ? "active:bg-slate-700" : "active:bg-gray-100"}`}>
-                    <MaterialIcons name="edit" size={24} color="#2B5E9C" />
+                    <MaterialIcons name="edit" size={24} color={accentColor} />
                 </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadReflectionDetail(); }} />}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: Math.max(140, tabBarHeight + 140) }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadReflectionDetail(); }} tintColor={isDark ? accentColor : '#2B5F9E'} colors={[accentColor, '#2B5F9E']} />}>
 
                 {/* Main Card */}
                 <View className={`p-5 rounded-2xl border shadow-sm mb-6 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
@@ -309,10 +314,10 @@ export default function ReflectionDetailScreen() {
                         )}
 
                         <Pressable onPress={() => handleViewDocument(reflection.documentIds[0] as number)} className={`bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-600 flex-row items-center active:opacity-70`}>
-                            <MaterialIcons name="description" size={24} color="#2B5E9C" />
+                            <MaterialIcons name="description" size={24} color={accentColor} />
                             <View className="ml-3">
                                 <Text className={`font-medium ${isDark ? "text-gray-200" : "text-gray-700"}`}>Attached Document</Text>
-                                <Text className="text-xs text-blue-500">Tap to View File</Text>
+                                <Text className="text-xs" style={{ color: accentColor }}>Tap to View File</Text>
                             </View>
                         </Pressable>
                     </View>
@@ -321,8 +326,8 @@ export default function ReflectionDetailScreen() {
             </ScrollView>
 
             {/* Footer */}
-            <View className={`absolute bottom-0 w-full px-4 pt-4 border-t ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-gray-200"}`} style={{ paddingBottom: Math.max(16, insets.bottom + 16) }}>
-                <Pressable onPress={handleEditOpen} className="bg-[#2B5E9C] py-4 rounded-xl items-center shadow-sm">
+            <View className={`absolute w-full px-4 pt-4 border-t ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-gray-200"}`} style={{ bottom: tabBarHeight, paddingBottom: Math.max(16, insets.bottom + 16) }}>
+                <Pressable onPress={handleEditOpen} className="py-4 rounded-xl items-center shadow-sm" style={{ backgroundColor: accentColor }}>
                     <Text className="text-white font-bold text-base">Edit Reflection</Text>
                 </Pressable>
             </View>
@@ -366,7 +371,7 @@ export default function ReflectionDetailScreen() {
                                     ) : fileUri && attachment ? (
                                         <View className={`flex-row items-center justify-between p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200"}`}>
                                             <View className="flex-row items-center flex-1">
-                                                <MaterialIcons name="upload-file" size={20} color="#2B5E9C" />
+                                                <MaterialIcons name="upload-file" size={20} color={accentColor} />
                                                 <Text className={`ml-2 ${isDark ? "text-gray-300" : "text-gray-700"}`} numberOfLines={1}>{attachment.name}</Text>
                                             </View>
                                             <Pressable onPress={() => { setFileUri(null); setAttachment(null); }} className="p-2">
@@ -376,22 +381,22 @@ export default function ReflectionDetailScreen() {
                                     ) : (
                                         <View className="flex-row gap-3">
                                             <Pressable onPress={() => handleFileSelect('camera')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
-                                                <MaterialIcons name="camera-alt" size={24} color="#2B5E9C" />
+                                                <MaterialIcons name="camera-alt" size={24} color={accentColor} />
                                                 <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Camera</Text>
                                             </Pressable>
                                             <Pressable onPress={() => handleFileSelect('gallery')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
-                                                <MaterialIcons name="photo-library" size={24} color="#2B5E9C" />
+                                                <MaterialIcons name="photo-library" size={24} color={accentColor} />
                                                 <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Gallery</Text>
                                             </Pressable>
                                             <Pressable onPress={() => handleFileSelect('files')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
-                                                <MaterialIcons name="folder" size={24} color="#2B5E9C" />
+                                                <MaterialIcons name="folder" size={24} color={accentColor} />
                                                 <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Files</Text>
                                             </Pressable>
                                         </View>
                                     )}
                                 </View>
 
-                                <Pressable onPress={handleUpdate} disabled={isSubmitting} className={`p-4 rounded-xl items-center mt-4 ${isSubmitting ? "bg-gray-400" : "bg-[#2B5E9C]"}`}>
+                                <Pressable onPress={handleUpdate} disabled={isSubmitting} className={`p-4 rounded-xl items-center mt-4 ${isSubmitting ? "bg-gray-400" : ""}`} style={!isSubmitting ? { backgroundColor: accentColor } : undefined}>
                                     {isSubmitting ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-base">Save Changes</Text>}
                                 </Pressable>
                                 <View className="h-10" />

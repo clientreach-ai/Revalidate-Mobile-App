@@ -96,6 +96,17 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
     const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
     const [showScopeModal, setShowScopeModal] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [submitAttempted, setSubmitAttempted] = useState(false);
+
+    const showErrors = submitAttempted;
+    const missing = {
+        workingMode: !workingMode,
+        selectedDate: !selectedDate,
+        selectedHospital: !selectedHospital,
+        rate: !rate?.trim(),
+        workSetting: !workSetting?.trim(),
+        scope: !scope?.trim(),
+    };
 
     return (
         <Modal visible={visible} transparent animationType="slide">
@@ -141,7 +152,9 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                         {/* Working Mode */}
                         <View className="mb-6">
                             <Text
-                                className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'
+                                className={`text-sm font-semibold mb-3 ${showErrors && missing.workingMode
+                                    ? 'text-red-500'
+                                    : isDark ? 'text-slate-400' : 'text-slate-500'
                                     }`}
                             >
                                 WORKING MODE (REQUIRED)
@@ -153,9 +166,11 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                                         onPress={() => setWorkingMode(mode)}
                                         className={`flex-1 py-3 items-center rounded-2xl border ${workingMode === mode
                                             ? 'bg-blue-500 border-blue-500'
-                                            : isDark
-                                                ? 'bg-slate-800 border-slate-700'
-                                                : 'bg-slate-50 border-slate-200'
+                                            : showErrors && missing.workingMode
+                                                ? 'bg-transparent border-red-500'
+                                                : isDark
+                                                    ? 'bg-slate-800 border-slate-700'
+                                                    : 'bg-slate-50 border-slate-200'
                                             }`}
                                     >
                                         <Text
@@ -176,14 +191,18 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                         {/* Date */}
                         <View className="mb-6">
                             <Text
-                                className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'
+                                className={`text-sm font-semibold mb-3 ${showErrors && missing.selectedDate
+                                    ? 'text-red-500'
+                                    : isDark ? 'text-slate-400' : 'text-slate-500'
                                     }`}
                             >
                                 DATE (REQUIRED)
                             </Text>
                             <Pressable
                                 onPress={() => setShowDatePicker(true)}
-                                className={`p-4 rounded-2xl border flex-row justify-between items-center ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                                className={`p-4 rounded-2xl border flex-row justify-between items-center ${showErrors && missing.selectedDate
+                                    ? 'border-red-500'
+                                    : isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                                     }`}
                             >
                                 <Text className={isDark ? 'text-white' : 'text-slate-800'}>
@@ -200,14 +219,18 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                         {/* Hospital */}
                         <View className="mb-6">
                             <Text
-                                className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'
+                                className={`text-sm font-semibold mb-3 ${showErrors && missing.selectedHospital
+                                    ? 'text-red-500'
+                                    : isDark ? 'text-slate-400' : 'text-slate-500'
                                     }`}
                             >
                                 HOSPITAL (REQUIRED)
                             </Text>
                             <Pressable
                                 onPress={() => setShowHospitalModal(true)}
-                                className={`p-4 rounded-2xl border flex-row justify-between items-center ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                                className={`p-4 rounded-2xl border flex-row justify-between items-center ${showErrors && missing.selectedHospital
+                                    ? 'border-red-500'
+                                    : isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                                     }`}
                             >
                                 <Text className={isDark ? 'text-white' : 'text-slate-800'}>
@@ -228,13 +251,14 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                                     className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'
                                         }`}
                                 >
-                                    HOURS (REQUIRED)
+                                    HOURS (HH:MM:SS)
                                 </Text>
                                 <TextInput
                                     value={hours}
                                     onChangeText={setHours}
-                                    keyboardType="numeric"
-                                    placeholder="0.00"
+                                    keyboardType="numbers-and-punctuation"
+                                    editable={false}
+                                    placeholder="00:00:00"
                                     placeholderTextColor="gray"
                                     className={`p-4 rounded-2xl border ${isDark
                                         ? 'bg-slate-800 border-slate-700 text-white'
@@ -244,7 +268,9 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                             </View>
                             <View className="flex-1">
                                 <Text
-                                    className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'
+                                    className={`text-sm font-semibold mb-3 ${showErrors && missing.rate
+                                        ? 'text-red-500'
+                                        : isDark ? 'text-slate-400' : 'text-slate-500'
                                         }`}
                                 >
                                     RATE (£/HR) (REQUIRED)
@@ -255,9 +281,11 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                                     keyboardType="numeric"
                                     placeholder="0.00"
                                     placeholderTextColor="gray"
-                                    className={`p-4 rounded-2xl border ${isDark
-                                        ? 'bg-slate-800 border-slate-700 text-white'
-                                        : 'bg-slate-50 border-slate-200 text-slate-800'
+                                    className={`p-4 rounded-2xl border ${showErrors && missing.rate
+                                        ? 'border-red-500'
+                                        : isDark
+                                            ? 'bg-slate-800 border-slate-700 text-white'
+                                            : 'bg-slate-50 border-slate-200 text-slate-800'
                                         }`}
                                 />
                             </View>
@@ -266,14 +294,18 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                         {/* Work Setting */}
                         <View className="mb-6">
                             <Text
-                                className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'
+                                className={`text-sm font-semibold mb-3 ${showErrors && missing.workSetting
+                                    ? 'text-red-500'
+                                    : isDark ? 'text-slate-400' : 'text-slate-500'
                                     }`}
                             >
                                 WORK SETTING (REQUIRED)
                             </Text>
                             <Pressable
                                 onPress={() => setShowWorkSettingModal(true)}
-                                className={`p-4 rounded-2xl border flex-row justify-between items-center ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                                className={`p-4 rounded-2xl border flex-row justify-between items-center ${showErrors && missing.workSetting
+                                    ? 'border-red-500'
+                                    : isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                                     }`}
                             >
                                 <Text className={isDark ? 'text-white' : 'text-slate-800'}>
@@ -290,14 +322,18 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                         {/* Scope of Practice */}
                         <View className="mb-6">
                             <Text
-                                className={`text-sm font-semibold mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'
+                                className={`text-sm font-semibold mb-3 ${showErrors && missing.scope
+                                    ? 'text-red-500'
+                                    : isDark ? 'text-slate-400' : 'text-slate-500'
                                     }`}
                             >
                                 SCOPE OF PRACTICE (REQUIRED)
                             </Text>
                             <Pressable
                                 onPress={() => setShowScopeModal(true)}
-                                className={`p-4 rounded-2xl border flex-row justify-between items-center ${isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+                                className={`p-4 rounded-2xl border flex-row justify-between items-center ${showErrors && missing.scope
+                                    ? 'border-red-500'
+                                    : isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
                                     }`}
                             >
                                 <Text className={isDark ? 'text-white' : 'text-slate-800'}>
@@ -388,7 +424,10 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                         </View>
 
                         <Pressable
-                            onPress={handleSaveWorkSession}
+                            onPress={() => {
+                                setSubmitAttempted(true);
+                                handleSaveWorkSession();
+                            }}
                             disabled={isSavingWork}
                             className={`py-4 rounded-2xl items-center shadow-lg ${isSavingWork ? 'bg-slate-400' : 'bg-blue-600 shadow-blue-200'
                                 }`}

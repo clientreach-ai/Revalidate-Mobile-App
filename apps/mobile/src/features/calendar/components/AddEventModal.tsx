@@ -5,6 +5,7 @@ import { TimePickerModal } from './TimePickerModal';
 // Reuse existing date picker from dashboard
 import { CalendarDatePickerModal } from '@/features/dashboard/components/CalendarDatePickerModal';
 import { searchUsers } from '@/features/users/users.api';
+import { usePremium } from '@/hooks/usePremium';
 
 interface AddEventModalProps {
     visible: boolean;
@@ -25,6 +26,9 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
     editingEventId,
     existingEventData,
 }) => {
+    const { isPremium } = usePremium();
+    const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+    const accentSoft = isPremium ? '#D4AF37' : '#2B5F9E';
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showStartTimePicker, setShowStartTimePicker] = useState(false);
     const [showEndTimePicker, setShowEndTimePicker] = useState(false);
@@ -41,6 +45,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
 
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     // Search state
     const [searchQuery, setSearchQuery] = useState('');
@@ -76,6 +81,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
             setFormErrors({});
             setSearchQuery('');
             setSearchResults([]);
+            setSubmitError(null);
         }
     }, [visible, editingEventId, existingEventData, initialDate]);
 
@@ -150,11 +156,13 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
     const handleSave = async () => {
         if (validateForm()) {
             setIsSubmitting(true);
+            setSubmitError(null);
             try {
                 await onSave(eventForm, selectedUsers);
                 // Form reset handled by useEffect on visible change or parent
-            } catch (error) {
-                // Error handling should be done by parent or here
+            } catch (error: any) {
+                console.error('Failed to save event', error);
+                setSubmitError(error?.message || 'Failed to save event');
             } finally {
                 setIsSubmitting(false);
             }
@@ -214,6 +222,12 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                                         <Text className="text-red-500 text-xs mt-1">{formErrors.title}</Text>
                                     )}
                                 </View>
+
+                                {submitError && (
+                                    <View className={`rounded-2xl border px-4 py-3 ${isDark ? 'bg-red-900/20 border-red-900/40' : 'bg-red-50 border-red-200'}`}>
+                                        <Text className={`${isDark ? 'text-red-200' : 'text-red-700'} text-sm font-medium`}>{submitError}</Text>
+                                    </View>
+                                )}
 
                                 {/* Description */}
                                 <View>
@@ -350,7 +364,7 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                                         <Pressable
                                             onPress={() => setEventForm({ ...eventForm, type: 'official' })}
                                             className={`flex-1 py-4 rounded-2xl border-2 items-center ${eventForm.type === 'official'
-                                                ? 'bg-blue-50 border-[#2B5F9E]'
+                                                ? (isPremium ? 'bg-[#D4AF37]/10 border-[#D4AF37]' : 'bg-blue-50 border-[#2B5F9E]')
                                                 : isDark
                                                     ? 'bg-slate-700 border-slate-600'
                                                     : 'bg-white border-slate-200'
@@ -359,10 +373,10 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                                             <MaterialIcons
                                                 name="business"
                                                 size={24}
-                                                color={eventForm.type === 'official' ? '#2B5F9E' : (isDark ? '#6B7280' : '#94A3B8')}
+                                                color={eventForm.type === 'official' ? accentColor : (isDark ? '#6B7280' : '#94A3B8')}
                                             />
                                             <Text className={`text-sm font-semibold mt-2 ${eventForm.type === 'official'
-                                                ? 'text-[#2B5F9E]'
+                                                ? (isPremium ? 'text-[#D4AF37]' : 'text-[#2B5F9E]')
                                                 : (isDark ? 'text-gray-300' : 'text-slate-600')
                                                 }`}>
                                                 Official CPD
@@ -455,8 +469,8 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
                             <Pressable
                                 onPress={handleSave}
                                 disabled={isSubmitting}
-                                className={`flex-1 py-4 rounded-2xl items-center ${isSubmitting ? 'bg-[#2B5F9E]/50' : 'bg-[#2B5F9E]'
-                                    }`}
+                                className="flex-1 py-4 rounded-2xl items-center"
+                                style={{ backgroundColor: isSubmitting ? `${accentSoft}80` : accentColor }}
                             >
                                 {isSubmitting ? (
                                     <Text className="text-white font-semibold text-base">Saving...</Text>

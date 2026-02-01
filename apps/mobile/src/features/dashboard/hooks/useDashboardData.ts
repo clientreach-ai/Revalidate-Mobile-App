@@ -15,6 +15,7 @@ export const useDashboardData = () => {
     const [stats, setStats] = useState<DashboardStats>({
         totalHours: 0,
         totalEarnings: 0,
+        workSessionsCount: 0,
         cpdHours: 0,
         reflectionsCount: 0,
         appraisalsCount: 0,
@@ -122,6 +123,16 @@ export const useDashboardData = () => {
             let totalHours = whr?.data?.totalHours || 0;
             let totalEarnings = whr?.data?.totalEarnings || 0;
 
+            let workSessionsCount = 0;
+            try {
+                const sessions = await apiService.get<{ pagination?: { total?: number } }>(
+                    `${API_ENDPOINTS.WORK_HOURS.LIST}?limit=1`,
+                    token,
+                    force
+                );
+                workSessionsCount = sessions?.pagination?.total || 0;
+            } catch (e) { }
+
             if (totalHours === 0 || totalEarnings === 0) {
                 try {
                     const onboarding = await apiService.get<{ data: any }>(
@@ -169,8 +180,9 @@ export const useDashboardData = () => {
 
             if (isMounted.current) {
                 setStats({
-                    totalHours: Math.round(totalHours),
+                    totalHours: Math.ceil(Number(totalHours)),
                     totalEarnings: Math.round(totalEarnings),
+                    workSessionsCount,
                     cpdHours: Math.round(cpdHours),
                     reflectionsCount,
                     appraisalsCount,

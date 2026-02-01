@@ -1,10 +1,11 @@
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput, Platform, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { usePremium } from '@/hooks/usePremium';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import * as DocumentPicker from 'expo-document-picker';
@@ -37,6 +38,8 @@ export default function FeedbackScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
+  const { isPremium } = usePremium();
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
   const [activeFilter, setActiveFilter] = useState<'all' | 'patient' | 'colleague' | 'manager'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -77,6 +80,12 @@ export default function FeedbackScreen() {
     loadFeedback();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadFeedback(true);
+    }, [])
+  );
+
   const loadUserRole = async () => {
     try {
       const userDataStr = await AsyncStorage.getItem('userData');
@@ -91,7 +100,7 @@ export default function FeedbackScreen() {
     }
   };
 
-  const loadFeedback = async () => {
+  const loadFeedback = async (forceRefresh = false) => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
@@ -103,7 +112,7 @@ export default function FeedbackScreen() {
       const response = await apiService.get<{
         success: boolean;
         data: ApiFeedback[];
-      }>(API_ENDPOINTS.FEEDBACK.LIST, token);
+      }>(API_ENDPOINTS.FEEDBACK.LIST, token, forceRefresh);
 
       if (response?.data) {
         const mapped: FeedbackEntry[] = response.data.map((f) => {
@@ -302,7 +311,7 @@ export default function FeedbackScreen() {
       setFileUri(null);
       setAttachment(null);
 
-      loadFeedback();
+      loadFeedback(true);
 
     } catch (error: any) {
       console.error('Submit error:', error);
@@ -348,7 +357,7 @@ export default function FeedbackScreen() {
 
       {/* List */}
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadFeedback(); }} />}>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadFeedback(true); }} tintColor={isDark ? accentColor : '#2B5F9E'} colors={[accentColor, '#2B5F9E']} />}>
         <View style={{ gap: 16 }}>
           {filtered.map(item => (
             <Pressable key={item.id} onPress={() => router.push(`/(tabs)/feedback/${item.id}` as any)}
