@@ -177,7 +177,7 @@ export default function FeedbackDetailScreen() {
         };
     };
 
-    const loadFeedbackDetail = async () => {
+    const loadFeedbackDetail = async (forceRefresh = false) => {
         try {
             if (isMountedRef.current) {
                 setLoading(true);
@@ -194,7 +194,8 @@ export default function FeedbackDetailScreen() {
 
             const response = await apiService.get<{ success: boolean; data: ApiFeedback }>(
                 `${API_ENDPOINTS.FEEDBACK.GET_BY_ID}/${id}`,
-                token
+                token,
+                forceRefresh
             );
 
             if (response?.data) {
@@ -298,8 +299,8 @@ export default function FeedbackDetailScreen() {
     const handleEditOpen = () => {
         if (!feedback) return;
         setForm({
-            title: feedback.title,
-            date: feedback.date,
+            title: feedback!.title,
+            date: feedback!.date.split('T')[0],
             source: feedback.source,
             method: feedback.method,
             text: feedback.feedback,
@@ -323,7 +324,7 @@ export default function FeedbackDetailScreen() {
     };
 
     const handleUpdate = async () => {
-        if (!form.title || !form.source || !form.method || !form.date) {
+        if (!id || !form.title || !form.source || !form.method || !form.date) {
             return showToast.error('Please fill all required fields', 'Validation Error');
         }
 
@@ -360,7 +361,7 @@ export default function FeedbackDetailScreen() {
                         { title: form.title, category: 'feedback' }
                     );
                     if (uploadRes?.data?.id) {
-                        documentIds = [uploadRes.data.id]; // Replace with new
+                        documentIds = [Number(uploadRes.data.id)]; // Replace with new
                     }
                 } catch (e) {
                     console.error("Upload failed in edit", e);
@@ -370,10 +371,13 @@ export default function FeedbackDetailScreen() {
                 }
             } else if (!hasExistingAttachment && !fileUri) {
                 documentIds = []; // Removed
+            } else {
+                // Ensure existing IDs are numbers
+                documentIds = documentIds.map(id => Number(id));
             }
 
             await apiService.put(`${API_ENDPOINTS.FEEDBACK.UPDATE}/${id}`, {
-                feedback_date: form.date,
+                feedback_date: form.date.split('T')[0],
                 feedback_type: apiType,
                 feedback_text: packedText,
                 document_ids: documentIds
@@ -381,7 +385,7 @@ export default function FeedbackDetailScreen() {
 
             showToast.success('Feedback updated', 'Success');
             setShowEditModal(false);
-            loadFeedbackDetail(); // Reload to see changes
+            loadFeedbackDetail(true); // Reload to see changes (force refresh)
         } catch (error: any) {
             console.error('Update failed:', error);
             showToast.error(error.message || 'Failed to update', 'Error');
@@ -458,7 +462,7 @@ export default function FeedbackDetailScreen() {
                 </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadFeedbackDetail(); }} tintColor={isDark ? accentColor : '#2B5F9E'} colors={[accentColor, '#2B5F9E']} />}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadFeedbackDetail(true); }} tintColor={isDark ? accentColor : '#2B5F9E'} colors={[accentColor, '#2B5F9E']} />}>
 
                 {/* Main Card */}
                 <View className={`p-5 rounded-2xl border shadow-sm mb-6 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
@@ -567,7 +571,7 @@ export default function FeedbackDetailScreen() {
                                     <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Date</Text>
                                     <Pressable onPress={() => setShowDatePicker(true)}
                                         className={`p-3 rounded-xl border flex-row justify-between items-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
-                                        <Text className={isDark ? "text-white" : "text-slate-800"}>{form.date}</Text>
+                                        <Text className={isDark ? "text-white" : "text-slate-800"}>{formatDisplayDate(form.date)}</Text>
                                         <MaterialIcons name="event" size={20} color={isDark ? "#999" : "#666"} />
                                     </Pressable>
                                 </View>
