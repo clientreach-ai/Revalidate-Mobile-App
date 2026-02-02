@@ -391,6 +391,21 @@ export default function FeedbackDetailScreen() {
     };
 
     // Calendar Helpers
+    const formatDisplayDate = (dateStr: string) => {
+        if (!dateStr) return '';
+        try {
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr;
+            return date.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+        } catch (e) {
+            return dateStr;
+        }
+    };
+
     const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
     const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
     const formatYMD = (year: number, month: number, day: number) => {
@@ -472,7 +487,7 @@ export default function FeedbackDetailScreen() {
                             <Text className={`text-xs text-gray-500 mb-1`}>Date Received</Text>
                             <View className="flex-row items-center">
                                 <MaterialIcons name="event" size={16} color={isDark ? "#9ca3af" : "#6b7280"} className="mr-1" />
-                                <Text className={`${isDark ? "text-gray-300" : "text-gray-700"} font-medium`}>{feedback.date}</Text>
+                                <Text className={`${isDark ? "text-gray-300" : "text-gray-700"} font-medium`}>{formatDisplayDate(feedback.date)}</Text>
                             </View>
                         </View>
                         <View className="flex-1">
@@ -525,7 +540,7 @@ export default function FeedbackDetailScreen() {
             </ScrollView>
 
             {/* Footer Buttons */}
-            <View className={`absolute bottom-0 w-full px-4 pt-4 border-t ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-gray-200"}`} style={{ paddingBottom: Math.max(16, insets.bottom + 16) }}>
+            <View className={`absolute bottom-0 w-full px-4 pt-4 border-t ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-gray-200"}`} style={{ paddingBottom: Math.max(80, insets.bottom + 80) }}>
                 <Pressable onPress={handleEditOpen} className="bg-[#2B5E9C] py-4 rounded-xl items-center shadow-sm">
                     <Text className="text-white font-bold text-base">Edit Feedback</Text>
                 </Pressable>
