@@ -31,6 +31,7 @@
     "db:studio": "prisma studio",
     "clean": "rm -rf dist node_modules",
     "backfill:reg-type": "tsx src/scripts/backfill-reg-type-from-description.ts"
+    ,"inspect:user-by-email": "tsx src/scripts/inspect-user-by-email.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

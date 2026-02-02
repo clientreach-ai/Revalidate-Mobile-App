@@ -48,11 +48,33 @@ export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
   const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
 
   const [users] = await pool.execute(
-    `SELECT id, email, name, registration, due_date, reg_type, description,
-     work_settings, scope_practice, subscription_tier, subscription_status,
-     status, user_type, created_at, updated_at, firebase_uid
-     FROM users 
-     ORDER BY created_at DESC 
+    `SELECT u.id, u.email, u.name, u.registration, u.due_date, u.reg_type, u.description,
+     u.work_settings, u.scope_practice, u.subscription_tier, u.subscription_status,
+     u.status, u.user_type, u.created_at, u.updated_at, u.firebase_uid,
+     p.name AS registration_name,
+     c.name AS work_setting_name,
+     b.name AS scope_practice_name,
+    COALESCE(
+      NULLIF(JSON_UNQUOTE(JSON_EXTRACT(u.description, '$.professionalRole')), ''),
+      CASE
+        WHEN u.registration IN (3,4,5,6,7,8,9) THEN 'Nurse'
+        WHEN u.registration IN (10,12) THEN 'Doctor'
+        WHEN u.registration IN (13,14) THEN 'Pharmacist'
+        ELSE NULL
+      END,
+      NULLIF(u.reg_type, ''),
+      CASE
+        WHEN u.registration IN (3,4,5,6,7,8,9) THEN 'Nurse'
+        WHEN u.registration IN (10,12) THEN 'Doctor'
+        WHEN u.registration IN (13,14) THEN 'Pharmacist'
+        ELSE NULL
+      END
+    ) AS professional_role
+     FROM users u
+     LEFT JOIN portfolios p ON CAST(u.registration AS CHAR) = CAST(p.id AS CHAR)
+     LEFT JOIN categories c ON u.work_settings = c.id
+     LEFT JOIN brands b ON u.scope_practice = b.id
+     ORDER BY u.created_at DESC
      LIMIT ? OFFSET ?`,
     [limit, offset]
   ) as any[];

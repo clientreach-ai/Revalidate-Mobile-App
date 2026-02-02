@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, Animated, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { safeNavigate } from "@/utils/navigation";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { useAuthStore, useAuthHydrated } from "@/features/auth/auth.store";
 import { useSubscriptionStore } from "@/features/subscription/subscription.store";
@@ -12,7 +12,7 @@ import "./global.css";
 
 export default function SplashScreen() {
     const spinAnim = useRef(new Animated.Value(0)).current;
-    const router = useRouter();
+
     const { isDark, toggleTheme } = useThemeStore();
     const hasHydrated = useAuthHydrated();
     const [hasNavigated, setHasNavigated] = useState(false);
@@ -125,7 +125,7 @@ export default function SplashScreen() {
             setHasNavigated(true);
             requestAnimationFrame(() => {
                 setTimeout(() => {
-                    router.replace(route as any);
+                    safeNavigate.replace(route as any);
                 }, 1200);
             });
         };
@@ -143,7 +143,7 @@ export default function SplashScreen() {
         };
 
         checkAuthAndRoute();
-    }, [hasHydrated, hasNavigated, router]);
+    }, [hasHydrated, hasNavigated]);
 
     const spin = spinAnim.interpolate({
         inputRange: [0, 1],

@@ -1,19 +1,17 @@
+import '../src/bootstrap';
 import React, { useEffect, useRef } from 'react';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
+import { safeNavigate } from '@/utils/navigation';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, Platform } from 'react-native';
+import * as Linking from 'expo-linking';
 import { ThemeProvider } from '@/features/theme/ThemeProvider';
 import { useThemeStore } from '@/features/theme/theme.store';
 import Toast from 'react-native-toast-message';
 import { initializeSyncService, cleanupSyncService } from '@/services/sync-service';
 import { addNotificationResponseReceivedListener } from '@/features/notifications/notifications.service';
+import { NavigationErrorBoundary } from '@/components/common/NavigationErrorBoundary';
 import "./global.css";
-
-// ErrorUtils is available globally in React Native
-declare const ErrorUtils: {
-  getGlobalHandler: () => ((error: Error, isFatal?: boolean) => void) | null;
-  setGlobalHandler: (handler: (error: Error, isFatal?: boolean) => void) => void;
-};
 
 import { StripeProvider } from '@/services/stripe';
 
@@ -206,13 +204,15 @@ export default function RootLayout() {
 
       try {
         pendingNavigationRef.current = null;
-        router.push({ pathname: pending.pathname, params: pending.params } as any);
+        safeNavigate.push({ pathname: pending.pathname, params: pending.params } as any);
       } catch (e: any) {
         // Most common case: navigation tree not ready yet.
         const message = e?.message || String(e);
-        const shouldRetry = message.includes('navigation context') || message.includes('NavigationContainer');
+        const shouldRetry = message.includes('navigation context') ||
+          message.includes('NavigationContainer') ||
+          message.includes('router is not ready');
 
-        if (shouldRetry && attempt < 8) {
+        if (shouldRetry && attempt < 15) { // Increased retries
           pendingNavigationRef.current = pending;
           scheduleFlush(attempt + 1);
           return;
@@ -224,21 +224,18 @@ export default function RootLayout() {
   };
 
   useEffect(() => {
-    // Handle unhandled promise rejections (suppress non-critical keep-awake errors)
-    const originalErrorHandler = ErrorUtils.getGlobalHandler();
+    // Initialize sync service
+    initializeSyncService();
 
-    ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
-      const errorMessage = error?.message || error?.toString() || '';
-      if (errorMessage.includes('Unable to activate keep awake')) {
-        // Suppress this non-critical Expo development tool error
-        return;
+    return () => {
+      cleanupSyncService();
+      if (flushTimeoutRef.current) {
+        clearTimeout(flushTimeoutRef.current);
       }
-      // Call original error handler for other errors
-      if (originalErrorHandler) {
-        originalErrorHandler(error, isFatal);
-      }
-    });
+    };
+  }, []);
 
+  useEffect(() => {
     // Listen for notification interactions (taps)
     // This handles navigation when user taps a notification while app is foreground/background
     const subscription = addNotificationResponseReceivedListener(response => {
@@ -262,18 +259,49 @@ export default function RootLayout() {
       }
     });
 
-    initializeSyncService();
+    // Deep-link handler: queue incoming URLs and replay navigation when router is ready
+    const handleUrl = (event: { url: string }) => {
+      try {
+        let path = event.url;
+
+        // If this is an app-generated URL using Linking.createURL('/'), strip the prefix
+        const prefix = Linking.createURL('/');
+        if (path.startsWith(prefix)) {
+          path = path.slice(prefix.length - 1); // keep leading '/'
+        } else {
+          // Fallback: strip scheme and host (e.g. myapp://host/path)
+          const schemeIndex = path.indexOf('://');
+          if (schemeIndex !== -1) {
+            const firstSlash = path.indexOf('/', schemeIndex + 3);
+            path = firstSlash !== -1 ? path.slice(firstSlash) : '/';
+          }
+        }
+
+        // Normalize to tabs route when appropriate (most profile routes live under /(tabs))
+        if (path.startsWith('/profile')) {
+          path = '/(tabs)' + path;
+        }
+
+        pendingNavigationRef.current = { pathname: path };
+        scheduleFlush(0);
+      } catch (e) {
+        console.error('Failed to handle deep link:', e);
+      }
+    };
+
+    const linkingSubscription = Linking.addEventListener('url', handleUrl);
+
+    // Handle initial URL on cold start
+    Linking.getInitialURL().then((initialUrl) => {
+      if (initialUrl) handleUrl({ url: initialUrl });
+    }).catch(() => { /* ignore */ });
 
     return () => {
-      if (originalErrorHandler) {
-        ErrorUtils.setGlobalHandler(originalErrorHandler);
-      }
-      cleanupSyncService();
       subscription.remove();
-
-      if (flushTimeoutRef.current) {
-        clearTimeout(flushTimeoutRef.current);
-        flushTimeoutRef.current = null;
+      try {
+        linkingSubscription.remove();
+      } catch (e) {
+        // ignore if remove is not available
       }
     };
   }, []);
@@ -284,11 +312,13 @@ export default function RootLayout() {
     >
       <ThemeProvider>
         <StatusBarWrapper />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-          }}
-        />
+        <NavigationErrorBoundary>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+            }}
+          />
+        </NavigationErrorBoundary>
         <Toast config={toastConfig} />
       </ThemeProvider>
     </StripeProvider>

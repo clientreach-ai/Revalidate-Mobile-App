@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { safeNavigate } from '@/utils/navigation';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { setSubscriptionInfo } from '@/utils/subscription';
 import { UserData, DashboardStats, RecentActivity } from '../dashboard.types';
@@ -8,7 +8,6 @@ import { formatTimeAgo } from '../dashboard.utils';
 import { useNotificationStore } from '@/features/notifications/notification.store';
 
 export const useDashboardData = () => {
-    const router = useRouter();
     const isMounted = useRef(true);
 
     const [userData, setUserData] = useState<UserData | null>(null);
@@ -42,7 +41,7 @@ export const useDashboardData = () => {
             if (isMounted.current) setIsUserLoading(true);
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
-                router.replace('/(auth)/login');
+                safeNavigate.replace('/(auth)/login');
                 return;
             }
             const response = await apiService.get<{ success: boolean; data: any }>(
@@ -107,7 +106,7 @@ export const useDashboardData = () => {
         } finally {
             if (isMounted.current) setIsUserLoading(false);
         }
-    }, [router]);
+    }, []);
 
     const loadDashboardStats = useCallback(async (force = false) => {
         try {

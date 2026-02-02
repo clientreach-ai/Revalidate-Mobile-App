@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { safeNavigate } from '@/utils/navigation';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import { useTimerStore } from '@/features/timer/timer.store';
@@ -9,7 +9,6 @@ import { TimerService } from '@/features/timer/timer.service';
 import { ActiveSession } from '../dashboard.types';
 
 export const useActiveSession = (onSessionEnded?: () => void) => {
-    const router = useRouter();
 
     // Stable selectors for actions to avoid unnecessary re-renders
     const storeActiveSessionId = useTimerStore(s => s.activeSessionId);
@@ -200,7 +199,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
                 showToast.error('Please log in again', 'Error');
-                router.replace('/(auth)/login');
+                safeNavigate.replace('/(auth)/login');
                 return;
             }
             const startTime = new Date().toISOString();
@@ -320,7 +319,7 @@ export const useActiveSession = (onSessionEnded?: () => void) => {
                             const token = await AsyncStorage.getItem('authToken');
                             if (!token) {
                                 showToast.error('Please log in again', 'Error');
-                                router.replace('/(auth)/login');
+                                safeNavigate.replace('/(auth)/login');
                                 return;
                             }
 

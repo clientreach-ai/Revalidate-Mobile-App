@@ -1012,7 +1012,7 @@ model users {
   email                            String?
   phone_code                       String?                    @db.VarChar(100)
   mobile                           String?                    @db.VarChar(100)
-  reg_type                         users_reg_type
+  reg_type                         String?                    @db.VarChar(200)
   status                           users_status               @default(zero)
   user_type                        users_user_type            @default(Customer)
   otp                              Int                        @default(0)

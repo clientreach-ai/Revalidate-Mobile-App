@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { safeNavigate } from '@/utils/navigation';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import { ApiDocument } from '../gallery.types';
@@ -8,7 +8,6 @@ import { isImageFile } from '@/utils/document';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export const useGeneralGalleryData = () => {
-    const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [documents, setDocuments] = useState<any[]>([]);
@@ -55,7 +54,7 @@ export const useGeneralGalleryData = () => {
             setLoading(true);
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
-                router.replace('/(auth)/login');
+                safeNavigate.replace('/(auth)/login');
                 return;
             }
 
@@ -104,7 +103,7 @@ export const useGeneralGalleryData = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [router]);
+    }, []);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);

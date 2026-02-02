@@ -258,7 +258,20 @@ export default function RoleSelection() {
                 token
             );
 
-            // Navigate to next step
+            // Verify the role was saved by fetching onboarding data
+            const verifyResponse = await apiService.get<{
+                success: boolean;
+                data: {
+                    step1: { role: string | null };
+                };
+            }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token);
+
+            if (!verifyResponse?.data?.step1?.role) {
+                showToast.error("Role was not saved. Please try again.", "Error");
+                return;
+            }
+
+            // Navigate to next step only if role is confirmed saved
         router.push({
             pathname: "/(onboarding)/personal-details",
             params: { role: data.role },

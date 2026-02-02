@@ -1,12 +1,11 @@
 import { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { safeNavigate } from '@/utils/navigation';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import { Appraisal, Hospital, ApiAppraisal } from '../appraisal.types';
 
 export const useAppraisalData = () => {
-    const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [appraisals, setAppraisals] = useState<Appraisal[]>([]);
@@ -17,7 +16,7 @@ export const useAppraisalData = () => {
             setLoading(true);
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
-                router.replace('/(auth)/login');
+                safeNavigate.replace('/(auth)/login');
                 return;
             }
 

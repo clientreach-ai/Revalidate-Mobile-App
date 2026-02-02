@@ -52,15 +52,43 @@ export function mapUserRow(dbRow: any): any {
     }
   }
 
+  // If no professional role set, or it's a registration method, derive from registration
+  if (!professionalRole || professionalRole === 'email' || professionalRole === 'mobile' || professionalRole === 'facebook' || professionalRole === 'google' || professionalRole === 'apple') {
+    if (dbRow.registration) {
+      const regId = parseInt(dbRow.registration);
+      switch (regId) {
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+          professionalRole = 'Nurse';
+          break;
+        case 10:
+        case 12:
+          professionalRole = 'Doctor';
+          break;
+        case 13:
+        case 14:
+          professionalRole = 'Pharmacist';
+          break;
+        default:
+          professionalRole = 'Unknown';
+      }
+    }
+  }
+
   return {
     id: typeof dbRow.id === 'bigint' ? dbRow.id.toString() : dbRow.id,
     firebase_uid: dbRow.firebase_uid,
     email: dbRow.email,
-    registration_number: dbRow.registration,
+    registration_number: dbRow.registration_name || dbRow.registration,
     revalidation_date: dbRow.due_date,
     professional_role: professionalRole,
-    work_setting: dbRow.work_settings ? String(dbRow.work_settings) : null,
-    scope_of_practice: dbRow.scope_practice ? String(dbRow.scope_practice) : null,
+    work_setting: dbRow.work_setting_name || (dbRow.work_settings ? String(dbRow.work_settings) : null),
+    scope_of_practice: dbRow.scope_practice_name || (dbRow.scope_practice ? String(dbRow.scope_practice) : null),
     subscription_tier: dbRow.subscription_tier || 'free',
     subscription_status: dbRow.subscription_status || 'active',
     trial_ends_at: dbRow.trial_ends_at,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert, ActivityIndicator } from 'react-native';
 import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -17,7 +17,7 @@ import { useStripe } from '@/services/stripe';
 // Safe Stripe import handled by platform-specific files in @/services/stripe
 let isStripeAvailable = Platform.OS !== 'web';
 
-export default function SubscriptionScreen() {
+function SubscriptionInner() {
   const { isDark } = useThemeStore();
   const authToken = useAuthStore((state) => state.token);
   const isMountedRef = useRef(true);
@@ -36,11 +36,14 @@ export default function SubscriptionScreen() {
     expMonth: number;
     expYear: number;
   } | null>(null);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const setSubscriptionInfoStore = useSubscriptionStore((state) => state.setSubscriptionInfo);
 
   const stripe = useStripe();
-  const initPaymentSheet = stripe?.initPaymentSheet || (async () => ({ error: { message: "Stripe not available" } }));
-  const presentPaymentSheet = stripe?.presentPaymentSheet || (async () => ({ error: { message: "Stripe not available" } }));
+  const initPaymentSheet = stripe?.initPaymentSheet;
+  const presentPaymentSheet = stripe?.presentPaymentSheet;
+
+  const isStripeServiceReady = !!(stripe && typeof initPaymentSheet === 'function' && typeof presentPaymentSheet === 'function');
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -101,7 +104,7 @@ export default function SubscriptionScreen() {
         if (isMountedRef.current) {
           setIsLoading(false);
         }
-        return;
+        return null;
       }
 
       const response = await apiService.get<{
@@ -130,10 +133,15 @@ export default function SubscriptionScreen() {
 
         await setSubscriptionInfo(info);
         setSubscriptionInfoStore(info as any);
+
+        return info;
       }
+
+      return null;
     } catch (error) {
       console.error('Error loading subscription status:', error);
       showToast.error('Failed to load subscription status', 'Error');
+      return null;
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false);
@@ -142,7 +150,7 @@ export default function SubscriptionScreen() {
   };
 
   const initializePaymentSheet = async () => {
-    if (!clientSecret) return;
+    if (!clientSecret || !isStripeServiceReady) return;
 
     try {
       const { error } = await initPaymentSheet({
@@ -150,7 +158,9 @@ export default function SubscriptionScreen() {
         merchantDisplayName: 'Revalidation Tracker',
         // If Stripe needs to hand off to a browser (3DS, bank redirects), ensure we return
         // directly to this screen instead of landing on the Splash route.
-        returnURL: Linking.createURL('/profile/subscription'),
+        // Use full tabs path to ensure the router resolves to the correct tree
+        // (prevents navigation-context race on return from external flows)
+        returnURL: Linking.createURL('/(tabs)/profile/subscription'),
       });
 
       if (error) {
@@ -248,6 +258,9 @@ export default function SubscriptionScreen() {
         return;
       }
 
+      if (!isStripeServiceReady) {
+        throw new Error("Stripe service not initialized");
+      }
       const { error } = await presentPaymentSheet();
 
       if (error) {
@@ -277,13 +290,24 @@ export default function SubscriptionScreen() {
       );
 
       if (isMountedRef.current) {
+        // mark verification in progress to avoid transient UI
+        setIsVerifyingPayment(true);
+      }
+
+      // Reload subscription status and verify server-side that user is premium
+      const info = await loadSubscriptionStatus(true);
+
+      if (isMountedRef.current) {
         setClientSecret(null);
         setPaymentIntentId(null);
+        setIsVerifyingPayment(false);
       }
-      showToast.success("Payment successful! Premium plan activated.", "Success");
 
-      // Reload subscription status
-      await loadSubscriptionStatus();
+      if (info?.isPremium) {
+        showToast.success("Payment successful! Premium plan activated.", "Success");
+      } else {
+        showToast.error("Payment completed but premium access not yet active. Please check your billing portal or try again shortly.", "Info");
+      }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error
         ? error.message
@@ -386,7 +410,7 @@ export default function SubscriptionScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between mb-8 px-6 pt-4">
-          
+
           <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
             Subscription
           </Text>
@@ -648,8 +672,8 @@ export default function SubscriptionScreen() {
               <>
                 <Pressable
                   onPress={clientSecret ? handlePayment : handleUpgrade}
-                  disabled={isProcessingPayment || !isStripeAvailable}
-                  className={`rounded-xl p-4 items-center mt-2 flex-row justify-center ${isProcessingPayment || !isStripeAvailable ? "bg-[#D4AF37]/50" : "bg-[#D4AF37]"
+                  disabled={isProcessingPayment || !isStripeAvailable || !isStripeServiceReady}
+                  className={`rounded-xl p-4 items-center mt-2 flex-row justify-center ${isProcessingPayment || !isStripeAvailable || !isStripeServiceReady ? "bg-[#D4AF37]/50" : "bg-[#D4AF37]"
                     }`}
                   style={!isProcessingPayment && isStripeAvailable ? {
                     shadowColor: '#D4AF37',
@@ -680,8 +704,8 @@ export default function SubscriptionScreen() {
                     // TODO: Handle yearly upgrade specifics if different flow
                     handleUpgrade();
                   }}
-                  disabled={isProcessingPayment || !isStripeAvailable}
-                  className={`rounded-xl p-4 items-center mt-3 flex-row justify-center border-2 ${isProcessingPayment || !isStripeAvailable
+                  disabled={isProcessingPayment || isVerifyingPayment || !isStripeAvailable}
+                  className={`rounded-xl p-4 items-center mt-3 flex-row justify-center border-2 ${isProcessingPayment || isVerifyingPayment || !isStripeAvailable
                     ? "border-[#D4AF37]/30 bg-transparent"
                     : "border-[#D4AF37] bg-[#D4AF37]/10"
                     }`}
@@ -824,4 +848,18 @@ export default function SubscriptionScreen() {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+export default function SubscriptionScreen() {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
+
+  return <SubscriptionInner />;
 }

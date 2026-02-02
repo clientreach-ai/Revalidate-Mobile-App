@@ -9,7 +9,7 @@ async function main() {
 
   try {
     const rows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT id, email, name, reg_type, registration, due_date, description, status, user_type, created_at, updated_at
+      `SELECT id, email, name, reg_type, registration, due_date, description, status, user_type, work_settings, scope_practice, designation_id, created_at, updated_at
        FROM users
        WHERE email IN (${emails.map(() => '?').join(',')})
        ORDER BY id ASC`,
@@ -28,6 +28,9 @@ async function main() {
       console.log(`reg_type=${u.reg_type}`);
       console.log(`registration=${u.registration}`);
       console.log(`due_date=${u.due_date}`);
+      console.log(`work_settings=${u.work_settings}`);
+      console.log(`scope_practice=${u.scope_practice}`);
+      console.log(`designation_id=${u.designation_id}`);
       console.log(`status=${u.status} user_type=${u.user_type}`);
       console.log(`created_at=${u.created_at} updated_at=${u.updated_at}`);
       console.log(`description=${typeof u.description === 'string' ? u.description : JSON.stringify(u.description)}`);

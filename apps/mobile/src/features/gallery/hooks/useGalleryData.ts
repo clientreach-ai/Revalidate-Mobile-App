@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { safeNavigate } from '@/utils/navigation';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
 import { Category, RecentFile, Document, ApiDocument } from '../gallery.types';
@@ -114,8 +114,7 @@ const getTimeAgo = (date: Date): string => {
     return `${Math.floor(diffDays / 7)}W AGO`;
 };
 
-export const useGalleryData = () => {
-    const router = useRouter();
+export const useGalleryData = (category?: string) => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -127,7 +126,7 @@ export const useGalleryData = () => {
             setLoading(true);
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
-                router.replace('/(auth)/login');
+                safeNavigate.replace('/(auth)/login');
                 return;
             }
 

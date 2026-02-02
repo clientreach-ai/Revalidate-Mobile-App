@@ -34,6 +34,7 @@ export default function UsersPage() {
   const loadUsers = async () => {
     try {
       const data = await apiService.getAllUsers({ limit: 1000 });
+      console.log('API response for users:', data);
       setUsers(data);
     } catch (err: any) {
       if (err.message.includes('401') || err.message.includes('403')) {
