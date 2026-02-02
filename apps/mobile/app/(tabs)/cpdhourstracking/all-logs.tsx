@@ -87,9 +87,7 @@ export default function AllCPDLogsScreen() {
         <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
             <View className={`border-b ${isDark ? "bg-slate-800/80 border-slate-700" : "bg-white/80 border-gray-100"}`}>
                 <View className="flex-row items-center px-4 py-2">
-                    <Pressable onPress={() => router.back()} className="w-10 h-10 items-center justify-center">
-                        <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
-                    </Pressable>
+                    
                     <Text className={`text-lg font-bold ml-2 ${isDark ? "text-white" : "text-[#121417]"}`}>All CPD Activities</Text>
                 </View>
 

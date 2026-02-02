@@ -28,7 +28,7 @@ const stripe = STRIPE_CONFIG.secretKey
 export async function createPaymentIntent(
   userId: string,
   amount: number,
-  currency: string = 'usd'
+  currency: string = STRIPE_CONFIG.currency
 ): Promise<Stripe.PaymentIntent> {
   if (!stripe) {
     throw new Error('Stripe is not initialized. Set STRIPE_SECRET_KEY environment variable.');
@@ -167,6 +167,9 @@ export async function createSubscriptionSetup(
       throw new Error('Stripe is not initialized. Set STRIPE_SECRET_KEY environment variable.');
     }
 
+    const price = await stripe.prices.retrieve(finalPriceId);
+    const priceCurrency = price.currency;
+
     // Create or retrieve customer
     let customer: Stripe.Customer;
     const existingCustomers = await stripe.customers.list({
@@ -174,13 +177,58 @@ export async function createSubscriptionSetup(
       limit: 1,
     });
 
-    if (existingCustomers.data.length > 0) {
-      customer = existingCustomers.data[0];
+    const existing = existingCustomers.data[0];
+    if (existing && !('deleted' in existing && existing.deleted)) {
+      customer = existing as Stripe.Customer;
+
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customer.id,
+        status: 'all',
+        limit: 20,
+        expand: ['data.items.data.price'],
+      });
+
+      const subscriptionCurrencies = new Set<string>();
+      for (const sub of subscriptions.data) {
+        for (const item of sub.items.data) {
+          const itemPrice = item.price as Stripe.Price | null;
+          if (itemPrice?.currency) {
+            subscriptionCurrencies.add(itemPrice.currency);
+          }
+        }
+      }
+
+      const invoiceItems = await stripe.invoiceItems.list({
+        customer: customer.id,
+        limit: 20,
+      });
+      const invoiceCurrencies = new Set(
+        invoiceItems.data.map(item => item.currency).filter(Boolean) as string[]
+      );
+
+      const hasCurrencyMismatch = [...subscriptionCurrencies, ...invoiceCurrencies].some(
+        currency => currency !== priceCurrency
+      );
+
+      if (hasCurrencyMismatch) {
+        logger.warn(
+          `Stripe customer ${customer.id} has existing currency ${[...subscriptionCurrencies, ...invoiceCurrencies].join(', ')}; creating new customer for ${priceCurrency}.`
+        );
+        customer = await stripe.customers.create({
+          email: user?.email,
+          metadata: {
+            userId: userId,
+            previousCustomerId: customer.id,
+            preferredCurrency: priceCurrency,
+          },
+        });
+      }
     } else {
       customer = await stripe.customers.create({
         email: user?.email,
         metadata: {
           userId: userId,
+          preferredCurrency: priceCurrency,
         },
       });
     }

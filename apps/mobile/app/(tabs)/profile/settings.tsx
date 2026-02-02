@@ -112,17 +112,7 @@ export default function SettingsScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between mb-8 px-6 pt-4">
-          <Pressable
-            onPress={() => router.back()}
-            className={`w-10 h-10 items-center justify-center rounded-full ${isDark ? "bg-slate-800" : "bg-white"
-              } shadow-sm`}
-          >
-            <MaterialIcons
-              name="arrow-back-ios"
-              size={20}
-              color={isDark ? "#E5E7EB" : "#1F2937"}
-            />
-          </Pressable>
+        
           <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
             Settings
           </Text>

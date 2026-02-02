@@ -21,7 +21,6 @@ export default function PersonalDetails() {
     const params = useLocalSearchParams();
     const role = params.role as string;
     const [isLoading, setIsLoading] = useState(false);
-    const [isLoadingData, setIsLoadingData] = useState(true);
 
     const { isDark } = useThemeStore();
 
@@ -45,7 +44,6 @@ export default function PersonalDetails() {
             try {
                 const token = await AsyncStorage.getItem('authToken');
                 if (!token) {
-                    setIsLoadingData(false);
                     return;
                 }
 
@@ -67,7 +65,6 @@ export default function PersonalDetails() {
                 // Silently fail - user might not have saved data yet
                 console.log('No saved personal details found');
             } finally {
-                setIsLoadingData(false);
             }
         };
 

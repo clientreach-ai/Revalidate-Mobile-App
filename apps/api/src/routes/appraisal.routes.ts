@@ -6,11 +6,13 @@ import {
   update,
   remove,
 } from '../modules/logs/appraisal.controller';
+import { uploadDocument } from '../modules/documents/documents.controller';
 import { authenticateToken } from '../modules/auth/auth.middleware';
 
 const router = Router();
 router.use(authenticateToken);
 
+router.post('/upload', uploadDocument);
 router.post('/', create);
 router.get('/', list);
 router.get('/:id', getById);

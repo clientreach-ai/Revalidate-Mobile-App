@@ -91,7 +91,6 @@ export default function AllEventsScreen() {
     const month = today.getMonth();
     // Show 3 months of days for simple selection
     for (let m = -1; m <= 1; m++) {
-      const d = new Date(year, month + m, 1);
       const lastDay = new Date(year, month + m + 1, 0).getDate();
       for (let i = 1; i <= lastDay; i++) {
         days.push({
@@ -220,7 +219,6 @@ export default function AllEventsScreen() {
 
 
   const headerBgColor = isDark ? "bg-background-dark" : "bg-background-light";
-  const headerTextColor = isDark ? "text-white" : "text-slate-800";
   const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
 
   return (
@@ -265,33 +263,42 @@ export default function AllEventsScreen() {
       {/* Filter Tabs */}
       <View className={`flex-row px-6 py-3 border-b ${isDark ? "border-slate-700 bg-slate-800" : "border-slate-200 bg-white"
         }`} style={{ gap: 8 }}>
-        {(['all', 'official', 'personal'] as EventType[]).map((filter) => (
-          <Pressable
-            key={filter}
-            onPress={() => setActiveFilter(filter)}
-            className={`px-4 py-2 rounded-full ${activeFilter === filter
-              ? isDark
+        {(['all', 'official', 'personal'] as EventType[]).map((filter) => {
+          const isActive = activeFilter === filter;
+          return (
+            <Pressable
+              key={filter}
+              onPress={() => setActiveFilter(filter)}
+              className={`px-4 py-2 rounded-full ${isActive
                 ? isPremium
-                  ? 'bg-[#D4AF37]'
+                  ? ''
                   : 'bg-[#2B5F9E]'
-                : 'bg-[#2B5F9E]'
-              : isDark
-                ? 'bg-slate-700'
-                : 'bg-slate-100'
-              }`}
-          >
-            <Text
-              className={`text-sm font-semibold capitalize ${activeFilter === filter
-                ? 'text-white'
                 : isDark
-                  ? 'text-gray-400'
-                  : 'text-slate-600'
+                  ? 'bg-slate-700'
+                  : 'bg-slate-100'
                 }`}
+              style={isPremium ? (isActive
+                ? { backgroundColor: accentColor }
+                : {
+                    backgroundColor: isDark ? 'rgba(212, 175, 55, 0.12)' : 'rgba(212, 175, 55, 0.08)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(212, 175, 55, 0.45)'
+                  }) : undefined}
             >
-              {filter === 'all' ? 'All' : filter}
-            </Text>
-          </Pressable>
-        ))}
+              <Text
+                className={`text-sm font-semibold capitalize ${isActive
+                  ? 'text-white'
+                  : isDark
+                    ? 'text-gray-400'
+                    : 'text-slate-600'
+                  }`}
+                style={isPremium && !isActive ? { color: '#D4AF37' } : undefined}
+              >
+                {filter === 'all' ? 'All' : filter}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Events List */}
@@ -310,7 +317,7 @@ export default function AllEventsScreen() {
       >
         {isLoading ? (
           <View className="items-center justify-center py-20">
-            <ActivityIndicator size="large" color={isDark ? accentColor : '#2B5F9E'} />
+            <ActivityIndicator size="large" color={accentColor} />
             <Text className={`mt-4 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
               Loading events...
             </Text>
@@ -416,7 +423,8 @@ export default function AllEventsScreen() {
                 setFormErrors({});
                 setShowAddEventModal(true);
               }}
-              className="mt-6 bg-[#2B5F9E] px-6 py-3 rounded-xl shadow-sm active:opacity-90"
+              className="mt-6 px-6 py-3 rounded-xl shadow-sm active:opacity-90"
+              style={{ backgroundColor: accentColor }}
             >
               <Text className="text-white font-bold">Add New Event</Text>
             </Pressable>
@@ -538,7 +546,8 @@ export default function AllEventsScreen() {
                   <Pressable
                     onPress={handleSaveEvent}
                     disabled={isSubmitting}
-                    className={`rounded-2xl p-4 items-center shadow-sm mt-4 bg-[#2B5E9C] ${isSubmitting ? "opacity-50" : ""}`}
+                    className={`rounded-2xl p-4 items-center shadow-sm mt-4 ${isSubmitting ? "opacity-50" : ""}`}
+                    style={!isSubmitting ? { backgroundColor: accentColor } : undefined}
                   >
                     {isSubmitting ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-base">Save Event</Text>}
                   </Pressable>
@@ -556,7 +565,12 @@ export default function AllEventsScreen() {
             <Text className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-slate-800"}`}>Select Date</Text>
             <ScrollView className="max-h-64">
               {calendarDays.map((d, i) => (
-                <Pressable key={i} onPress={() => { setEventForm({ ...eventForm, date: d.date }); setShowDatePicker(false); }} className={`p-3 rounded-lg mb-2 ${isSameDay(d.date, eventForm.date) ? 'bg-blue-500' : ''}`}>
+                <Pressable
+                  key={i}
+                  onPress={() => { setEventForm({ ...eventForm, date: d.date }); setShowDatePicker(false); }}
+                  className="p-3 rounded-lg mb-2"
+                  style={isSameDay(d.date, eventForm.date) ? { backgroundColor: accentColor } : undefined}
+                >
                   <Text className={isSameDay(d.date, eventForm.date) ? 'text-white' : isDark ? 'text-white' : 'text-slate-800'}>{d.date.toLocaleDateString()}</Text>
                 </Pressable>
               ))}

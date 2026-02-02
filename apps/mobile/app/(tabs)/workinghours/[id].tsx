@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Modal, TextInput, Image, RefreshControl } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -31,12 +31,15 @@ interface WorkSession {
 }
 
 export default function WorkHistoryDetailScreen() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
   const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+  const accentSoft = isPremium ? 'rgba(212, 175, 55, 0.18)' : 'rgba(43, 95, 158, 0.18)';
+  const accentText = isPremium ? '#F9E3A1' : '#FFFFFF';
+  const accentTextMuted = isPremium ? '#F0D27A' : 'rgba(255, 255, 255, 0.8)';
+  const accentTextSecondary = isPremium ? '#E6C266' : 'rgba(255, 255, 255, 0.7)';
+  const isMountedRef = useRef(true);
   const [session, setSession] = useState<WorkSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,6 +65,13 @@ export default function WorkHistoryDetailScreen() {
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (id) {
       loadWorkSession();
     }
@@ -83,7 +93,9 @@ export default function WorkHistoryDetailScreen() {
         if (!url.startsWith('http')) {
           url = apiService.baseUrl + (url.startsWith('/') ? '' : '/') + url;
         }
-        setAttachmentUrl(url);
+        if (isMountedRef.current) {
+          setAttachmentUrl(url);
+        }
       }
     } catch (e) {
       console.warn('Failed to load attachment info', e);
@@ -92,10 +104,14 @@ export default function WorkHistoryDetailScreen() {
 
   const loadWorkSession = async () => {
     try {
-      if (!refreshing) setLoading(true);
+      if (!refreshing && isMountedRef.current) setLoading(true);
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -105,7 +121,9 @@ export default function WorkHistoryDetailScreen() {
       }>(`${API_ENDPOINTS.WORK_HOURS.GET_BY_ID}/${id}`, token);
 
       if (response.success && response.data) {
-        setSession(response.data);
+        if (isMountedRef.current) {
+          setSession(response.data);
+        }
       } else {
         showToast.error('Session not found', 'Error');
         router.back();
@@ -115,8 +133,10 @@ export default function WorkHistoryDetailScreen() {
       showToast.error(error.message || 'Failed to load session', 'Error');
       router.back();
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -126,7 +146,7 @@ export default function WorkHistoryDetailScreen() {
     const end = session.endTime ? new Date(session.endTime) : null;
 
     setForm({
-      date: session.startTime.split('T')[0],
+      date: session.startTime.split('T')[0] ?? '',
       startTime: `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`,
       endTime: end ? `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}` : '',
       description: session.workDescription || '',
@@ -274,7 +294,7 @@ export default function WorkHistoryDetailScreen() {
     return (
       <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={isDark ? '#D4AF37' : '#2B5F9E'} />
+          <ActivityIndicator size="large" color={accentColor} />
           <Text className={`mt-4 ${isDark ? "text-gray-400" : "text-slate-500"}`}>
             Loading session details...
           </Text>
@@ -292,7 +312,8 @@ export default function WorkHistoryDetailScreen() {
           </Text>
           <Pressable
             onPress={() => router.back()}
-            className="mt-4 px-6 py-3 bg-[#1E61EB] rounded-full"
+            className="mt-4 px-6 py-3 rounded-full"
+            style={{ backgroundColor: accentColor }}
           >
             <Text className="text-white font-semibold">Go Back</Text>
           </Pressable>
@@ -405,43 +426,55 @@ export default function WorkHistoryDetailScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); loadWorkSession(); }}
-            tintColor={isDark ? accentColor : '#2B5F9E'}
+            tintColor={accentColor}
           />
         }
       >
         {/* Date Badge Card */}
         <View className="px-4 pt-6 pb-4">
-          <View className={`p-6 rounded-3xl shadow-lg ${isDark ? "bg-gradient-to-br from-blue-900/30 to-blue-800/20" : "bg-[#1E61EB]"
-            }`}>
+          <View
+            className="p-6 rounded-3xl shadow-lg"
+            style={{ backgroundColor: isDark ? accentSoft : accentColor }}
+          >
             <View className="flex-row items-center justify-between">
               <View>
-                <Text className={`text-sm font-medium uppercase tracking-wider mb-2 ${isDark ? "text-blue-300" : "text-white/80"
-                  }`}>
+                <Text
+                  className="text-sm font-medium uppercase tracking-wider mb-2"
+                  style={{ color: isDark ? accentTextMuted : accentTextMuted }}
+                >
                   Session Date
                 </Text>
                 <View className="flex-row items-baseline">
-                  <Text className={`text-4xl font-bold mr-2 ${isDark ? "text-blue-200" : "text-white"
-                    }`}>
+                  <Text
+                    className="text-4xl font-bold mr-2"
+                    style={{ color: isDark ? accentText : '#FFFFFF' }}
+                  >
                     {dateInfo.day}
                   </Text>
                   <View>
-                    <Text className={`text-lg font-semibold ${isDark ? "text-blue-300" : "text-white"
-                      }`}>
+                    <Text
+                      className="text-lg font-semibold"
+                      style={{ color: isDark ? accentText : '#FFFFFF' }}
+                    >
                       {dateInfo.month.substring(0, 3).toUpperCase()}
                     </Text>
-                    <Text className={`text-sm ${isDark ? "text-blue-400" : "text-white/70"
-                      }`}>
+                    <Text
+                      className="text-sm"
+                      style={{ color: isDark ? accentTextSecondary : accentTextSecondary }}
+                    >
                       {dateInfo.year}
                     </Text>
                   </View>
                 </View>
               </View>
-              <View className={`w-20 h-20 rounded-2xl items-center justify-center ${isDark ? "bg-blue-800/30" : "bg-white/20"
-                }`}>
+              <View
+                className="w-20 h-20 rounded-2xl items-center justify-center"
+                style={{ backgroundColor: isDark ? accentSoft : 'rgba(255, 255, 255, 0.2)' }}
+              >
                 <MaterialIcons
                   name="schedule"
                   size={40}
-                  color={isDark ? "#93C5FD" : "#FFFFFF"}
+                  color={isDark ? accentText : '#FFFFFF'}
                 />
               </View>
             </View>
@@ -506,10 +539,10 @@ export default function WorkHistoryDetailScreen() {
                 onPress={handleViewDocument}
                 className={`bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-600 flex-row items-center active:opacity-70`}
               >
-                <MaterialIcons name="description" size={24} color="#2B5E9C" />
+                <MaterialIcons name="description" size={24} color={accentColor} />
                 <View className="ml-3">
                   <Text className={`font-medium ${isDark ? "text-gray-200" : "text-gray-700"}`}>Attached Evidence</Text>
-                  <Text className="text-xs text-blue-500">Tap to View File</Text>
+                  <Text className="text-xs" style={{ color: accentColor }}>Tap to View File</Text>
                 </View>
               </Pressable>
             </View>
@@ -670,7 +703,7 @@ export default function WorkHistoryDetailScreen() {
                   ) : fileUri && attachment ? (
                     <View className={`flex-row items-center justify-between p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600" : "bg-gray-50 border-gray-200"}`}>
                       <View className="flex-row items-center flex-1">
-                        <MaterialIcons name="upload-file" size={20} color="#2B5E9C" />
+                        <MaterialIcons name="upload-file" size={20} color={accentColor} />
                         <Text className={`ml-2 ${isDark ? "text-gray-300" : "text-gray-700"}`} numberOfLines={1}>{attachment.name}</Text>
                       </View>
                       <Pressable onPress={() => { setFileUri(null); setAttachment(null); }} className="p-2">
@@ -680,15 +713,15 @@ export default function WorkHistoryDetailScreen() {
                   ) : (
                     <View className="flex-row gap-3">
                       <Pressable onPress={() => handleFileSelect('camera')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
-                        <MaterialIcons name="camera-alt" size={24} color="#2B5E9C" />
+                        <MaterialIcons name="camera-alt" size={24} color={accentColor} />
                         <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Camera</Text>
                       </Pressable>
                       <Pressable onPress={() => handleFileSelect('gallery')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
-                        <MaterialIcons name="photo-library" size={24} color="#2B5E9C" />
+                        <MaterialIcons name="photo-library" size={24} color={accentColor} />
                         <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Gallery</Text>
                       </Pressable>
                       <Pressable onPress={() => handleFileSelect('files')} className={`flex-1 p-3 rounded-xl border items-center justify-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
-                        <MaterialIcons name="folder" size={24} color="#2B5E9C" />
+                        <MaterialIcons name="folder" size={24} color={accentColor} />
                         <Text className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>Files</Text>
                       </Pressable>
                     </View>
@@ -698,7 +731,8 @@ export default function WorkHistoryDetailScreen() {
                 <Pressable
                   onPress={handleUpdate}
                   disabled={isSubmitting}
-                  className={`p-4 rounded-xl items-center mt-4 shadow-sm ${isSubmitting ? "bg-gray-400" : "bg-[#2B5E9C]"}`}
+                  className={`p-4 rounded-xl items-center mt-4 shadow-sm ${isSubmitting ? "bg-gray-400" : ""}`}
+                  style={!isSubmitting ? { backgroundColor: accentColor } : undefined}
                 >
                   {isSubmitting ? (
                     <ActivityIndicator color="white" />

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
+import { useAuthStore } from '@/features/auth/auth.store';
 import { useSubscriptionStore } from '@/features/subscription/subscription.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
 import { showToast } from '@/utils/toast';
@@ -17,7 +18,9 @@ import { useStripe } from '@/services/stripe';
 let isStripeAvailable = Platform.OS !== 'web';
 
 export default function SubscriptionScreen() {
+  const router = useRouter();
   const { isDark } = useThemeStore();
+  const authToken = useAuthStore((state) => state.token);
   const [isPremium, setIsPremium] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('free');
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
@@ -83,9 +86,10 @@ export default function SubscriptionScreen() {
 
   const loadSubscriptionStatus = async (forceRefresh: boolean = false) => {
     try {
-      const token = await AsyncStorage.getItem('authToken');
+      const token = authToken ?? await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        showToast.error('Please log in again', 'Error');
+        setIsLoading(false);
         return;
       }
 
@@ -334,13 +338,7 @@ export default function SubscriptionScreen() {
       >
         {/* Header */}
         <View className="flex-row items-center justify-between mb-8 px-6 pt-4">
-          <Pressable
-            onPress={() => router.back()}
-            className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
-              }`}
-          >
-            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#1F2937"} />
-          </Pressable>
+          
           <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
             Subscription
           </Text>

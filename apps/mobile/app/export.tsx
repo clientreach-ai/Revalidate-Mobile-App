@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { router } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -30,9 +30,9 @@ interface ExportSection {
 }
 
 export default function ExportScreen() {
-  const router = useRouter();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
+  const isMountedRef = useRef(true);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -43,15 +43,25 @@ export default function ExportScreen() {
   const cardBg = isDark ? 'bg-slate-800' : 'bg-white';
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadPreview();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const loadPreview = async () => {
     try {
-      setIsLoading(true);
+      if (isMountedRef.current) {
+        setIsLoading(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -61,7 +71,8 @@ export default function ExportScreen() {
       );
 
       if (response.success && response.data) {
-        setSections([
+        if (isMountedRef.current) {
+          setSections([
           {
             id: 'workHours',
             title: 'Practice Hours',
@@ -102,20 +113,25 @@ export default function ExportScreen() {
             count: response.data.appraisals.count,
             enabled: true,
           },
-        ]);
+          ]);
+        }
       }
     } catch (error) {
       console.error('Error loading export preview:', error);
       // Set default sections even on error so UI still works
-      setSections([
+      if (isMountedRef.current) {
+        setSections([
         { id: 'workHours', title: 'Practice Hours', subtitle: '0 hours logged', icon: 'work', count: 0, enabled: true },
         { id: 'cpd', title: 'CPD Activities', subtitle: '0 CPD hours', icon: 'school', count: 0, enabled: true },
         { id: 'reflections', title: 'Reflections', subtitle: '0 reflective accounts', icon: 'psychology', count: 0, enabled: true },
         { id: 'feedback', title: 'Feedback', subtitle: '0 entries', icon: 'feedback', count: 0, enabled: true },
         { id: 'appraisals', title: 'Appraisals', subtitle: '0 discussions', icon: 'rate-review', count: 0, enabled: true },
-      ]);
+        ]);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -145,10 +161,16 @@ export default function ExportScreen() {
     }
 
     try {
-      setIsExporting(true);
+      if (isMountedRef.current) {
+        setIsExporting(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -207,7 +229,9 @@ export default function ExportScreen() {
       console.error('Error exporting portfolio:', error);
       showToast.error(error.message || 'Failed to export portfolio', 'Error');
     } finally {
-      setIsExporting(false);
+      if (isMountedRef.current) {
+        setIsExporting(false);
+      }
     }
   };
 
@@ -223,9 +247,7 @@ export default function ExportScreen() {
         {/* Header */}
         <View className={`border-b ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white/80 border-gray-100'}`}>
           <View className="flex-row items-center justify-between px-4 py-2">
-            <Pressable onPress={() => router.back()} className="w-12 h-12 shrink-0 items-center justify-center">
-              <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? '#E5E7EB' : '#121417'} />
-            </Pressable>
+          
             <Text className={`text-lg font-bold flex-1 text-center ${textColor}`}>
               Export Portfolio
             </Text>

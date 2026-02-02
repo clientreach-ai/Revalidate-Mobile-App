@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -44,10 +44,10 @@ function StatCard({ title, value, subtitle, icon, iconColor, bgColor, isDark }: 
 }
 
 export default function AllStatsScreen() {
-  const router = useRouter();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
   const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+  const isMountedRef = useRef(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -60,12 +60,25 @@ export default function AllStatsScreen() {
     earnings: 0,
   });
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const loadStats = async (forceRefresh: boolean = false) => {
     try {
-      setLoading(true);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -130,22 +143,26 @@ export default function AllStatsScreen() {
         } catch (e) { console.log('Onboarding data failed', e); }
       }
 
-      setStats({
-        practiceHours,
-        workSessionsCount,
-        cpdHours,
-        reflectionsCount,
-        feedbackCount,
-        documentsCount,
-        earnings,
-      });
+      if (isMountedRef.current) {
+        setStats({
+          practiceHours,
+          workSessionsCount,
+          cpdHours,
+          reflectionsCount,
+          feedbackCount,
+          documentsCount,
+          earnings,
+        });
+      }
 
     } catch (error: any) {
       console.error('Error loading stats:', error);
       showToast.error('Failed to load stats', 'Error');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -223,13 +240,7 @@ export default function AllStatsScreen() {
         }
       >
         <View className="flex-row items-center justify-between mb-8 px-6 pt-4">
-          <Pressable
-            onPress={() => router.back()}
-            className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${isDark ? "bg-slate-800" : "bg-white"
-              }`}
-          >
-            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#1F2937"} />
-          </Pressable>
+          
           <Text className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
             All Stats
           </Text>

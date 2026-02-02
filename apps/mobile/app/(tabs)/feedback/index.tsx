@@ -1,8 +1,8 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -35,12 +35,12 @@ interface ApiFeedback {
 }
 
 export default function FeedbackScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
   const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
-  const [activeFilter, setActiveFilter] = useState<'all' | 'patient' | 'colleague' | 'manager'>('all');
+  const isMountedRef = useRef(true);
+  const [activeFilter] = useState<'all' | 'patient' | 'colleague' | 'manager'>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allFeedback, setAllFeedback] = useState<FeedbackEntry[]>([]);
@@ -76,8 +76,12 @@ export default function FeedbackScreen() {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadUserRole();
     loadFeedback();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   useFocusEffect(
@@ -92,7 +96,9 @@ export default function FeedbackScreen() {
       if (userDataStr) {
         const userData = JSON.parse(userDataStr);
         if (userData.professionalRole) {
-          setUserRole(userData.professionalRole);
+          if (isMountedRef.current) {
+            setUserRole(userData.professionalRole);
+          }
         }
       }
     } catch (e) {
@@ -102,10 +108,16 @@ export default function FeedbackScreen() {
 
   const loadFeedback = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -170,7 +182,9 @@ export default function FeedbackScreen() {
 
         // Sort by date descending
         mapped.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setAllFeedback(mapped);
+        if (isMountedRef.current) {
+          setAllFeedback(mapped);
+        }
       }
     } catch (error: any) {
       console.error('Error loading feedback:', error);
@@ -178,8 +192,10 @@ export default function FeedbackScreen() {
         showToast.error(error?.message || 'Failed to load feedback', 'Error');
       }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -346,9 +362,7 @@ export default function FeedbackScreen() {
       {/* Header */}
       <View className={`border-b ${isDark ? "bg-slate-800/80 border-slate-700" : "bg-[#F6F7F8]/80 border-[#DDE0E4]/50"}`}>
         <View className="flex-row items-center px-4 py-2 justify-between">
-          <Pressable onPress={() => router.back()} className="w-12 h-12 items-center justify-center">
-            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
-          </Pressable>
+        
           <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-[#121417]"}`}>Feedback Log</Text>
           <View className="w-12" />
         </View>

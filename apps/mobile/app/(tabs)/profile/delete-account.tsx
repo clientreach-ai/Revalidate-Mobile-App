@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { router } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
@@ -10,12 +10,20 @@ import { showToast } from '@/utils/toast';
 import '../../global.css';
 
 export default function DeleteAccountScreen() {
-    const router = useRouter();
     const { isDark } = useThemeStore();
+
+    const isMountedRef = useRef(true);
 
     const [confirmText, setConfirmText] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [step, setStep] = useState<'info' | 'confirm'>('info');
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     const CONFIRMATION_TEXT = 'DELETE';
 
@@ -35,12 +43,18 @@ export default function DeleteAccountScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            setIsDeleting(true);
+                            if (isMountedRef.current) {
+                                setIsDeleting(true);
+                            }
                             const token = await AsyncStorage.getItem('authToken');
 
                             if (!token) {
                                 showToast.error('Please log in again', 'Authentication Error');
-                                router.replace('/(auth)/login');
+                                try {
+                                    router.replace('/(auth)/login');
+                                } catch (e) {
+                                    console.warn('Navigation not ready for login redirect:', e);
+                                }
                                 return;
                             }
 
@@ -50,12 +64,18 @@ export default function DeleteAccountScreen() {
                             await AsyncStorage.clear();
 
                             showToast.success('Account deleted successfully', 'Success');
-                            router.replace('/(auth)/login');
+                            try {
+                                router.replace('/(auth)/login');
+                            } catch (e) {
+                                console.warn('Navigation not ready for login redirect:', e);
+                            }
                         } catch (error: any) {
                             console.error('Error deleting account:', error);
                             showToast.error(error.message || 'Failed to delete account', 'Error');
                         } finally {
-                            setIsDeleting(false);
+                            if (isMountedRef.current) {
+                                setIsDeleting(false);
+                            }
                         }
                     },
                 },
@@ -78,9 +98,7 @@ export default function DeleteAccountScreen() {
                 {/* Header */}
                 <View className={`border-b ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white/80 border-gray-100'}`}>
                     <View className="flex-row items-center justify-between px-4 py-2">
-                        <Pressable onPress={() => router.back()} className="w-12 h-12 shrink-0 items-center justify-center">
-                            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? '#E5E7EB' : '#121417'} />
-                        </Pressable>
+                       
                         <Text className={`text-lg font-bold flex-1 text-center ${textColor}`}>
                             Delete Account
                         </Text>

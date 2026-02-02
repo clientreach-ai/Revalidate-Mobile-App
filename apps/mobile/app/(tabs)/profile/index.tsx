@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
@@ -33,7 +33,6 @@ interface MenuItem {
 }
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const { isDark } = useThemeStore();
   const { profile, isLoading, isRefreshing, refresh } = useProfile();
   const { isPremium } = usePremium();
@@ -145,11 +144,19 @@ export default function ProfileScreen() {
       await useAuthStore.getState().logout();
       timerStore.reset();
       showToast.success('Logged out successfully', 'Success');
-      router.replace('/(auth)/login');
+      try {
+        router.replace('/(auth)/login');
+      } catch (e) {
+        console.warn('Navigation not ready for login redirect:', e);
+      }
     } catch (error) {
       console.error('Error during logout:', error);
       showToast.error('Error during logout', 'Error');
-      router.replace('/(auth)/login');
+      try {
+        router.replace('/(auth)/login');
+      } catch (e) {
+        console.warn('Navigation not ready for login redirect:', e);
+      }
     }
   };
 

@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
@@ -44,7 +44,6 @@ interface ApiNotification {
 }
 
 export default function NotificationsScreen() {
-  const router = useRouter();
   const {
     notificationId,
     notificationTitle,
@@ -65,6 +64,7 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const isMountedRef = useRef(true);
   const autoOpenedRef = useRef<string | null>(null);
 
   // Modal states for calendar invites
@@ -76,6 +76,13 @@ export default function NotificationsScreen() {
     null
   );
   const [isModalFetching, setIsModalFetching] = useState(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     loadNotifications(true);
@@ -100,10 +107,16 @@ export default function NotificationsScreen() {
 
   const loadNotifications = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -160,7 +173,9 @@ export default function NotificationsScreen() {
           (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
         );
 
-        setNotifications(mappedNotifications);
+        if (isMountedRef.current) {
+          setNotifications(mappedNotifications);
+        }
       }
     } catch (error: any) {
       console.error('Error loading notifications:', error);
@@ -168,10 +183,14 @@ export default function NotificationsScreen() {
         // Don't show error for notifications - silently fail
         console.warn('Notifications API error:', error?.message);
       }
-      setNotifications([]);
+      if (isMountedRef.current) {
+        setNotifications([]);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -269,7 +288,9 @@ export default function NotificationsScreen() {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) return;
 
-      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+      if (isMountedRef.current) {
+        setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+      }
       await apiService.patch(
         `${API_ENDPOINTS.NOTIFICATIONS.MARK_READ}/read-all`,
         {},
@@ -286,9 +307,11 @@ export default function NotificationsScreen() {
     const target = notifications.find((n) => n.id === id);
     if (target?.isRead) return;
 
-    setNotifications(
-      notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+    if (isMountedRef.current) {
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+    }
 
     try {
       const token = await AsyncStorage.getItem('authToken');
@@ -307,7 +330,9 @@ export default function NotificationsScreen() {
 
   const handleResponse = async (status: 'accepted' | 'declined') => {
     if (!selectedEvent || !currentAttendeeId) return;
-    setIsResponding(true);
+    if (isMountedRef.current) {
+      setIsResponding(true);
+    }
     try {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) return;
@@ -352,13 +377,17 @@ export default function NotificationsScreen() {
         status === 'accepted' ? 'Invitation accepted' : 'Invitation declined',
         'Success'
       );
-      setShowAcceptModal(false);
-      setSelectedEvent(null);
+      if (isMountedRef.current) {
+        setShowAcceptModal(false);
+        setSelectedEvent(null);
+      }
     } catch (error: any) {
       console.error('Failed to respond to invite:', error);
       showToast.error(error?.message || 'Failed to update response');
     } finally {
-      setIsResponding(false);
+      if (isMountedRef.current) {
+        setIsResponding(false);
+      }
     }
   };
 

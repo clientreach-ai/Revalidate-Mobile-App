@@ -1,15 +1,35 @@
-import * as FileSystem from 'expo-file-system';
+import { cacheDirectory, downloadAsync } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { showToast } from './toast';
+
+const ensureFileExtension = (fileName: string, url: string) => {
+    // If caller already provided an extension, keep it.
+    if (/\.[a-z0-9]{1,10}$/i.test(fileName)) return fileName;
+
+    // Try to infer from the URL path.
+    try {
+        const u = new URL(url);
+        const last = (u.pathname.split('/').pop() || '').trim();
+        const extMatch = last.match(/\.[a-z0-9]{1,10}$/i);
+        if (extMatch?.[0]) return `${fileName}${extMatch[0]}`;
+    } catch {
+        // URL may be relative or invalid; ignore.
+    }
+
+    // Reasonable default for typical evidence uploads.
+    return `${fileName}.pdf`;
+};
 
 export const downloadAndShareFile = async (url: string, fileName: string) => {
     try {
         showToast.info('Preparing document...', 'Please wait');
 
-        const fileUri = `${(FileSystem as any).cacheDirectory}${fileName}`;
+        const safeName = ensureFileExtension(fileName, url);
+        const baseDir = cacheDirectory || '';
+        const fileUri = `${baseDir}${safeName}`;
 
-        const downloadRes = await FileSystem.downloadAsync(url, fileUri);
+        const downloadRes = await downloadAsync(url, fileUri);
 
         if (downloadRes.status !== 200) {
             showToast.error('Failed to download file', 'Error');

@@ -270,9 +270,12 @@ class ApiService {
         return cachedData;
       }
 
-      // Return cache immediately, silent background update
-      fetchNewData().catch(() => { });
-      return cachedData;
+      // Force refresh: return fresh data when possible, fallback to cache
+      try {
+        return await fetchNewData();
+      } catch (e) {
+        return cachedData;
+      }
     }
 
     // No cache available - try network, but gracefully fallback for premium offline

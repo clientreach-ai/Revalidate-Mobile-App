@@ -1,9 +1,8 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput, Image, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useState, useEffect } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -34,13 +33,14 @@ interface ApiReflection {
 }
 
 export default function ReflectionDetailScreen() {
-    const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
     const { isPremium } = usePremium();
     const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
-    const tabBarHeight = useBottomTabBarHeight();
+    const tabBarHeight = Platform.OS === 'ios' ? 70 + insets.bottom : 72;
+
+    const isMountedRef = useRef(true);
 
     const [reflection, setReflection] = useState<ReflectionDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -65,6 +65,13 @@ export default function ReflectionDetailScreen() {
     const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
     useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
         if (id) loadReflectionDetail();
     }, [id]);
 
@@ -76,9 +83,18 @@ export default function ReflectionDetailScreen() {
 
     const loadReflectionDetail = async () => {
         try {
-            setLoading(true);
+            if (isMountedRef.current) {
+                setLoading(true);
+            }
             const token = await AsyncStorage.getItem('authToken');
-            if (!token) return router.replace('/(auth)/login');
+            if (!token) {
+                try {
+                    router.replace('/(auth)/login');
+                } catch (e) {
+                    console.warn('Navigation not ready for login redirect:', e);
+                }
+                return;
+            }
 
             const response = await apiService.get<{ success: boolean; data: ApiReflection }>(
                 `${API_ENDPOINTS.REFLECTIONS.GET_BY_ID}/${id}`,
@@ -91,13 +107,15 @@ export default function ReflectionDetailScreen() {
                 const lines = rawText.split('\n').filter(l => l.trim());
                 const title = lines[0]?.substring(0, 50) || 'Reflective Account';
 
-                setReflection({
-                    id: String(r.id),
-                    title,
-                    date: r.reflectionDate || (r.createdAt || '').split('T')[0] || '',
-                    text: rawText,
-                    documentIds: r.documentIds || [],
-                });
+                if (isMountedRef.current) {
+                    setReflection({
+                        id: String(r.id),
+                        title,
+                        date: r.reflectionDate || (r.createdAt || '').split('T')[0] || '',
+                        text: rawText,
+                        documentIds: r.documentIds || [],
+                    });
+                }
             } else {
                 showToast.error('Reflection not found', 'Error');
                 router.back();
@@ -107,8 +125,10 @@ export default function ReflectionDetailScreen() {
             showToast.error('Failed to load reflection', 'Error');
             router.back();
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     };
 
@@ -122,7 +142,9 @@ export default function ReflectionDetailScreen() {
                 if (!url.startsWith('http')) {
                     url = apiService.baseUrl + (url.startsWith('/') ? '' : '/') + url;
                 }
-                setAttachmentUrl(url);
+                if (isMountedRef.current) {
+                    setAttachmentUrl(url);
+                }
             }
         } catch (e) { console.warn('Failed to load attachment info', e); }
     };

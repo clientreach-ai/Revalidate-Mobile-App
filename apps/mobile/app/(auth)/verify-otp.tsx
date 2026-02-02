@@ -26,6 +26,11 @@ export default function VerifyOTP() {
     const email = params.email || "";
 
     const handleOtpChange = (value: string, index: number) => {
+        // Handle paste (some platforms deliver paste via onChangeText)
+        if (value.length > 1) {
+            handlePaste(value);
+            return;
+        }
         // Only allow numbers
         if (value && !/^\d+$/.test(value)) {
             return;
@@ -211,10 +216,6 @@ export default function VerifyOTP() {
                                     value={digit}
                                     onChangeText={(value) => handleOtpChange(value, index)}
                                     onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                                    onPaste={(e) => {
-                                        const text = e.nativeEvent.text;
-                                        handlePaste(text);
-                                    }}
                                     keyboardType="number-pad"
                                     maxLength={1}
                                     selectTextOnFocus

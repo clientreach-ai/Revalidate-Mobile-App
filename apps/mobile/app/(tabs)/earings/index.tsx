@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -47,10 +47,10 @@ interface MonthGroup {
 }
 
 export default function EarningsScreen() {
-  const router = useRouter();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
   const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+  const isMountedRef = useRef(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState<EarningsEntry[]>([]);
@@ -73,6 +73,13 @@ export default function EarningsScreen() {
   ];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // New session state
   const [newSession, setNewSession] = useState({
     location: '',
@@ -90,10 +97,16 @@ export default function EarningsScreen() {
   // Load work hours and calculate earnings
   const loadEarnings = async (forceRefresh: boolean = false) => {
     try {
-      setLoading(true);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -104,7 +117,9 @@ export default function EarningsScreen() {
           data: { hourlyRate?: number };
         }>(API_ENDPOINTS.USERS.ME, token, forceRefresh);
         if (userResponse?.data?.hourlyRate) {
-          setHourlyRate(userResponse.data.hourlyRate);
+          if (isMountedRef.current) {
+            setHourlyRate(userResponse.data.hourlyRate);
+          }
         }
       } catch (error) {
         console.warn('Could not load hourly rate, using default');
@@ -175,15 +190,21 @@ export default function EarningsScreen() {
           return bTime - aTime;
         });
 
-        setEarnings(earningsEntries);
+        if (isMountedRef.current) {
+          setEarnings(earningsEntries);
+        }
       }
     } catch (error: any) {
       console.error('Error loading earnings:', error);
       showToast.error(error.message || 'Failed to load earnings', 'Error');
-      setEarnings([]);
+      if (isMountedRef.current) {
+        setEarnings([]);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -396,9 +417,7 @@ export default function EarningsScreen() {
       {/* Header */}
       <View className={`border-b ${isDark ? "bg-slate-800/80 border-slate-700" : "bg-white/80 border-zinc-100"}`}>
         <View className="flex-row items-center px-4 py-2 justify-between">
-          <Pressable onPress={() => router.back()} className="w-12 h-12 shrink-0 items-center justify-center">
-            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
-          </Pressable>
+       
           <Text className={`text-lg font-bold flex-1 text-center ${isDark ? "text-white" : "text-[#121417]"}`}>
             Earnings & Financials
           </Text>
@@ -568,10 +587,11 @@ export default function EarningsScreen() {
                     <Text className={`text-sm font-bold mb-2 ml-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Date</Text>
                     <Pressable
                       onPress={() => {
-                        const parts = newSession.date.split('-').map(Number);
-                        if (parts.length === 3) {
-                          setSelectedYear(parts[0]);
-                          setSelectedMonth(parts[1] - 1);
+                        const dateStr = newSession.date ?? (new Date().toISOString().split('T')[0] ?? '');
+                        const parts = dateStr.split('-').map(Number);
+                        if (parts.length === 3 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+                          setSelectedYear(parts[0] ?? new Date().getFullYear());
+                          setSelectedMonth((parts[1] ?? (new Date().getMonth() + 1)) - 1);
                         }
                         setShowDatePicker(true);
                       }}

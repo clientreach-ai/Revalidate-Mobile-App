@@ -106,7 +106,7 @@ export const API_ENDPOINTS = {
   APPRAISALS: {
     LIST: '/api/v1/appraisals',
     CREATE: '/api/v1/appraisals',
-    UPLOAD: '/api/v1/appraisals/upload',
+    UPLOAD: '/api/v1/documents/upload',
     GET_BY_ID: '/api/v1/appraisals',
     UPDATE: '/api/v1/appraisals',
     DELETE: '/api/v1/appraisals',

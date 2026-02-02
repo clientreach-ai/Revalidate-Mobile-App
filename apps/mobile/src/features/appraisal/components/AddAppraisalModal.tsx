@@ -19,7 +19,6 @@ interface AddAppraisalModalProps {
     hospitals: Hospital[];
     onLoadHospitals: () => void;
     onSearchHospitals: (query: string) => void;
-    setHospitals: (hospitals: Hospital[]) => void;
 }
 
 export const AddAppraisalModal = ({
@@ -30,7 +29,6 @@ export const AddAppraisalModal = ({
     hospitals,
     onLoadHospitals,
     onSearchHospitals,
-    setHospitals,
 }: AddAppraisalModalProps) => {
     const [isUploading, setIsUploading] = useState(false);
     const [fileUri, setFileUri] = useState<string | null>(null);
@@ -122,15 +120,26 @@ export const AddAppraisalModal = ({
             };
 
             if (fileUri && form.file) {
-                await apiService.uploadFile(
-                    API_ENDPOINTS.APPRAISALS.UPLOAD,
+                const uploadRes: any = await apiService.uploadFile(
+                    API_ENDPOINTS.DOCUMENTS.UPLOAD,
                     { uri: fileUri, type: form.file.type, name: form.file.name },
                     token,
-                    payload
+                    {
+                        title: form.file.name,
+                        category: 'appraisal',
+                        description: 'Appraisal document',
+                    }
                 );
-            } else {
-                await apiService.post(API_ENDPOINTS.APPRAISALS.CREATE, payload, token);
+
+                const documentId = uploadRes?.data?.id;
+                if (!documentId) {
+                    throw new Error('Failed to upload appraisal document');
+                }
+
+                payload.document_ids = [documentId];
             }
+
+            await apiService.post(API_ENDPOINTS.APPRAISALS.CREATE, payload, token);
 
             showToast.success('Appraisal logged successfully');
             onSuccess();

@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityIndicator, Image, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { router } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/features/theme/theme.store';
@@ -13,10 +13,11 @@ import { showToast } from '@/utils/toast';
 import '../../global.css';
 
 export default function AccountSettingsScreen() {
-  const router = useRouter();
   const { isDark } = useThemeStore();
   const { profile, refresh: refreshProfile } = useProfile();
   const { isPremium } = usePremium();
+
+  const isMountedRef = useRef(true);
 
   const premiumGold = '#D4AF37';
   const premiumGoldDark = '#B8860B';
@@ -66,6 +67,13 @@ export default function AccountSettingsScreen() {
   const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     loadUserData();
     loadProfileImage();
   }, []);
@@ -102,10 +110,16 @@ export default function AccountSettingsScreen() {
 
   const loadUserData = async () => {
     try {
-      setLoading(true);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -117,25 +131,29 @@ export default function AccountSettingsScreen() {
 
       if (response?.data) {
         const data = response.data;
-        setName(data.step2?.name || profile?.name || '');
-        setEmail(data.step2?.email || profile?.email || '');
-        setPhone(data.step2?.phone || '');
-        setRole(data.step1?.role || profile?.professionalRole || '');
-        setRegistrationNumber(data.step3?.registrationNumber || profile?.registrationNumber || '');
+        if (isMountedRef.current) {
+          setName(data.step2?.name || profile?.name || '');
+          setEmail(data.step2?.email || profile?.email || '');
+          setPhone(data.step2?.phone || '');
+          setRole(data.step1?.role || profile?.professionalRole || '');
+          setRegistrationNumber(data.step3?.registrationNumber || profile?.registrationNumber || '');
+        }
 
         if (data.step3) {
           const s3 = data.step3;
-          if (s3.revalidationDate) setRevalidationDate(new Date(s3.revalidationDate));
-          setWorkSetting(s3.workSetting || '');
-          setScope(s3.scope || '');
-          setProfessionalRegistrations(Array.isArray(s3.professionalRegistrations) ? s3.professionalRegistrations : []);
-          setRegistrationPin(s3.registrationPin || '');
-          setHourlyRate(String(s3.hourlyRate || ''));
-          setWorkHoursCompleted(String(s3.workHoursCompleted || ''));
-          setTrainingHoursCompleted(String(s3.trainingHoursCompleted || ''));
-          setEarningsCurrentYear(String(s3.earningsCurrentYear || ''));
-          setWorkDescription(s3.workDescription || '');
-          setNotepad(s3.notepad || '');
+          if (isMountedRef.current) {
+            if (s3.revalidationDate) setRevalidationDate(new Date(s3.revalidationDate));
+            setWorkSetting(s3.workSetting || '');
+            setScope(s3.scope || '');
+            setProfessionalRegistrations(Array.isArray(s3.professionalRegistrations) ? s3.professionalRegistrations : []);
+            setRegistrationPin(s3.registrationPin || '');
+            setHourlyRate(String(s3.hourlyRate || ''));
+            setWorkHoursCompleted(String(s3.workHoursCompleted || ''));
+            setTrainingHoursCompleted(String(s3.trainingHoursCompleted || ''));
+            setEarningsCurrentYear(String(s3.earningsCurrentYear || ''));
+            setWorkDescription(s3.workDescription || '');
+            setNotepad(s3.notepad || '');
+          }
         }
       }
 
@@ -154,19 +172,25 @@ export default function AccountSettingsScreen() {
 
         if (workResp?.data || Array.isArray(workResp)) {
           const items = Array.isArray(workResp) ? workResp : workResp.data;
-          setWorkSettingsOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+          if (isMountedRef.current) {
+            setWorkSettingsOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+          }
         }
 
         if (scopeResp?.data || Array.isArray(scopeResp)) {
           const items = Array.isArray(scopeResp) ? scopeResp : scopeResp.data;
-          setScopeOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+          if (isMountedRef.current) {
+            setScopeOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+          }
         }
 
         // Fetch registration options
         const regResp = await apiService.get<any>('/api/v1/profile/registration', token);
         if (regResp?.data || Array.isArray(regResp)) {
           const items = Array.isArray(regResp) ? regResp : regResp.data;
-          setRegistrationOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+          if (isMountedRef.current) {
+            setRegistrationOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+          }
         }
 
       } catch (e) {
@@ -176,8 +200,10 @@ export default function AccountSettingsScreen() {
       console.error('Error loading user data:', error);
       // Don't show error to user, just rely on useProfile fallback
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -469,9 +495,7 @@ export default function AccountSettingsScreen() {
         {/* Header */}
         <View className={`border-b ${isDark ? "bg-slate-800/80 border-slate-700" : "bg-white/80 border-gray-100"}`}>
           <View className="flex-row items-center justify-between px-4 py-2">
-            <Pressable onPress={() => router.back()} className="w-12 h-12 shrink-0 items-center justify-center">
-              <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
-            </Pressable>
+           
             <Text className={`text-lg font-bold flex-1 text-center ${isDark ? "text-white" : "text-[#121417]"}`}>
               Account Settings
             </Text>

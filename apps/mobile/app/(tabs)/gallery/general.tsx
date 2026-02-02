@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Image, Dimensions, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { router } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -22,11 +22,11 @@ const GAP = 12;
 const ITEM_WIDTH = (width - (CONTAINER_PADDING * 2) - (GAP * (COLUMN_COUNT - 1))) / COLUMN_COUNT;
 
 export default function GeneralGalleryScreen() {
-    const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
     const { isPremium } = usePremium();
     const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+    const isMountedRef = useRef(true);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerUrl, setViewerUrl] = useState<string | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -46,8 +46,12 @@ export default function GeneralGalleryScreen() {
     } = useGalleryData();
 
     useEffect(() => {
+        isMountedRef.current = true;
         loadDocuments();
         loadGalleryMeta();
+        return () => {
+            isMountedRef.current = false;
+        };
     }, [loadDocuments, loadGalleryMeta]);
 
     const getFullUrl = (url: string) => {
@@ -69,7 +73,11 @@ export default function GeneralGalleryScreen() {
             if (!url) {
                 const token = await AsyncStorage.getItem('authToken');
                 if (!token) {
-                    router.replace('/(auth)/login');
+                    try {
+                        router.replace('/(auth)/login');
+                    } catch (e) {
+                        console.warn('Navigation not ready for login redirect:', e);
+                    }
                     return;
                 }
 
@@ -87,8 +95,10 @@ export default function GeneralGalleryScreen() {
 
             if (url) {
                 if (file.isImage) {
-                    setViewerUrl(url);
-                    setViewerVisible(true);
+                    if (isMountedRef.current) {
+                        setViewerUrl(url);
+                        setViewerVisible(true);
+                    }
                 } else {
                     await downloadAndShareFile(url, file.name || 'document');
                 }
@@ -119,12 +129,7 @@ export default function GeneralGalleryScreen() {
     return (
         <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
             <View className="flex-row items-center justify-between px-6 pt-4 mb-2">
-                <Pressable
-                    onPress={() => router.back()}
-                    className={`w-10 h-10 items-center justify-center rounded-full shadow-sm ${isDark ? "bg-slate-800" : "bg-white"}`}
-                >
-                    <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#1F2937"} />
-                </Pressable>
+                
                 <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
                     General Gallery
                 </Text>

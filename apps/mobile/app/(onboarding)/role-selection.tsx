@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useFocusEffect } from '@react-navigation/native';
+import { useRouter, useFocusEffect } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Resolver, SubmitHandler } from "react-hook-form";
@@ -17,14 +16,6 @@ import { useThemeStore } from "@/features/theme/theme.store";
 import { apiService, API_ENDPOINTS } from "@/services/api";
 import { showToast } from "@/utils/toast";
 import "../global.css";
-
-const DEFAULT_ROLES = [
-    { value: "doctor" as const, label: "Doctor / GP", icon: "healing", description: "General practitioners and medical doctors" },
-    { value: "nurse" as const, label: "Nurse / Midwife", icon: "local-hospital", description: "Registered nurses and midwives" },
-    { value: "pharmacist" as const, label: "Pharmacist", icon: "science", description: "Registered pharmacists" },
-    { value: "dentist" as const, label: "Dentist", icon: "health-and-safety", description: "Dental practitioners" },
-    { value: "other" as const, label: "Other Healthcare Professional", icon: "person", description: "Other regulated healthcare roles" },
-] as const;
 
 type RoleItem = {
     value: Role;

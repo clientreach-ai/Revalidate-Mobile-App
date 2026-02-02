@@ -3,8 +3,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { router } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -31,11 +31,11 @@ interface ApiReflection {
 }
 
 export default function ReflectionsScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
   const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+  const isMountedRef = useRef(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'category' | 'evidence'>('all');
   const [refreshing, setRefreshing] = useState(false);
@@ -60,15 +60,27 @@ export default function ReflectionsScreen() {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadReflections();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const loadReflections = async (forceRefresh = false) => {
     try {
-      setLoading(true);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
-        router.replace('/(auth)/login');
+        // Using the global expo-router `router` avoids relying on a per-screen
+        // navigation context which may be unavailable during teardown/re-mount.
+        try {
+          router.replace('/(auth)/login');
+        } catch (e) {
+          console.warn('Navigation not ready for login redirect:', e);
+        }
         return;
       }
 
@@ -103,17 +115,23 @@ export default function ReflectionsScreen() {
 
         // Sort by date descending
         mappedReflections.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setReflections(mappedReflections);
+        if (isMountedRef.current) {
+          setReflections(mappedReflections);
+        }
       }
     } catch (error: any) {
       console.error('Error loading reflections:', error);
       if (!error?.message?.includes('OFFLINE_MODE')) {
         showToast.error(error?.message || 'Failed to load reflections', 'Error');
       }
-      setReflections([]);
+      if (isMountedRef.current) {
+        setReflections([]);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -294,9 +312,7 @@ export default function ReflectionsScreen() {
         }`}>
         <View className="flex-row items-center justify-between px-4 py-2">
           <View className="flex-row items-center" style={{ gap: 8 }}>
-            <Pressable onPress={() => router.back()}>
-              <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? "#E5E7EB" : "#121417"} />
-            </Pressable>
+           
             <Text className={`text-2xl font-bold ${isDark ? "text-white" : "text-[#121417]"}`}>
               Reflections
             </Text>

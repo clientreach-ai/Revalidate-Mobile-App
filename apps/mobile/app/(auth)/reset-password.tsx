@@ -30,6 +30,11 @@ export default function ResetPassword() {
     const email = params.email || "";
 
     const handleOtpChange = (value: string, index: number) => {
+        // Handle paste (some platforms deliver paste via onChangeText)
+        if (value.length > 1) {
+            handlePaste(value);
+            return;
+        }
         // Only allow numbers
         if (value && !/^\d+$/.test(value)) {
             return;
@@ -220,7 +225,9 @@ export default function ResetPassword() {
                                 {otp.map((digit, index) => (
                                     <TextInput
                                         key={index}
-                                        ref={(ref) => (inputRefs.current[index] = ref)}
+                                        ref={(ref) => {
+                                            inputRefs.current[index] = ref;
+                                        }}
                                         className={`w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 ${
                                             isDark
                                                 ? "bg-slate-800 text-white border-slate-700"
@@ -231,7 +238,6 @@ export default function ResetPassword() {
                                         value={digit}
                                         onChangeText={(text) => handleOtpChange(text, index)}
                                         onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                                        onPaste={handlePaste}
                                         editable={!isLoading}
                                     />
                                 ))}

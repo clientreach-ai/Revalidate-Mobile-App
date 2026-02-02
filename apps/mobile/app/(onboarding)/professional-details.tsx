@@ -5,7 +5,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { Resolver, SubmitHandler } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
     onboardingProfessionalDetailsSchema,
@@ -80,7 +80,6 @@ export default function ProfessionalDetails() {
 
     const {
         control,
-        handleSubmit,
         setValue,
         watch,
         reset,
@@ -539,77 +538,6 @@ export default function ProfessionalDetails() {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
-    };
-
-    const onSubmit: SubmitHandler<OnboardingProfessionalDetailsInput> = async (data) => {
-        try {
-            setIsLoading(true);
-
-            // Get auth token
-            const token = await AsyncStorage.getItem('authToken');
-            if (!token) {
-                showToast.error("Please log in again", "Error");
-                router.replace("/(auth)/login");
-                return;
-            }
-
-            // Map frontend fields to backend API format
-            const apiData: any = {
-                gmc_registration_number: data.registrationNumber,
-                revalidation_date: formatDateForAPI(data.revalidationDate),
-            };
-
-            // Add optional fields if they exist
-            if (data.workSetting) {
-                apiData.work_setting = data.workSetting;
-            }
-            if (data.scope) {
-                apiData.scope_of_practice = data.scope;
-            }
-            if (data.professionalRegistrations && data.professionalRegistrations.length > 0) {
-                // Convert array to comma-separated string
-                apiData.professional_registrations = data.professionalRegistrations.join(',');
-            }
-            if (data.registrationPin) {
-                apiData.registration_reference_pin = data.registrationPin;
-            }
-            if (data.hourlyRate !== undefined && data.hourlyRate > 0) {
-                apiData.hourly_rate = data.hourlyRate;
-            }
-            if (data.workHoursCompleted !== undefined && data.workHoursCompleted > 0) {
-                apiData.work_hours_completed_already = data.workHoursCompleted;
-            }
-            if (data.trainingHoursCompleted !== undefined && data.trainingHoursCompleted > 0) {
-                apiData.training_hours_completed_already = data.trainingHoursCompleted;
-            }
-            if (data.earningsCurrentYear !== undefined && data.earningsCurrentYear > 0) {
-                apiData.earned_current_financial_year = data.earningsCurrentYear;
-            }
-            if (data.workDescription) {
-                apiData.brief_description_of_work = data.workDescription;
-            }
-            if (data.notepad) {
-                apiData.notepad = data.notepad;
-            }
-
-            // Call API to save professional details
-            await apiService.post(
-                API_ENDPOINTS.USERS.ONBOARDING.STEP_3,
-                apiData,
-                token
-            );
-
-            // Navigate to next step
-        router.push("/(onboarding)/plan-choose");
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error 
-                ? error.message 
-                : "Failed to save professional details. Please try again.";
-            
-            showToast.error(errorMessage, "Error");
-        } finally {
-            setIsLoading(false);
-        }
     };
 
     // Allow completing setup even if some fields fail zod validation by

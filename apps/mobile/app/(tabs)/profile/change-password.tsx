@@ -1,8 +1,8 @@
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { router } from 'expo-router';
+import { useState, useRef, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { apiService, API_ENDPOINTS } from '@/services/api';
@@ -10,8 +10,9 @@ import { showToast } from '@/utils/toast';
 import '../../global.css';
 
 export default function ChangePasswordScreen() {
-    const router = useRouter();
     const { isDark } = useThemeStore();
+
+    const isMountedRef = useRef(true);
 
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -21,6 +22,13 @@ export default function ChangePasswordScreen() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errors, setErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     const validateForm = (): boolean => {
         const newErrors: { current?: string; new?: string; confirm?: string } = {};
@@ -53,12 +61,18 @@ export default function ChangePasswordScreen() {
         if (!validateForm()) return;
 
         try {
-            setIsSubmitting(true);
+            if (isMountedRef.current) {
+                setIsSubmitting(true);
+            }
             const token = await AsyncStorage.getItem('authToken');
 
             if (!token) {
                 showToast.error('Please log in again', 'Authentication Error');
-                router.replace('/(auth)/login');
+                try {
+                    router.replace('/(auth)/login');
+                } catch (e) {
+                    console.warn('Navigation not ready for login redirect:', e);
+                }
                 return;
             }
 
@@ -70,10 +84,12 @@ export default function ChangePasswordScreen() {
             showToast.success('Password changed successfully', 'Success');
 
             // Clear form
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
-            setErrors({});
+            if (isMountedRef.current) {
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                setErrors({});
+            }
 
             // Navigate back
             router.back();
@@ -83,12 +99,16 @@ export default function ChangePasswordScreen() {
             // Handle specific error messages
             const errorMessage = error.message || 'Failed to change password';
             if (errorMessage.toLowerCase().includes('incorrect') || errorMessage.toLowerCase().includes('wrong')) {
-                setErrors({ current: 'Current password is incorrect' });
+                if (isMountedRef.current) {
+                    setErrors({ current: 'Current password is incorrect' });
+                }
             } else {
                 showToast.error(errorMessage, 'Error');
             }
         } finally {
-            setIsSubmitting(false);
+            if (isMountedRef.current) {
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -108,9 +128,7 @@ export default function ChangePasswordScreen() {
                 {/* Header */}
                 <View className={`border-b ${isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-white/80 border-gray-100'}`}>
                     <View className="flex-row items-center justify-between px-4 py-2">
-                        <Pressable onPress={() => router.back()} className="w-12 h-12 shrink-0 items-center justify-center">
-                            <MaterialIcons name="arrow-back-ios" size={20} color={isDark ? '#E5E7EB' : '#121417'} />
-                        </Pressable>
+                       
                         <Text className={`text-lg font-bold flex-1 text-center ${isDark ? 'text-white' : 'text-[#121417]'}`}>
                             Change Password
                         </Text>

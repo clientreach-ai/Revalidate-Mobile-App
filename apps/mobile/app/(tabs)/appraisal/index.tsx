@@ -28,7 +28,6 @@ export default function AppraisalScreen() {
         onRefresh,
         hospitals,
         searchHospitals,
-        setHospitals,
     } = useAppraisalData();
 
     useFocusEffect(
@@ -134,11 +133,10 @@ export default function AppraisalScreen() {
                 visible={showAddModal}
                 onClose={() => setShowAddModal(false)}
                 isDark={isDark}
-                onSuccess={loadAppraisals}
+                onSuccess={() => loadAppraisals(true)}
                 hospitals={hospitals}
                 onLoadHospitals={loadHospitals}
                 onSearchHospitals={searchHospitals}
-                setHospitals={setHospitals}
             />
         </SafeAreaView>
     );

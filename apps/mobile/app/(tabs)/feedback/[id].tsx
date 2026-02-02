@@ -1,10 +1,10 @@
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput, Linking, Image } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Modal, TextInput, Image } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -38,12 +38,13 @@ interface ApiFeedback {
 }
 
 export default function FeedbackDetailScreen() {
-    const router = useRouter();
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
     const { isDark } = useThemeStore();
     const { isPremium } = usePremium();
     const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+
+    const isMountedRef = useRef(true);
 
     const [feedback, setFeedback] = useState<FeedbackDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -78,8 +79,16 @@ export default function FeedbackDetailScreen() {
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     useEffect(() => {
-        if (feedback?.documentIds && feedback.documentIds.length > 0) {
-            checkAttachment(feedback.documentIds[0]);
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        const firstDocId = feedback?.documentIds?.[0];
+        if (typeof firstDocId === 'number') {
+            checkAttachment(firstDocId);
         }
     }, [feedback]);
 
@@ -93,7 +102,9 @@ export default function FeedbackDetailScreen() {
                 if (!url.startsWith('http')) {
                     url = apiService.baseUrl + (url.startsWith('/') ? '' : '/') + url;
                 }
-                setAttachmentUrl(url);
+                if (isMountedRef.current) {
+                    setAttachmentUrl(url);
+                }
             }
         } catch (e) { console.warn('Failed to load attachment info', e); }
     };
@@ -168,9 +179,18 @@ export default function FeedbackDetailScreen() {
 
     const loadFeedbackDetail = async () => {
         try {
-            setLoading(true);
+            if (isMountedRef.current) {
+                setLoading(true);
+            }
             const token = await AsyncStorage.getItem('authToken');
-            if (!token) return router.replace('/(auth)/login');
+            if (!token) {
+                try {
+                    router.replace('/(auth)/login');
+                } catch (e) {
+                    console.warn('Navigation not ready for login redirect:', e);
+                }
+                return;
+            }
 
             const response = await apiService.get<{ success: boolean; data: ApiFeedback }>(
                 `${API_ENDPOINTS.FEEDBACK.GET_BY_ID}/${id}`,
@@ -178,7 +198,9 @@ export default function FeedbackDetailScreen() {
             );
 
             if (response?.data) {
-                setFeedback(parseFeedback(response.data));
+                if (isMountedRef.current) {
+                    setFeedback(parseFeedback(response.data));
+                }
             } else {
                 showToast.error('Feedback not found', 'Error');
                 router.back();
@@ -188,8 +210,10 @@ export default function FeedbackDetailScreen() {
             showToast.error('Failed to load feedback', 'Error');
             router.back();
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     };
 
@@ -218,8 +242,10 @@ export default function FeedbackDetailScreen() {
                 }
 
                 if (isImageFile(fullUrl)) {
-                    setViewerUrl(fullUrl);
-                    setViewerVisible(true);
+                    if (isMountedRef.current) {
+                        setViewerUrl(fullUrl);
+                        setViewerVisible(true);
+                    }
                 } else {
                     await downloadAndShareFile(fullUrl, feedback?.id ? `feedback-${feedback.id}` : 'document');
                 }
@@ -478,7 +504,15 @@ export default function FeedbackDetailScreen() {
                                 <Image source={{ uri: attachmentUrl }} className="w-full h-48 bg-gray-100 dark:bg-slate-700" resizeMode="cover" />
                             </View>
                         )}
-                        <Pressable onPress={() => handleViewDocument(feedback.documentIds[0])} className={`bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-600 flex-row items-center active:opacity-70`}>
+                        <Pressable
+                            onPress={() => {
+                                const firstDocId = feedback.documentIds?.[0];
+                                if (typeof firstDocId === 'number') {
+                                    handleViewDocument(firstDocId);
+                                }
+                            }}
+                            className={`bg-gray-50 dark:bg-slate-700/50 p-3 rounded-xl border border-gray-100 dark:border-slate-600 flex-row items-center active:opacity-70`}
+                        >
                             <MaterialIcons name="description" size={24} color="#2B5E9C" />
                             <View className="ml-3">
                                 <Text className={`font-medium ${isDark ? "text-gray-200" : "text-gray-700"}`}>Attached Document</Text>
