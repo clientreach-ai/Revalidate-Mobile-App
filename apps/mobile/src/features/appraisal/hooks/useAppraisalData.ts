@@ -49,7 +49,7 @@ export const useAppraisalData = () => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [router]);
+    }, []);
 
     const loadHospitals = useCallback(async () => {
         try {

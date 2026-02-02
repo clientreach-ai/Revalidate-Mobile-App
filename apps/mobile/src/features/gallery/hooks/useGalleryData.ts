@@ -241,7 +241,7 @@ export const useGalleryData = (category?: string) => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [router]);
+    }, []);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
