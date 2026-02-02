@@ -129,7 +129,7 @@ export default function GeneralGalleryScreen() {
     return (
         <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-background-light"}`} edges={['top']}>
             <View className="flex-row items-center justify-between px-6 pt-4 mb-2">
-                
+
                 <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
                     General Gallery
                 </Text>
@@ -229,7 +229,7 @@ export default function GeneralGalleryScreen() {
                 onClose={() => setShowAddModal(false)}
                 categories={categories}
                 isDark={isDark}
-                onSuccess={loadDocuments}
+                onSuccess={() => loadDocuments(true)}
             />
         </SafeAreaView>
     );

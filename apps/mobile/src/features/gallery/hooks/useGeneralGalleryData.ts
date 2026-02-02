@@ -49,7 +49,7 @@ export const useGeneralGalleryData = () => {
         return `${apiBase}${pathPart.startsWith('/') ? '' : '/'}${pathPart}`;
     };
 
-    const loadDocuments = useCallback(async () => {
+    const loadDocuments = useCallback(async (forceRefresh = false) => {
         try {
             setLoading(true);
             const token = await AsyncStorage.getItem('authToken');
@@ -61,7 +61,7 @@ export const useGeneralGalleryData = () => {
             const response = await apiService.get<{
                 success: boolean;
                 data: ApiDocument[];
-            }>(`${API_ENDPOINTS.DOCUMENTS.LIST}?limit=1000`, token);
+            }>(`${API_ENDPOINTS.DOCUMENTS.LIST}?limit=1000`, token, forceRefresh);
 
             if (response.success && response.data) {
                 const mapped = response.data.map((apiDoc) => {
@@ -107,7 +107,7 @@ export const useGeneralGalleryData = () => {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await loadDocuments();
+        await loadDocuments(true);
     }, [loadDocuments]);
 
     const deleteDocument = useCallback(async (id: string) => {
