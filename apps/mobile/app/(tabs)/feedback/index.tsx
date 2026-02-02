@@ -200,6 +200,21 @@ export default function FeedbackScreen() {
   };
 
   // Calendar Helpers
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
   const formatYMD = (year: number, month: number, day: number) => {
@@ -362,7 +377,7 @@ export default function FeedbackScreen() {
       {/* Header */}
       <View className={`border-b ${isDark ? "bg-slate-800/80 border-slate-700" : "bg-[#F6F7F8]/80 border-[#DDE0E4]/50"}`}>
         <View className="flex-row items-center px-4 py-2 justify-between">
-        
+
           <Text className={`text-lg font-bold ${isDark ? "text-white" : "text-[#121417]"}`}>Feedback Log</Text>
           <View className="w-12" />
         </View>
@@ -378,7 +393,7 @@ export default function FeedbackScreen() {
               className={`p-4 rounded-xl border shadow-sm ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-100"}`}>
               <View className="flex-row justify-between mb-2">
                 <Text className={`text-base font-bold flex-1 ${isDark ? "text-white" : "text-slate-800"}`} numberOfLines={1}>{item.title}</Text>
-                <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-500"}`}>{item.date}</Text>
+                <Text className={`text-xs ${isDark ? "text-gray-400" : "text-slate-500"}`}>{formatDisplayDate(item.date)}</Text>
               </View>
 
               <View className="flex-row flex-wrap gap-2 mb-3">
