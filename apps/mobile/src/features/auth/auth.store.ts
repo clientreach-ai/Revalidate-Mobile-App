@@ -43,12 +43,18 @@ export const useAuthStore = create<AuthState & AuthActions>()(
   persist(
     (set, get) => ({
       ...initialState,
-      setAuth: (token, user) =>
+      setAuth: (token, user) => {
+        // Back-compat: many screens still read AsyncStorage.getItem('authToken')
+        // directly instead of using the Zustand store.
+        // Keep this key in sync so onboarding writes reach the API.
+        AsyncStorage.setItem('authToken', token).catch(() => {});
+
         set({
           token,
           user,
           isAuthenticated: true,
-        }),
+        });
+      },
       setOnboardingCompleted: (completed) =>
         set({
           onboardingCompleted: completed,

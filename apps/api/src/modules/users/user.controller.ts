@@ -395,10 +395,12 @@ export const onboardingStep2 = asyncHandler(
 const step3Schema = z.object({
   gmc_registration_number: z
     .string()
-    .min(1, 'GMC registration number is required'),
+    .min(1, 'GMC registration number is required')
+    .optional(),
   revalidation_date: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format. Use YYYY-MM-DD'),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format. Use YYYY-MM-DD')
+    .optional(),
   work_setting: z.string().optional(),
   scope_of_practice: z.string().optional(),
   professional_registrations: z.string().optional(),

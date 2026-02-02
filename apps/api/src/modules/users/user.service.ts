@@ -284,7 +284,9 @@ export async function updateOnboardingStep1(userId: string, data: OnboardingStep
   // (some legacy rows contain invalid enum values which cause Prisma to throw
   // when returning the updated object). Then return the user via raw getter.
   await prisma.$executeRaw`
-    UPDATE users SET description = ${description}, updated_at = ${new Date()} WHERE id = ${BigInt(userId)}
+    UPDATE users
+    SET description = ${description}, reg_type = ${data.professional_role}, updated_at = ${new Date()}
+    WHERE id = ${BigInt(userId)}
   `;
 
   return getUserById(userId) as Promise<User>;
@@ -326,10 +328,16 @@ export async function updateOnboardingStep2(userId: string, data: OnboardingStep
  */
 export async function updateOnboardingStep3(userId: string, data: OnboardingStep3Professional): Promise<User> {
   const updateData: any = {
-    registration: data.gmc_registration_number,
-    due_date: data.revalidation_date,
     updated_at: new Date(),
   };
+
+  // Only update required fields when present (mobile sends partial updates while typing)
+  if (data.gmc_registration_number !== undefined) {
+    updateData.registration = data.gmc_registration_number;
+  }
+  if (data.revalidation_date !== undefined) {
+    updateData.due_date = data.revalidation_date;
+  }
 
   // Work setting and scope of practice (stored as Int in DB, but we accept string)
   if (data.work_setting !== undefined) {

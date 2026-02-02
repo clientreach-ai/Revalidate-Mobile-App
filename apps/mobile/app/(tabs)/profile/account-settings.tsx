@@ -50,9 +50,11 @@ export default function AccountSettingsScreen() {
 
   // Modals / Selection state
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
   const [showWorkSettingModal, setShowWorkSettingModal] = useState(false);
   const [showScopeModal, setShowScopeModal] = useState(false);
   const [showRegistrationsModal, setShowRegistrationsModal] = useState(false);
+  const [roleOptions, setRoleOptions] = useState<{ value: string; label: string }[]>([]);
   const [registrationOptions, setRegistrationOptions] = useState<{ value: string; label: string }[]>([]);
   const [workSettingsOptions, setWorkSettingsOptions] = useState<{ value: string; label: string }[]>([]);
   const [scopeOptions, setScopeOptions] = useState<{ value: string; label: string }[]>([]);
@@ -86,6 +88,28 @@ export default function AccountSettingsScreen() {
     if (!registrationNumber && profile?.registrationNumber) setRegistrationNumber(profile.registrationNumber);
     if (profile?.image) setProfileImage(profile.image);
   }, [profile]);
+
+  const getOptionLabel = (
+    options: { value: string; label: string }[],
+    value: string
+  ): string => {
+    if (!value) return '';
+    return options.find((o) => o.value === value)?.label || value;
+  };
+
+  const coerceMasterList = (resp: any): any[] => {
+    if (!resp) return [];
+    const data = resp?.data ?? resp;
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  };
+
+  const isEnabledMasterItem = (item: any): boolean => {
+    const s = item?.status ?? item?.active ?? item?.enabled;
+    if (s === undefined || s === null) return true;
+    return String(s) === 'one' || String(s) === '1' || s === 1 || s === true;
+  };
 
   const loadProfileImage = async () => {
     try {
@@ -165,31 +189,66 @@ export default function AccountSettingsScreen() {
           apiService.get<any>('/api/v1/profile/scope', token),
         ]);
 
-        if (rolesResp?.data?.roles) {
-          // Flatten roles into registration types if needed, or follow onboarding logic
-          // For now let's just use the ones already provided in onboarding
+        // Roles + (optionally) work settings can come from onboarding/roles
+        // Expected shape: { success: true, data: { roles: [...], workSettings: [...] } }
+        const rolesData = rolesResp?.data?.roles ? rolesResp.data : (rolesResp?.data?.data ?? rolesResp?.data ?? rolesResp);
+        if (rolesData?.roles && isMountedRef.current) {
+          const mappedRoles = (rolesData.roles as any[])
+            .filter(isEnabledMasterItem)
+            .map((r: any) => ({ value: String(r.key ?? r.value ?? r.name), label: String(r.name ?? r.label ?? r.key) }))
+            .filter((r: any) => r.value && r.label);
+          const unique = Array.from(new Map(mappedRoles.map((m) => [m.value, m])).values());
+          setRoleOptions(unique);
         }
 
-        if (workResp?.data || Array.isArray(workResp)) {
-          const items = Array.isArray(workResp) ? workResp : workResp.data;
-          if (isMountedRef.current) {
-            setWorkSettingsOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+        if (rolesData?.workSettings && isMountedRef.current) {
+          const mappedWork = (rolesData.workSettings as any[])
+            .filter(isEnabledMasterItem)
+            .map((w: any) => ({ value: String(w.id ?? w.value ?? w.name), label: String(w.name ?? w.label ?? w.id) }))
+            .filter((w: any) => w.value && w.label);
+          const unique = Array.from(new Map(mappedWork.map((m) => [m.value, m])).values());
+          setWorkSettingsOptions(unique);
+        } else {
+          // Fallback to legacy endpoint
+          const items = coerceMasterList(workResp);
+          if (items.length && isMountedRef.current) {
+            const mapped = items
+              .filter(isEnabledMasterItem)
+              .map((i: any) => ({ value: String(i.id ?? i.value ?? i.name), label: String(i.name ?? i.label ?? i.value ?? i.id) }))
+              .filter((i: any) => i.value && i.label);
+            const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
+            setWorkSettingsOptions(unique);
           }
         }
 
-        if (scopeResp?.data || Array.isArray(scopeResp)) {
-          const items = Array.isArray(scopeResp) ? scopeResp : scopeResp.data;
-          if (isMountedRef.current) {
-            setScopeOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+        // Scope list
+        {
+          const items = coerceMasterList(scopeResp);
+          if (items.length && isMountedRef.current) {
+            const mapped = items
+              .filter(isEnabledMasterItem)
+              .map((i: any) => ({ value: String(i.id ?? i.value ?? i.name), label: String(i.name ?? i.label ?? i.value ?? i.id) }))
+              .filter((i: any) => i.value && i.label);
+            const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
+            setScopeOptions(unique);
           }
         }
 
         // Fetch registration options
         const regResp = await apiService.get<any>('/api/v1/profile/registration', token);
-        if (regResp?.data || Array.isArray(regResp)) {
-          const items = Array.isArray(regResp) ? regResp : regResp.data;
-          if (isMountedRef.current) {
-            setRegistrationOptions(items.filter((i: any) => i.status === 'one').map((i: any) => ({ value: i.name || i.id, label: i.name })));
+        {
+          const items = coerceMasterList(regResp);
+          if (items.length && isMountedRef.current) {
+            // For registrations we store the label/name (better for display/history) unless API lacks names
+            const mapped = items
+              .filter(isEnabledMasterItem)
+              .map((i: any) => {
+                const label = String(i.name ?? i.label ?? i.value ?? i.id).trim();
+                return { value: label, label };
+              })
+              .filter((i: any) => i.value && i.label);
+            const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
+            setRegistrationOptions(unique);
           }
         }
 
@@ -255,6 +314,32 @@ export default function AccountSettingsScreen() {
       const token = await AsyncStorage.getItem('authToken');
       if (!token) return;
 
+      if (!name.trim()) {
+        showToast.error('Name is required', 'Validation');
+        return;
+      }
+      if (!email.trim()) {
+        showToast.error('Email is required', 'Validation');
+        return;
+      }
+      if (!phone.trim()) {
+        showToast.error('Phone number is required', 'Validation');
+        return;
+      }
+
+      // Persist onboarding role (Step 1) so admin/onboarding shows it
+      // Normalize any legacy/unknown values to a valid backend key.
+      const allowedRoleKeys = ['doctor', 'nurse', 'pharmacist', 'other_healthcare'] as const;
+      const normalizedRole = allowedRoleKeys.includes(role as any) ? role : (role ? 'other_healthcare' : '');
+      if (normalizedRole) {
+        await apiService.post(
+          API_ENDPOINTS.USERS.ONBOARDING.STEP_1,
+          { professional_role: normalizedRole },
+          token
+        );
+        if (normalizedRole !== role) setRole(normalizedRole);
+      }
+
       // Update personal details (Step 2)
       await apiService.post(API_ENDPOINTS.USERS.ONBOARDING.STEP_2, {
         name,
@@ -262,28 +347,54 @@ export default function AccountSettingsScreen() {
         phone_number: phone,
       }, token);
 
+      // Update professional details (Step 3) so registration/due date persist
+      const step3Payload: any = {
+        // backend expects this key for registration
+        gmc_registration_number: registrationNumber?.trim() ? registrationNumber.trim() : undefined,
+        revalidation_date: revalidationDate ? revalidationDate.toISOString().split('T')[0] : undefined,
+        // IMPORTANT: these should be IDs (stringified ints) so backend can store them
+        work_setting: workSetting || undefined,
+        scope_of_practice: scope || undefined,
+        professional_registrations: professionalRegistrations.length ? professionalRegistrations.join(',') : undefined,
+        registration_reference_pin: registrationPin?.trim() ? registrationPin.trim() : undefined,
+        hourly_rate: hourlyRate ? (parseFloat(hourlyRate) || 0) : undefined,
+        work_hours_completed_already: workHoursCompleted ? (parseInt(workHoursCompleted) || 0) : undefined,
+        training_hours_completed_already: trainingHoursCompleted ? (parseInt(trainingHoursCompleted) || 0) : undefined,
+        earned_current_financial_year: earningsCurrentYear ? (parseFloat(earningsCurrentYear) || 0) : undefined,
+        brief_description_of_work: workDescription?.trim() ? workDescription.trim() : undefined,
+        notepad: notepad?.trim() ? notepad.trim() : undefined,
+      };
+
+      // Remove undefined keys to avoid backend validation issues (e.g. empty string for date)
+      Object.keys(step3Payload).forEach((k) => step3Payload[k] === undefined && delete step3Payload[k]);
+      if (Object.keys(step3Payload).length > 0) {
+        await apiService.post(API_ENDPOINTS.USERS.ONBOARDING.STEP_3, step3Payload, token);
+      }
+
       // Update professional details (Profile)
-      let apiRole = role.toLowerCase();
+      let apiRole = ((normalizedRole || role) || '').toLowerCase();
       const validRoles = ['doctor', 'nurse', 'pharmacist', 'other', 'other_healthcare'];
 
       const updatePayload: any = {
-        registration_number: registrationNumber,
+        registration_number: registrationNumber?.trim() ? registrationNumber.trim() : undefined,
         revalidation_date: revalidationDate ? revalidationDate.toISOString().split('T')[0] : undefined,
-        work_setting: workSetting,
-        scope_of_practice: scope,
-        professional_registrations: professionalRegistrations.join(','),
-        registration_reference_pin: registrationPin,
-        hourly_rate: parseFloat(hourlyRate) || 0,
-        work_hours_completed_already: parseInt(workHoursCompleted) || 0,
-        training_hours_completed_already: parseInt(trainingHoursCompleted) || 0,
-        earned_current_financial_year: parseFloat(earningsCurrentYear) || 0,
-        brief_description_of_work: workDescription,
-        notepad: notepad,
+        work_setting: workSetting || undefined,
+        scope_of_practice: scope || undefined,
+        professional_registrations: professionalRegistrations.length ? professionalRegistrations.join(',') : undefined,
+        registration_reference_pin: registrationPin?.trim() ? registrationPin.trim() : undefined,
+        hourly_rate: hourlyRate ? (parseFloat(hourlyRate) || 0) : undefined,
+        work_hours_completed_already: workHoursCompleted ? (parseInt(workHoursCompleted) || 0) : undefined,
+        training_hours_completed_already: trainingHoursCompleted ? (parseInt(trainingHoursCompleted) || 0) : undefined,
+        earned_current_financial_year: earningsCurrentYear ? (parseFloat(earningsCurrentYear) || 0) : undefined,
+        brief_description_of_work: workDescription?.trim() ? workDescription.trim() : undefined,
+        notepad: notepad?.trim() ? notepad.trim() : undefined,
       };
 
       if (validRoles.includes(apiRole)) {
         updatePayload.professional_role = apiRole;
       }
+
+      Object.keys(updatePayload).forEach((k) => updatePayload[k] === undefined && delete updatePayload[k]);
 
       await apiService.put(API_ENDPOINTS.USERS.UPDATE_PROFILE, updatePayload, token);
 
@@ -431,17 +542,20 @@ export default function AccountSettingsScreen() {
   const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'default', multiline = false }: any) => (
     <View>
       <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>{label}</Text>
-      <View className={`rounded-2xl border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}>
+      <View className={`w-full rounded-2xl border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}>
         <TextInput
-          value={value}
-          onChangeText={onChangeText}
+          value={value === null || value === undefined ? '' : String(value)}
+          onChangeText={(text) => onChangeText?.(text)}
           placeholder={placeholder}
           placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
-          className={`px-4 py-3 text-base ${isDark ? "text-white" : "text-slate-900"}`}
+          className={`w-full px-4 py-3 text-base ${isDark ? "text-white" : "text-slate-900"}`}
           keyboardType={keyboardType}
           multiline={multiline}
           numberOfLines={multiline ? 4 : 1}
-          style={multiline ? { textAlignVertical: 'top', minHeight: 100 } : {}}
+          style={[
+            multiline ? { textAlignVertical: 'top', minHeight: 100 } : null,
+            { width: '100%', minWidth: 0 },
+          ]}
         />
       </View>
     </View>
@@ -483,6 +597,8 @@ export default function AccountSettingsScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -539,15 +655,12 @@ export default function AccountSettingsScreen() {
               <InputField label="Full Name" value={name} onChangeText={setName} placeholder="Enter your full name" />
               <InputField label="Email Address" value={email} onChangeText={setEmail} placeholder="Enter your email" keyboardType="email-address" />
               <InputField label="Phone Number" value={phone} onChangeText={setPhone} placeholder="Enter your phone number" keyboardType="phone-pad" />
-              <View>
-                <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>Professional Role</Text>
-                <View className={`rounded-2xl border px-4 py-3 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}>
-                  <Text className={`text-base ${isDark ? "text-white" : "text-slate-900"}`}>{role || 'Other'}</Text>
-                </View>
-                <Text className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-slate-400"}`}>
-                  Role is set during onboarding and affects requirements.
-                </Text>
-              </View>
+              <SelectField
+                label="Professional Role"
+                value={role ? getOptionLabel(roleOptions, role) : ''}
+                onPress={() => setShowRoleModal(true)}
+                placeholder="Select your role"
+              />
               <SectionSaveButton label="Save Personal Details" />
             </View>
 
@@ -576,13 +689,13 @@ export default function AccountSettingsScreen() {
               <SectionHeader icon="business" title="Practice Settings" />
               <SelectField
                 label="Work Setting"
-                value={workSetting}
+                value={workSetting ? getOptionLabel(workSettingsOptions, workSetting) : ''}
                 onPress={() => setShowWorkSettingModal(true)}
                 placeholder="Select work setting"
               />
               <SelectField
                 label="Scope of Practice"
-                value={scope}
+                value={scope ? getOptionLabel(scopeOptions, scope) : ''}
                 onPress={() => setShowScopeModal(true)}
                 placeholder="Select scope of practice"
               />
@@ -712,6 +825,39 @@ export default function AccountSettingsScreen() {
       </Modal>
 
       {/* Selection Lists (Work Setting, Scope) */}
+      <Modal visible={showRoleModal} transparent animationType="fade" onRequestClose={() => setShowRoleModal(false)}>
+        <Pressable className="flex-1 bg-black/50 justify-center px-6" onPress={() => setShowRoleModal(false)}>
+          <View className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-6 max-h-[70%]`}>
+            <Text className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Select Role
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {roleOptions.length === 0 ? (
+                <View className={`py-4 ${isDark ? 'border-slate-700' : 'border-gray-100'}`}>
+                  <Text className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Loading roles…
+                  </Text>
+                </View>
+              ) : (
+                roleOptions.map((opt) => (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() => {
+                      setRole(opt.value);
+                      setShowRoleModal(false);
+                    }}
+                    className={`py-4 border-b ${isDark ? 'border-slate-700' : 'border-gray-100'}`}
+                  >
+                    <Text className={`text-base ${isDark ? 'text-white' : 'text-gray-800'}`}>{opt.label}</Text>
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Selection Lists (Work Setting, Scope) */}
       <Modal visible={showWorkSettingModal || showScopeModal} transparent animationType="fade" onRequestClose={() => { setShowWorkSettingModal(false); setShowScopeModal(false); }}>
         <Pressable className="flex-1 bg-black/50 justify-center px-6" onPress={() => { setShowWorkSettingModal(false); setShowScopeModal(false); }}>
           <View className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-6 max-h-[70%]`}>
@@ -723,8 +869,8 @@ export default function AccountSettingsScreen() {
                 <Pressable
                   key={opt.value}
                   onPress={() => {
-                    if (showWorkSettingModal) setWorkSetting(opt.label);
-                    else setScope(opt.label);
+                    if (showWorkSettingModal) setWorkSetting(opt.value);
+                    else setScope(opt.value);
                     setShowWorkSettingModal(false);
                     setShowScopeModal(false);
                   }}

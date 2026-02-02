@@ -48,7 +48,7 @@ export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
   const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
 
   const [users] = await pool.execute(
-    `SELECT id, email, name, registration, due_date, reg_type, 
+    `SELECT id, email, name, registration, due_date, reg_type, description,
      work_settings, scope_practice, subscription_tier, subscription_status,
      status, user_type, created_at, updated_at, firebase_uid
      FROM users 
@@ -391,8 +391,14 @@ export const getDashboardStats = asyncHandler(async (_req: Request, res: Respons
 
   // Users by role/reg_type
   const [usersByRole] = await pool.execute(
-    `SELECT reg_type, COUNT(*) as count 
-     FROM users 
+    `SELECT 
+       COALESCE(
+         NULLIF(reg_type, ''),
+         NULLIF(JSON_UNQUOTE(JSON_EXTRACT(description, '$.professionalRole')), ''),
+         'Unknown'
+       ) as reg_type,
+       COUNT(*) as count
+     FROM users
      GROUP BY reg_type`
   ) as any[];
 

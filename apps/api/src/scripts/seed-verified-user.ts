@@ -19,7 +19,7 @@ import { resolve } from 'path';
 
 dotenv.config({ path: resolve(process.cwd(), '.env') });
 
-const USER_EMAIL = process.env.SEED_USER_EMAIL || 'verified@example.com';
+const USER_EMAIL = process.env.SEED_USER_EMAIL || 'va@example.com';
 const USER_PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
 const USER_NAME = process.env.SEED_USER_NAME || 'Verified User';
 

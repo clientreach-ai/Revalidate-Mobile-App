@@ -552,7 +552,7 @@ export default function ProfessionalDetails() {
 
             const partial: Record<string, any> = {};
 
-            if (values.registrationNumber) partial.registration_number = (values.registrationNumber || '').toString();
+            if (values.registrationNumber) partial.gmc_registration_number = (values.registrationNumber || '').toString();
             if (values.revalidationDate) partial.revalidation_date = formatDateForAPI(values.revalidationDate as Date);
             if (values.workSetting) partial.work_setting = values.workSetting;
             if (values.scope) partial.scope_of_practice = values.scope;

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useRef } from 'react';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, Platform } from 'react-native';
 import { ThemeProvider } from '@/features/theme/ThemeProvider';
@@ -191,7 +191,38 @@ function StatusBarWrapper() {
 }
 
 export default function RootLayout() {
-  const router = useRouter();
+  const pendingNavigationRef = useRef<null | { pathname: string; params?: Record<string, string> }>(null);
+  const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleFlush = (attempt: number) => {
+    if (flushTimeoutRef.current) {
+      clearTimeout(flushTimeoutRef.current);
+      flushTimeoutRef.current = null;
+    }
+
+    flushTimeoutRef.current = setTimeout(() => {
+      const pending = pendingNavigationRef.current;
+      if (!pending) return;
+
+      try {
+        pendingNavigationRef.current = null;
+        router.push({ pathname: pending.pathname, params: pending.params } as any);
+      } catch (e: any) {
+        // Most common case: navigation tree not ready yet.
+        const message = e?.message || String(e);
+        const shouldRetry = message.includes('navigation context') || message.includes('NavigationContainer');
+
+        if (shouldRetry && attempt < 8) {
+          pendingNavigationRef.current = pending;
+          scheduleFlush(attempt + 1);
+          return;
+        }
+
+        console.error('Failed to navigate from notification:', e);
+      }
+    }, attempt === 0 ? 0 : 250);
+  };
+
   useEffect(() => {
     // Handle unhandled promise rejections (suppress non-critical keep-awake errors)
     const originalErrorHandler = ErrorUtils.getGlobalHandler();
@@ -216,11 +247,15 @@ export default function RootLayout() {
         // Check if this is a calendar invitation
         if (data?.type === 'calendar_invite' && data?.eventId) {
           console.log('Received calendar invite notification, navigating to event:', data.eventId);
-          // Navigate to event details and trigger accept/decline modal
-          router.push({
+          // Navigate to event details and trigger accept/decline modal.
+          // Navigation may not be ready yet (cold start / deep link return), so queue if needed.
+          const destination = {
             pathname: '/calendar/[id]',
-            params: { id: String(data.eventId), showAcceptModal: 'true' }
-          } as any);
+            params: { id: String(data.eventId), showAcceptModal: 'true' },
+          };
+
+          pendingNavigationRef.current = destination;
+          scheduleFlush(0);
         }
       } catch (err) {
         console.error('Error handling notification response:', err);
@@ -235,6 +270,11 @@ export default function RootLayout() {
       }
       cleanupSyncService();
       subscription.remove();
+
+      if (flushTimeoutRef.current) {
+        clearTimeout(flushTimeoutRef.current);
+        flushTimeoutRef.current = null;
+      }
     };
   }, []);
 

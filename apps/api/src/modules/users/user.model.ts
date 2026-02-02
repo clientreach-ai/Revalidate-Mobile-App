@@ -54,8 +54,8 @@ export interface OnboardingStep2Personal {
 }
 
 export interface OnboardingStep3Professional {
-  gmc_registration_number: string;
-  revalidation_date: string;
+  gmc_registration_number?: string;
+  revalidation_date?: string;
   work_setting?: string;
   scope_of_practice?: string;
   professional_registrations?: string; // Can be comma-separated or JSON

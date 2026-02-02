@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert, Linking } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert } from 'react-native';
+import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { useAuthStore } from '@/features/auth/auth.store';
@@ -18,9 +18,9 @@ import { useStripe } from '@/services/stripe';
 let isStripeAvailable = Platform.OS !== 'web';
 
 export default function SubscriptionScreen() {
-  const router = useRouter();
   const { isDark } = useThemeStore();
   const authToken = useAuthStore((state) => state.token);
+  const isMountedRef = useRef(true);
   const [isPremium, setIsPremium] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('free');
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
@@ -41,6 +41,13 @@ export default function SubscriptionScreen() {
   const stripe = useStripe();
   const initPaymentSheet = stripe?.initPaymentSheet || (async () => ({ error: { message: "Stripe not available" } }));
   const presentPaymentSheet = stripe?.presentPaymentSheet || (async () => ({ error: { message: "Stripe not available" } }));
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Load subscription status
   useEffect(() => {
@@ -77,7 +84,9 @@ export default function SubscriptionScreen() {
       }>(API_ENDPOINTS.PAYMENT.METHODS, token);
 
       if (response?.data) {
-        setPaymentMethod(response.data);
+        if (isMountedRef.current) {
+          setPaymentMethod(response.data);
+        }
       }
     } catch (error) {
       console.log('Error fetching payment method:', error);
@@ -89,7 +98,9 @@ export default function SubscriptionScreen() {
       const token = authToken ?? await AsyncStorage.getItem('authToken');
       if (!token) {
         showToast.error('Please log in again', 'Error');
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
         return;
       }
 
@@ -104,9 +115,11 @@ export default function SubscriptionScreen() {
 
       if (response?.data) {
         const isPremiumUser = response.data.subscriptionTier === 'premium';
-        setIsPremium(isPremiumUser);
-        setSubscriptionStatus(response.data.subscriptionStatus || 'free');
-        setTrialEndsAt(response.data.trialEndsAt || null);
+        if (isMountedRef.current) {
+          setIsPremium(isPremiumUser);
+          setSubscriptionStatus(response.data.subscriptionStatus || 'free');
+          setTrialEndsAt(response.data.trialEndsAt || null);
+        }
 
         const info = {
           subscriptionTier: (response.data.subscriptionTier || 'free') as 'free' | 'premium',
@@ -122,7 +135,9 @@ export default function SubscriptionScreen() {
       console.error('Error loading subscription status:', error);
       showToast.error('Failed to load subscription status', 'Error');
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -133,18 +148,27 @@ export default function SubscriptionScreen() {
       const { error } = await initPaymentSheet({
         paymentIntentClientSecret: clientSecret,
         merchantDisplayName: 'Revalidation Tracker',
+        // If Stripe needs to hand off to a browser (3DS, bank redirects), ensure we return
+        // directly to this screen instead of landing on the Splash route.
+        returnURL: Linking.createURL('/profile/subscription'),
       });
 
       if (error) {
         showToast.error(error.message || "Failed to initialize payment", "Error");
-        setIsProcessingPayment(false);
+        if (isMountedRef.current) {
+          setIsProcessingPayment(false);
+        }
         return;
       }
 
-      setIsProcessingPayment(false);
+      if (isMountedRef.current) {
+        setIsProcessingPayment(false);
+      }
     } catch (error: any) {
       showToast.error(error.message || "Failed to initialize payment", "Error");
-      setIsProcessingPayment(false);
+      if (isMountedRef.current) {
+        setIsProcessingPayment(false);
+      }
     }
   };
 
@@ -158,11 +182,15 @@ export default function SubscriptionScreen() {
     }
 
     try {
-      setIsProcessingPayment(true);
+      if (isMountedRef.current) {
+        setIsProcessingPayment(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
         showToast.error("Please log in again", "Error");
-        setIsProcessingPayment(false);
+        if (isMountedRef.current) {
+          setIsProcessingPayment(false);
+        }
         return;
       }
 
@@ -181,9 +209,11 @@ export default function SubscriptionScreen() {
       );
 
       if (paymentResponse?.data?.clientSecret) {
-        setPaymentIntentId(paymentResponse.data.paymentIntentId || paymentResponse.data.subscriptionId || null);
-        setClientSecret(paymentResponse.data.clientSecret);
-        setIsProcessingPayment(false);
+        if (isMountedRef.current) {
+          setPaymentIntentId(paymentResponse.data.paymentIntentId || paymentResponse.data.subscriptionId || null);
+          setClientSecret(paymentResponse.data.clientSecret);
+          setIsProcessingPayment(false);
+        }
         // Payment sheet will be initialized via useEffect
       } else {
         throw new Error("Failed to create payment intent");
@@ -193,7 +223,9 @@ export default function SubscriptionScreen() {
         ? error.message
         : "Failed to start payment process. Please try again.";
       showToast.error(errorMessage, "Error");
-      setIsProcessingPayment(false);
+      if (isMountedRef.current) {
+        setIsProcessingPayment(false);
+      }
     }
   }, []);
 
@@ -204,11 +236,15 @@ export default function SubscriptionScreen() {
     }
 
     try {
-      setIsProcessingPayment(true);
+      if (isMountedRef.current) {
+        setIsProcessingPayment(true);
+      }
       const token = await AsyncStorage.getItem('authToken');
       if (!token) {
         showToast.error("Please log in again", "Error");
-        setIsProcessingPayment(false);
+        if (isMountedRef.current) {
+          setIsProcessingPayment(false);
+        }
         return;
       }
 
@@ -218,7 +254,9 @@ export default function SubscriptionScreen() {
         if (error.code !== 'Canceled') {
           showToast.error(error.message || "Payment failed", "Payment Error");
         }
-        setIsProcessingPayment(false);
+        if (isMountedRef.current) {
+          setIsProcessingPayment(false);
+        }
         return;
       }
 
@@ -238,8 +276,10 @@ export default function SubscriptionScreen() {
         token
       );
 
-      setClientSecret(null);
-      setPaymentIntentId(null);
+      if (isMountedRef.current) {
+        setClientSecret(null);
+        setPaymentIntentId(null);
+      }
       showToast.success("Payment successful! Premium plan activated.", "Success");
 
       // Reload subscription status
@@ -249,10 +289,14 @@ export default function SubscriptionScreen() {
         ? error.message
         : "Payment processing failed. Please try again.";
       showToast.error(errorMessage, "Payment Error");
-      setIsProcessingPayment(false);
+      if (isMountedRef.current) {
+        setIsProcessingPayment(false);
+      }
       return;
     } finally {
-      setIsProcessingPayment(false);
+      if (isMountedRef.current) {
+        setIsProcessingPayment(false);
+      }
     }
   }, [clientSecret, paymentIntentId, presentPaymentSheet]);
 
@@ -267,13 +311,17 @@ export default function SubscriptionScreen() {
   };
 
   const onRefresh = async () => {
-    setRefreshing(true);
+    if (isMountedRef.current) {
+      setRefreshing(true);
+    }
     try {
       await loadSubscriptionStatus(true);
     } catch (error) {
       console.error('Error refreshing subscription:', error);
     } finally {
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setRefreshing(false);
+      }
     }
   };
 

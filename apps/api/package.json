@@ -17,6 +17,7 @@
     "seed:admin": "tsx src/scripts/seed-admin.ts",
     "seed:admin2": "tsx src/scripts/seed-admin2.ts",
     "seed:verified-user": "tsx src/scripts/seed-verified-user.ts",
+    "delete:users-by-email": "tsx src/scripts/delete-users-by-email.ts",
     "fix:work-hours-table": "tsx src/scripts/fix-work-hours-table.ts",
     "find:mysql": "tsx src/scripts/find-mysql-host.ts",
     "find:users-data": "tsx src/scripts/find-users-with-data.ts",
@@ -28,7 +29,8 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "clean": "rm -rf dist node_modules"
+    "clean": "rm -rf dist node_modules",
+    "backfill:reg-type": "tsx src/scripts/backfill-reg-type-from-description.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
