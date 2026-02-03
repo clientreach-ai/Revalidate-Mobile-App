@@ -2,7 +2,7 @@ import { View, Text, ScrollView, Pressable, TextInput, RefreshControl, ActivityI
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useThemeStore } from '@/features/theme/theme.store';
@@ -11,6 +11,118 @@ import { useProfile } from '@/hooks/useProfile';
 import { usePremium } from '@/hooks/usePremium';
 import { showToast } from '@/utils/toast';
 import '../../global.css';
+
+interface SectionHeaderProps {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  title: string;
+  isDark: boolean;
+  iconAccentColor: string;
+}
+
+const SectionHeader = memo(({ icon, title, isDark, iconAccentColor }: SectionHeaderProps) => (
+  <View className="flex-row items-center mb-2 mt-4 px-1" style={{ gap: 8 }}>
+    <MaterialIcons name={icon} size={20} color={iconAccentColor} />
+    <Text className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-gray-400" : "text-slate-500"}`}>
+      {title}
+    </Text>
+  </View>
+));
+
+interface InputFieldProps {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder: string;
+  isDark: boolean;
+  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+  multiline?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoCorrect?: boolean;
+  editable?: boolean;
+}
+
+const InputField = memo(({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  isDark,
+  keyboardType = 'default',
+  multiline = false,
+  autoCapitalize = 'sentences',
+  autoCorrect = true,
+  editable = true
+}: InputFieldProps) => (
+  <View style={{ opacity: editable ? 1 : 0.7 }}>
+    <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>{label}</Text>
+    <View className={`w-full rounded-2xl border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}
+      style={!editable ? { backgroundColor: isDark ? '#1e293b' : '#f8fafc' } : null}>
+      <TextInput
+        value={value === null || value === undefined ? '' : String(value)}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
+        className={`w-full px-4 py-3 text-base ${isDark ? "text-white" : "text-slate-900"}`}
+        keyboardType={keyboardType}
+        multiline={multiline}
+        numberOfLines={multiline ? 4 : 1}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
+        autoComplete="off"
+        editable={editable}
+        style={[
+          multiline ? { textAlignVertical: 'top', minHeight: 100 } : null,
+          { width: '100%', minWidth: 0 },
+        ]}
+      />
+    </View>
+  </View>
+));
+
+interface SelectFieldProps {
+  label: string;
+  value: string;
+  onPress: () => void;
+  placeholder: string;
+  isDark: boolean;
+}
+
+const SelectField = memo(({ label, value, onPress, placeholder, isDark }: SelectFieldProps) => (
+  <View>
+    <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      className={`flex-row items-center justify-between rounded-2xl border px-4 py-3 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}
+    >
+      <Text className={`text-base ${value ? (isDark ? "text-white" : "text-slate-900") : (isDark ? "text-gray-500" : "text-slate-400")}`}>
+        {value || placeholder}
+      </Text>
+      <MaterialIcons name="keyboard-arrow-down" size={20} color={isDark ? "#6B7280" : "#9CA3AF"} />
+    </Pressable>
+  </View>
+));
+
+interface SectionSaveButtonProps {
+  label: string;
+  onPress: () => void;
+  isSaving: boolean;
+  accentColor: string;
+}
+
+const SectionSaveButton = memo(({ label, onPress, isSaving, accentColor }: SectionSaveButtonProps) => (
+  <Pressable
+    onPress={onPress}
+    disabled={isSaving}
+    className="rounded-2xl p-3 items-center shadow-sm"
+    style={{ backgroundColor: isSaving ? '#9CA3AF' : accentColor }}
+  >
+    {isSaving ? (
+      <ActivityIndicator color="white" />
+    ) : (
+      <Text className="text-white font-semibold text-base">{label}</Text>
+    )}
+  </Pressable>
+));
 
 export default function AccountSettingsScreen() {
   const { isDark } = useThemeStore();
@@ -46,6 +158,15 @@ export default function AccountSettingsScreen() {
   const [workDescription, setWorkDescription] = useState('');
   const [notepad, setNotepad] = useState('');
 
+  // Track field modifications to prevent overwrites from background fetches
+  const manualLockRef = useRef(new Set<string>());
+
+  // Helper to change state and lock the field from further hydration
+  const handleChange = useCallback((field: string, val: string, setter: (v: string) => void) => {
+    manualLockRef.current.add(field);
+    setter(val);
+  }, []);
+
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   // Modals / Selection state
@@ -79,15 +200,6 @@ export default function AccountSettingsScreen() {
     loadUserData();
     loadProfileImage();
   }, []);
-
-  // Hydrate form from profile if onboarding data fails
-  useEffect(() => {
-    if (!name && profile?.name) setName(profile.name);
-    if (!email && profile?.email) setEmail(profile.email);
-    if (!role && profile?.professionalRole) setRole(profile.professionalRole);
-    if (!registrationNumber && profile?.registrationNumber) setRegistrationNumber(profile.registrationNumber);
-    if (profile?.image) setProfileImage(profile.image);
-  }, [profile]);
 
   const getOptionLabel = (
     options: { value: string; label: string }[],
@@ -153,31 +265,30 @@ export default function AccountSettingsScreen() {
         data: any;
       }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token);
 
-      if (response?.data) {
+      if (response?.data && isMountedRef.current) {
         const data = response.data;
-        if (isMountedRef.current) {
-          setName(data.step2?.name || profile?.name || '');
-          setEmail(data.step2?.email || profile?.email || '');
-          setPhone(data.step2?.phone || '');
-          setRole(data.step1?.role || profile?.professionalRole || '');
-          setRegistrationNumber(data.step3?.registrationNumber || profile?.registrationNumber || '');
-        }
+
+        // Hydrate only if not "locked" by manual user edits
+        if (!manualLockRef.current.has('name')) setName(data.step2?.name || profile?.name || '');
+        if (!manualLockRef.current.has('email')) setEmail(data.step2?.email || profile?.email || '');
+        if (!manualLockRef.current.has('phone')) setPhone(data.step2?.phone || '');
+        if (!manualLockRef.current.has('role')) setRole(data.step1?.role || profile?.professionalRole || '');
 
         if (data.step3) {
           const s3 = data.step3;
-          if (isMountedRef.current) {
-            if (s3.revalidationDate) setRevalidationDate(new Date(s3.revalidationDate));
-            setWorkSetting(s3.workSetting || '');
-            setScope(s3.scope || '');
-            setProfessionalRegistrations(Array.isArray(s3.professionalRegistrations) ? s3.professionalRegistrations : []);
-            setRegistrationPin(s3.registrationPin || '');
-            setHourlyRate(String(s3.hourlyRate || ''));
-            setWorkHoursCompleted(String(s3.workHoursCompleted || ''));
-            setTrainingHoursCompleted(String(s3.trainingHoursCompleted || ''));
-            setEarningsCurrentYear(String(s3.earningsCurrentYear || ''));
-            setWorkDescription(s3.workDescription || '');
-            setNotepad(s3.notepad || '');
-          }
+          if (!manualLockRef.current.has('registrationNumber')) setRegistrationNumber(s3.registrationNumber || profile?.registrationNumber || '');
+          if (!manualLockRef.current.has('revalidationDate') && s3.revalidationDate) setRevalidationDate(new Date(s3.revalidationDate));
+          if (!manualLockRef.current.has('registrationPin')) setRegistrationPin(s3.registrationPin || '');
+          if (!manualLockRef.current.has('professionalRegistrations')) setProfessionalRegistrations(Array.isArray(s3.professionalRegistrations) ? s3.professionalRegistrations : []);
+
+          if (!manualLockRef.current.has('workSetting')) setWorkSetting(s3.workSetting || '');
+          if (!manualLockRef.current.has('scope')) setScope(s3.scope || '');
+          if (!manualLockRef.current.has('hourlyRate')) setHourlyRate(String(s3.hourlyRate || ''));
+          if (!manualLockRef.current.has('earningsCurrentYear')) setEarningsCurrentYear(String(s3.earningsCurrentYear || ''));
+          if (!manualLockRef.current.has('workHoursCompleted')) setWorkHoursCompleted(String(s3.workHoursCompleted || ''));
+          if (!manualLockRef.current.has('trainingHoursCompleted')) setTrainingHoursCompleted(String(s3.trainingHoursCompleted || ''));
+          if (!manualLockRef.current.has('workDescription')) setWorkDescription(s3.workDescription || '');
+          if (!manualLockRef.current.has('notepad')) setNotepad(s3.notepad || '');
         }
       }
 
@@ -189,8 +300,6 @@ export default function AccountSettingsScreen() {
           apiService.get<any>('/api/v1/profile/scope', token),
         ]);
 
-        // Roles + (optionally) work settings can come from onboarding/roles
-        // Expected shape: { success: true, data: { roles: [...], workSettings: [...] } }
         const rolesData = rolesResp?.data?.roles ? rolesResp.data : (rolesResp?.data?.data ?? rolesResp?.data ?? rolesResp);
         if (rolesData?.roles && isMountedRef.current) {
           const mappedRoles = (rolesData.roles as any[])
@@ -209,7 +318,6 @@ export default function AccountSettingsScreen() {
           const unique = Array.from(new Map(mappedWork.map((m) => [m.value, m])).values());
           setWorkSettingsOptions(unique);
         } else {
-          // Fallback to legacy endpoint
           const items = coerceMasterList(workResp);
           if (items.length && isMountedRef.current) {
             const mapped = items
@@ -221,7 +329,6 @@ export default function AccountSettingsScreen() {
           }
         }
 
-        // Scope list
         {
           const items = coerceMasterList(scopeResp);
           if (items.length && isMountedRef.current) {
@@ -234,12 +341,10 @@ export default function AccountSettingsScreen() {
           }
         }
 
-        // Fetch registration options
         const regResp = await apiService.get<any>('/api/v1/profile/registration', token);
         {
           const items = coerceMasterList(regResp);
           if (items.length && isMountedRef.current) {
-            // For registrations we store the label/name (better for display/history) unless API lacks names
             const mapped = items
               .filter(isEnabledMasterItem)
               .map((i: any) => {
@@ -257,7 +362,6 @@ export default function AccountSettingsScreen() {
       }
     } catch (error: any) {
       console.error('Error loading user data:', error);
-      // Don't show error to user, just rely on useProfile fallback
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
@@ -287,7 +391,6 @@ export default function AccountSettingsScreen() {
         const key = profile?.id ? `profile_image_uri_${profile.id}` : 'profile_image_uri';
         await AsyncStorage.setItem(key, uri);
 
-        // Upload silently
         try {
           const token = await AsyncStorage.getItem('authToken');
           if (token) {
@@ -327,8 +430,6 @@ export default function AccountSettingsScreen() {
         return;
       }
 
-      // Persist onboarding role (Step 1) so admin/onboarding shows it
-      // Normalize any legacy/unknown values to a valid backend key.
       const allowedRoleKeys = ['doctor', 'nurse', 'pharmacist', 'other_healthcare'] as const;
       const normalizedRole = allowedRoleKeys.includes(role as any) ? role : (role ? 'other_healthcare' : '');
       if (normalizedRole) {
@@ -340,19 +441,15 @@ export default function AccountSettingsScreen() {
         if (normalizedRole !== role) setRole(normalizedRole);
       }
 
-      // Update personal details (Step 2)
       await apiService.post(API_ENDPOINTS.USERS.ONBOARDING.STEP_2, {
         name,
         email,
         phone_number: phone,
       }, token);
 
-      // Update professional details (Step 3) so registration/due date persist
       const step3Payload: any = {
-        // backend expects this key for registration
         gmc_registration_number: registrationNumber?.trim() ? registrationNumber.trim() : undefined,
         revalidation_date: revalidationDate ? revalidationDate.toISOString().split('T')[0] : undefined,
-        // IMPORTANT: these should be IDs (stringified ints) so backend can store them
         work_setting: workSetting || undefined,
         scope_of_practice: scope || undefined,
         professional_registrations: professionalRegistrations.length ? professionalRegistrations.join(',') : undefined,
@@ -365,13 +462,11 @@ export default function AccountSettingsScreen() {
         notepad: notepad?.trim() ? notepad.trim() : undefined,
       };
 
-      // Remove undefined keys to avoid backend validation issues (e.g. empty string for date)
       Object.keys(step3Payload).forEach((k) => step3Payload[k] === undefined && delete step3Payload[k]);
       if (Object.keys(step3Payload).length > 0) {
         await apiService.post(API_ENDPOINTS.USERS.ONBOARDING.STEP_3, step3Payload, token);
       }
 
-      // Update professional details (Profile)
       let apiRole = ((normalizedRole || role) || '').toLowerCase();
       const validRoles = ['doctor', 'nurse', 'pharmacist', 'other', 'other_healthcare'];
 
@@ -395,10 +490,7 @@ export default function AccountSettingsScreen() {
       }
 
       Object.keys(updatePayload).forEach((k) => updatePayload[k] === undefined && delete updatePayload[k]);
-
       await apiService.put(API_ENDPOINTS.USERS.UPDATE_PROFILE, updatePayload, token);
-
-      // Refresh global profile logic
       await refreshProfile();
 
       showToast.success('Settings updated successfully', 'Success');
@@ -413,6 +505,8 @@ export default function AccountSettingsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    // Clear lock to allow fresh server data to populate
+    manualLockRef.current.clear();
     await loadUserData();
     await refreshProfile();
   };
@@ -442,13 +536,11 @@ export default function AccountSettingsScreen() {
                 showToast.error('Please login again');
                 return;
               }
-
               await apiService.post(
                 API_ENDPOINTS.USERS.RESET_SECTION,
                 { section: section.id },
                 token
               );
-
               showToast.success(`${section.label} data has been reset`);
               loadUserData();
             } catch (error: any) {
@@ -530,67 +622,6 @@ export default function AccountSettingsScreen() {
     }
   };
 
-  const SectionHeader = ({ icon, title }: { icon: keyof typeof MaterialIcons.glyphMap; title: string }) => (
-    <View className="flex-row items-center mb-2 mt-4 px-1" style={{ gap: 8 }}>
-      <MaterialIcons name={icon} size={20} color={iconAccentColor} />
-      <Text className={`text-sm font-bold uppercase tracking-wider ${isDark ? "text-gray-400" : "text-slate-500"}`}>
-        {title}
-      </Text>
-    </View>
-  );
-
-  const InputField = ({ label, value, onChangeText, placeholder, keyboardType = 'default', multiline = false }: any) => (
-    <View>
-      <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>{label}</Text>
-      <View className={`w-full rounded-2xl border ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}>
-        <TextInput
-          value={value === null || value === undefined ? '' : String(value)}
-          onChangeText={(text) => onChangeText?.(text)}
-          placeholder={placeholder}
-          placeholderTextColor={isDark ? "#6B7280" : "#94A3B8"}
-          className={`w-full px-4 py-3 text-base ${isDark ? "text-white" : "text-slate-900"}`}
-          keyboardType={keyboardType}
-          multiline={multiline}
-          numberOfLines={multiline ? 4 : 1}
-          style={[
-            multiline ? { textAlignVertical: 'top', minHeight: 100 } : null,
-            { width: '100%', minWidth: 0 },
-          ]}
-        />
-      </View>
-    </View>
-  );
-
-  const SelectField = ({ label, value, onPress, placeholder }: any) => (
-    <View>
-      <Text className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>{label}</Text>
-      <Pressable
-        onPress={onPress}
-        className={`flex-row items-center justify-between rounded-2xl border px-4 py-3 ${isDark ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200 shadow-sm"}`}
-      >
-        <Text className={`text-base ${value ? (isDark ? "text-white" : "text-slate-900") : (isDark ? "text-gray-500" : "text-slate-400")}`}>
-          {value || placeholder}
-        </Text>
-        <MaterialIcons name="keyboard-arrow-down" size={20} color={isDark ? "#6B7280" : "#9CA3AF"} />
-      </Pressable>
-    </View>
-  );
-
-  const SectionSaveButton = ({ label }: { label: string }) => (
-    <Pressable
-      onPress={handleSave}
-      disabled={isSaving}
-      className="rounded-2xl p-3 items-center shadow-sm"
-      style={{ backgroundColor: isSaving ? '#9CA3AF' : accentColor }}
-    >
-      {isSaving ? (
-        <ActivityIndicator color="white" />
-      ) : (
-        <Text className="text-white font-semibold text-base">{label}</Text>
-      )}
-    </Pressable>
-  );
-
   return (
     <SafeAreaView className={`flex-1 ${isDark ? "bg-background-dark" : "bg-slate-50"}`} edges={['top']}>
       <ScrollView
@@ -608,10 +639,8 @@ export default function AccountSettingsScreen() {
           />
         }
       >
-        {/* Header */}
         <View className={`border-b ${isDark ? "bg-slate-800/80 border-slate-700" : "bg-white/80 border-gray-100"}`}>
           <View className="flex-row items-center justify-between px-4 py-2">
-           
             <Text className={`text-lg font-bold flex-1 text-center ${isDark ? "text-white" : "text-[#121417]"}`}>
               Account Settings
             </Text>
@@ -625,11 +654,9 @@ export default function AccountSettingsScreen() {
           </View>
         ) : (
           <View className="px-6 pb-8" style={{ gap: 24 }}>
-            {/* Profile Picture Section */}
             <View className="items-center my-8">
               <View className="relative">
-                <View className={`w-32 h-32 rounded-full border-4 overflow-hidden shadow-sm ${isDark ? "border-slate-800" : "border-slate-200"
-                  }`}>
+                <View className={`w-32 h-32 rounded-full border-4 overflow-hidden shadow-sm ${isDark ? "border-slate-800" : "border-slate-200"}`}>
                   {profileImage ? (
                     <Image source={{ uri: profileImage }} className="w-full h-full" />
                   ) : (
@@ -640,8 +667,7 @@ export default function AccountSettingsScreen() {
                 </View>
                 <Pressable
                   onPress={handleImagePick}
-                  className={`absolute bottom-1 right-1 p-2 rounded-full border-2 shadow-lg ${isDark ? "border-slate-800" : "border-slate-200"
-                    }`}
+                  className={`absolute bottom-1 right-1 p-2 rounded-full border-2 shadow-lg ${isDark ? "border-slate-800" : "border-slate-200"}`}
                   style={{ backgroundColor: accentColor }}
                 >
                   <MaterialIcons name="camera-alt" size={16} color="#FFFFFF" />
@@ -651,85 +677,104 @@ export default function AccountSettingsScreen() {
 
             {/* Personal Details */}
             <View style={{ gap: 16 }}>
-              <SectionHeader icon="person" title="Personal Details" />
-              <InputField label="Full Name" value={name} onChangeText={setName} placeholder="Enter your full name" />
-              <InputField label="Email Address" value={email} onChangeText={setEmail} placeholder="Enter your email" keyboardType="email-address" />
-              <InputField label="Phone Number" value={phone} onChangeText={setPhone} placeholder="Enter your phone number" keyboardType="phone-pad" />
+              <SectionHeader icon="person" title="Personal Details" isDark={isDark} iconAccentColor={iconAccentColor} />
+              <InputField label="Full Name" value={name} onChangeText={(v) => handleChange('name', v, setName)} placeholder="Enter your full name" isDark={isDark} autoCapitalize="words" />
+              <InputField label="Email Address" value={email} onChangeText={(v) => handleChange('email', v, setEmail)} placeholder="Enter your email" keyboardType="email-address" isDark={isDark} autoCapitalize="none" autoCorrect={false} editable={false} />
+              <InputField label="Phone Number" value={phone} onChangeText={(v) => handleChange('phone', v, setPhone)} placeholder="Enter your phone number" keyboardType="phone-pad" isDark={isDark} />
               <SelectField
                 label="Professional Role"
                 value={role ? getOptionLabel(roleOptions, role) : ''}
-                onPress={() => setShowRoleModal(true)}
+                onPress={() => {
+                  manualLockRef.current.add('role');
+                  setShowRoleModal(true);
+                }}
                 placeholder="Select your role"
+                isDark={isDark}
               />
-              <SectionSaveButton label="Save Personal Details" />
+              <SectionSaveButton label="Save Personal Details" onPress={handleSave} isSaving={isSaving} accentColor={accentColor} />
             </View>
 
             {/* Professional Details */}
             <View style={{ gap: 16 }}>
-              <SectionHeader icon="badge" title="Professional Details" />
-              <InputField label="Registration Number" value={registrationNumber} onChangeText={setRegistrationNumber} placeholder="Enter registration number" />
+              <SectionHeader icon="badge" title="Professional Details" isDark={isDark} iconAccentColor={iconAccentColor} />
+              <InputField label="Registration Number" value={registrationNumber} onChangeText={(v) => handleChange('registrationNumber', v, setRegistrationNumber)} placeholder="Enter registration number" isDark={isDark} />
               <SelectField
                 label="Revalidation Date"
                 value={revalidationDate ? formatDate(revalidationDate) : ''}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => {
+                  manualLockRef.current.add('revalidationDate');
+                  setShowDatePicker(true);
+                }}
                 placeholder="Select revalidation date"
+                isDark={isDark}
               />
-              <InputField label="Registration PIN" value={registrationPin} onChangeText={setRegistrationPin} placeholder="Enter PIN (if applicable)" />
+              <InputField label="Registration PIN" value={registrationPin} onChangeText={(v) => handleChange('registrationPin', v, setRegistrationPin)} placeholder="Enter PIN (if applicable)" isDark={isDark} />
               <SelectField
                 label="Professional Registrations"
                 value={professionalRegistrations.length > 0 ? `${professionalRegistrations.length} items selected` : ''}
-                onPress={() => setShowRegistrationsModal(true)}
+                onPress={() => {
+                  manualLockRef.current.add('professionalRegistrations');
+                  setShowRegistrationsModal(true);
+                }}
                 placeholder="Select registrations"
+                isDark={isDark}
               />
-              <SectionSaveButton label="Save Professional Details" />
+              <SectionSaveButton label="Save Professional Details" onPress={handleSave} isSaving={isSaving} accentColor={accentColor} />
             </View>
 
             {/* Practice Settings */}
             <View style={{ gap: 16 }}>
-              <SectionHeader icon="business" title="Practice Settings" />
+              <SectionHeader icon="business" title="Practice Settings" isDark={isDark} iconAccentColor={iconAccentColor} />
               <SelectField
                 label="Work Setting"
                 value={workSetting ? getOptionLabel(workSettingsOptions, workSetting) : ''}
-                onPress={() => setShowWorkSettingModal(true)}
+                onPress={() => {
+                  manualLockRef.current.add('workSetting');
+                  setShowWorkSettingModal(true);
+                }}
                 placeholder="Select work setting"
+                isDark={isDark}
               />
               <SelectField
                 label="Scope of Practice"
                 value={scope ? getOptionLabel(scopeOptions, scope) : ''}
-                onPress={() => setShowScopeModal(true)}
+                onPress={() => {
+                  manualLockRef.current.add('scope');
+                  setShowScopeModal(true);
+                }}
                 placeholder="Select scope of practice"
+                isDark={isDark}
               />
-              <SectionSaveButton label="Save Practice Settings" />
+              <SectionSaveButton label="Save Practice Settings" onPress={handleSave} isSaving={isSaving} accentColor={accentColor} />
             </View>
 
             {/* Financial Details */}
             <View style={{ gap: 16 }}>
-              <SectionHeader icon="payments" title="Financial Details" />
-              <InputField label="Hourly Rate (£)" value={hourlyRate} onChangeText={setHourlyRate} placeholder="e.g. 50" keyboardType="numeric" />
-              <InputField label="Earned This Financial Year (£)" value={earningsCurrentYear} onChangeText={setEarningsCurrentYear} placeholder="e.g. 0" keyboardType="numeric" />
-              <SectionSaveButton label="Save Financial Details" />
+              <SectionHeader icon="payments" title="Financial Details" isDark={isDark} iconAccentColor={iconAccentColor} />
+              <InputField label="Hourly Rate (£)" value={hourlyRate} onChangeText={(v) => handleChange('hourlyRate', v, setHourlyRate)} placeholder="e.g. 50" keyboardType="numeric" isDark={isDark} />
+              <InputField label="Earned This Financial Year (£)" value={earningsCurrentYear} onChangeText={(v) => handleChange('earningsCurrentYear', v, setEarningsCurrentYear)} placeholder="e.g. 0" keyboardType="numeric" isDark={isDark} />
+              <SectionSaveButton label="Save Financial Details" onPress={handleSave} isSaving={isSaving} accentColor={accentColor} />
             </View>
 
             {/* Work Load */}
             <View style={{ gap: 16 }}>
-              <SectionHeader icon="history" title="Work Load History" />
-              <InputField label="Work Hours Already Completed" value={workHoursCompleted} onChangeText={setWorkHoursCompleted} placeholder="e.g. 450" keyboardType="numeric" />
-              <InputField label="Training Hours Already Completed" value={trainingHoursCompleted} onChangeText={setTrainingHoursCompleted} placeholder="e.g. 35" keyboardType="numeric" />
-              <SectionSaveButton label="Save Work Load" />
+              <SectionHeader icon="history" title="Work Load History" isDark={isDark} iconAccentColor={iconAccentColor} />
+              <InputField label="Work Hours Already Completed" value={workHoursCompleted} onChangeText={(v) => handleChange('workHoursCompleted', v, setWorkHoursCompleted)} placeholder="e.g. 450" keyboardType="numeric" isDark={isDark} />
+              <InputField label="Training Hours Already Completed" value={trainingHoursCompleted} onChangeText={(v) => handleChange('trainingHoursCompleted', v, setTrainingHoursCompleted)} placeholder="e.g. 35" keyboardType="numeric" isDark={isDark} />
+              <SectionSaveButton label="Save Work Load" onPress={handleSave} isSaving={isSaving} accentColor={accentColor} />
             </View>
 
             {/* Notes */}
             <View style={{ gap: 16 }}>
-              <SectionHeader icon="notes" title="Additional Information" />
-              <InputField label="Brief Description of Work" value={workDescription} onChangeText={setWorkDescription} placeholder="Describe your current role..." multiline />
-              <InputField label="Notepad" value={notepad} onChangeText={setNotepad} placeholder="Personal notes..." multiline />
-              <SectionSaveButton label="Save Additional Info" />
+              <SectionHeader icon="notes" title="Additional Information" isDark={isDark} iconAccentColor={iconAccentColor} />
+              <InputField label="Brief Description of Work" value={workDescription} onChangeText={(v) => handleChange('workDescription', v, setWorkDescription)} placeholder="Describe your current role..." multiline isDark={isDark} />
+              <InputField label="Notepad" value={notepad} onChangeText={(v) => handleChange('notepad', v, setNotepad)} placeholder="Personal notes..." multiline isDark={isDark} />
+              <SectionSaveButton label="Save Additional Info" onPress={handleSave} isSaving={isSaving} accentColor={accentColor} />
             </View>
 
-            {/* Reset Data Section - Premium Only */}
             {isPremium && (
               <View style={{ gap: 16 }}>
-                <SectionHeader icon="refresh" title="Reset Data" />
+                <SectionHeader icon="refresh" title="Reset Data" isDark={isDark} iconAccentColor={iconAccentColor} />
                 <View className={`rounded-2xl border p-4 ${isDark ? 'bg-red-900/10 border-red-900/30' : 'bg-red-50 border-red-200'}`}>
                   <View className="flex-row items-center mb-3" style={{ gap: 8 }}>
                     <MaterialIcons name="warning" size={20} color={isDark ? '#FCA5A5' : '#EF4444'} />
@@ -746,12 +791,10 @@ export default function AccountSettingsScreen() {
                         key={section.id}
                         onPress={() => handleResetSection(section)}
                         disabled={isResetting}
-                        className={`flex-row items-center justify-between p-3 rounded-xl border ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'
-                          }`}
+                        className={`flex-row items-center justify-between p-3 rounded-xl border ${isDark ? 'border-slate-700 bg-slate-800' : 'border-gray-200 bg-white'}`}
                       >
                         <View className="flex-row items-center" style={{ gap: 12 }}>
-                          <View className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-slate-100'
-                            }`}>
+                          <View className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? 'bg-slate-700' : 'bg-slate-100'}`}>
                             <MaterialIcons
                               name={section.icon as keyof typeof MaterialIcons.glyphMap}
                               size={16}
@@ -774,7 +817,6 @@ export default function AccountSettingsScreen() {
               </View>
             )}
 
-            {/* Save Button */}
             <Pressable
               onPress={handleSave}
               disabled={isSaving}
@@ -800,7 +842,6 @@ export default function AccountSettingsScreen() {
         )}
       </ScrollView>
 
-      {/* Date Picker Modal */}
       <Modal visible={showDatePicker} transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
         <Pressable className="flex-1 bg-black/50 justify-end" onPress={() => setShowDatePicker(false)}>
           <Pressable onPress={(e) => e.stopPropagation()} className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-t-3xl p-6`}>
@@ -824,7 +865,6 @@ export default function AccountSettingsScreen() {
         </Pressable>
       </Modal>
 
-      {/* Selection Lists (Work Setting, Scope) */}
       <Modal visible={showRoleModal} transparent animationType="fade" onRequestClose={() => setShowRoleModal(false)}>
         <Pressable className="flex-1 bg-black/50 justify-center px-6" onPress={() => setShowRoleModal(false)}>
           <View className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-6 max-h-[70%]`}>
@@ -857,7 +897,6 @@ export default function AccountSettingsScreen() {
         </Pressable>
       </Modal>
 
-      {/* Selection Lists (Work Setting, Scope) */}
       <Modal visible={showWorkSettingModal || showScopeModal} transparent animationType="fade" onRequestClose={() => { setShowWorkSettingModal(false); setShowScopeModal(false); }}>
         <Pressable className="flex-1 bg-black/50 justify-center px-6" onPress={() => { setShowWorkSettingModal(false); setShowScopeModal(false); }}>
           <View className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-6 max-h-[70%]`}>
@@ -884,7 +923,6 @@ export default function AccountSettingsScreen() {
         </Pressable>
       </Modal>
 
-      {/* Multi-select Registrations */}
       <Modal visible={showRegistrationsModal} transparent animationType="slide" onRequestClose={() => setShowRegistrationsModal(false)}>
         <Pressable className="flex-1 bg-black/50 justify-end" onPress={() => setShowRegistrationsModal(false)}>
           <View className={`${isDark ? 'bg-slate-800' : 'bg-white'} rounded-t-3xl p-6 max-h-[85%]`}>
