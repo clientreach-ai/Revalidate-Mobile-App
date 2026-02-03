@@ -264,6 +264,7 @@ export async function registerUser(email: string, passwordHash: string): Promise
       password: passwordHash,
       name: email.split('@')[0],
       reg_type: 'email',
+      designation_id: 0, // Default to 0 (Regular User) so they don't show pre-filled roles until they pick one
     },
   });
 
@@ -297,66 +298,21 @@ export async function updateOnboardingStep1(userId: string, data: OnboardingStep
   const roleKey = normalizeRoleKey(rawRole);
   const description = JSON.stringify({ professionalRole: titleCase(rawRole || roleKey) });
 
-  // Attempt to resolve a matching portfolio id for the provided role so we can
-  // populate `users.registration` (this helps admin UI and derived role logic).
-  let registrationId: number | null = null;
-  try {
-    const roleText = (data.professional_role || '').trim();
-    if (roleText) {
-      // Exact match first
-      const exact = await prisma.$queryRawUnsafe<any[]>(
-        `SELECT id FROM portfolios WHERE LOWER(name) = LOWER(?) LIMIT 1`,
-        roleText
-      );
-      if (exact && exact.length > 0) {
-        registrationId = exact[0].id;
-      } else {
-        // Fallback to name containing the role text
-        const like = await prisma.$queryRawUnsafe<any[]>(
-          `SELECT id FROM portfolios WHERE LOWER(name) LIKE LOWER(CONCAT('%', ?, '%')) LIMIT 1`,
-          roleText
-        );
-        if (like && like.length > 0) registrationId = like[0].id;
-      }
-    }
-  } catch (e) {
-    // Ignore lookup failures and continue — we still set description/reg_type below
-    registrationId = null;
-  }
-
-    // If we didn't find a matching portfolio id, map common role keys to a
-    // sensible default registration id so the admin UI sees the familiar
-    // registration label (this mirrors the conservative values used in tests).
-    const defaultRegistrationForRole = (key: string | null) => {
-      if (!key) return null;
-      const k = key.toLowerCase();
-      if (k === 'nurse') return 4; // Registered Nurse
-      if (k === 'doctor') return 10; // Doctor (GP/Consultant)
-      if (k === 'pharmacist') return 13; // Pharmacist
-      return null;
-    };
-
-    if (!registrationId) {
-      const defaultId = defaultRegistrationForRole(roleKey);
-      if (defaultId) registrationId = defaultId;
-    }
+  // Map role to designation_id for Admin Dashboard visibility/filtering
+  let designationId = 0;
+  if (roleKey === 'nurse') designationId = 2;
+  else if (roleKey === 'doctor') designationId = 1;
+  else if (roleKey === 'pharmacist') designationId = 12;
+  else if (roleKey === 'other_healthcare') designationId = 11;
 
   // Use raw SQL update to avoid Prisma attempting to parse enum columns
   // (some legacy rows contain invalid enum values which cause Prisma to throw
-  // when returning the updated object). Include `registration` when we resolved an id.
-  if (registrationId) {
-    await prisma.$executeRaw`
-      UPDATE users
-      SET description = ${description}, reg_type = ${roleKey}, registration = ${String(registrationId)}, updated_at = ${new Date()}
-      WHERE id = ${BigInt(userId)}
-    `;
-  } else {
-    await prisma.$executeRaw`
-      UPDATE users
-      SET description = ${description}, reg_type = ${roleKey}, updated_at = ${new Date()}
-      WHERE id = ${BigInt(userId)}
-    `;
-  }
+  // when returning the updated object).
+  await prisma.$executeRaw`
+    UPDATE users
+    SET description = ${description}, reg_type = ${roleKey}, designation_id = ${designationId}, updated_at = ${new Date()}
+    WHERE id = ${BigInt(userId)}
+  `;
 
   return getUserById(userId) as Promise<User>;
 }
@@ -401,8 +357,11 @@ export async function updateOnboardingStep3(userId: string, data: OnboardingStep
   };
 
   // Only update required fields when present (mobile sends partial updates while typing)
+  // Placeholder for registration id (portfolio id)
+
+  // GMC registration number is handled via description JSON below to keep users.registration strictly for Portfolio IDs
   if (data.gmc_registration_number !== undefined) {
-    updateData.registration = data.gmc_registration_number;
+    // We will set this in descriptionData later
   }
   if (data.revalidation_date !== undefined) {
     // Normalize due_date to YYYY-MM-DD
@@ -457,22 +416,30 @@ export async function updateOnboardingStep3(userId: string, data: OnboardingStep
   // Update description with new professional data
   if (data.professional_registrations !== undefined) {
     descriptionData.professionalRegistrations = data.professional_registrations;
-    
+
     // Set users.registration to the ID of the first selected registration (like Lisa's data)
     if (data.professional_registrations) {
       const registrations = data.professional_registrations.split(',').map((r: string) => r.trim()).filter(Boolean);
       if (registrations.length > 0) {
         const firstReg = registrations[0];
-        // Look up the ID from portfolios table
-        const portfolio = await prisma.portfolios.findFirst({
-          where: { name: firstReg, status: 'one' },
-          select: { id: true },
-        });
-        if (portfolio) {
-          updateData.registration = portfolio.id.toString(); // Store as string since schema allows it
+        // Check if firstReg is already a numeric ID (sent by new mobile app)
+        if (/^\d+$/.test(firstReg)) {
+          updateData.registration = firstReg;
+        } else {
+          // Look up the ID from portfolios table (legacy support for names)
+          const portfolio = await prisma.portfolios.findFirst({
+            where: { name: firstReg, status: 'one' },
+            select: { id: true },
+          });
+          if (portfolio) {
+            updateData.registration = portfolio.id.toString();
+          }
         }
       }
     }
+  }
+  if (data.gmc_registration_number !== undefined) {
+    descriptionData.gmcRegistrationNumber = data.gmc_registration_number;
   }
   if (data.registration_reference_pin !== undefined) {
     descriptionData.registrationReferencePin = data.registration_reference_pin;
@@ -481,27 +448,8 @@ export async function updateOnboardingStep3(userId: string, data: OnboardingStep
     descriptionData.briefDescriptionOfWork = data.brief_description_of_work;
   }
 
-  // Look up work_setting ID from categories table
-  if (data.work_setting !== undefined) {
-    const category = await prisma.categories.findFirst({
-      where: { name: data.work_setting, status: 'one' },
-      select: { id: true },
-    });
-    if (category) {
-      updateData.work_settings = category.id;
-    }
-  }
-
-  // Look up scope_of_practice ID from brands table
-  if (data.scope_of_practice !== undefined) {
-    const brand = await prisma.brands.findFirst({
-      where: { name: data.scope_of_practice, status: 'one' },
-      select: { id: true },
-    });
-    if (brand) {
-      updateData.scope_practice = brand.id;
-    }
-  }
+  // Note: work_setting and scope_of_practice IDs are already parsed at lines 421-427
+  // Mobile now sends numeric IDs directly, so no name lookup is needed
 
   // Store as JSON string (preserves professionalRole from step 1 and adds new fields)
   // Normalize professionalRole to Title Case if present
@@ -516,9 +464,9 @@ export async function updateOnboardingStep3(userId: string, data: OnboardingStep
   // description, then derive from resolved registration id.
   const mapRegistrationToRoleKey = (regId: any) => {
     const id = parseInt(String(regId || ''), 10);
-    if ([3,4,5,6,7,8,9].includes(id)) return 'nurse';
-    if ([10,12].includes(id)) return 'doctor';
-    if ([13,14].includes(id)) return 'pharmacist';
+    if ([3, 4, 5, 6, 7, 8, 9].includes(id)) return 'nurse';
+    if ([10, 12].includes(id)) return 'doctor';
+    if ([13, 14].includes(id)) return 'pharmacist';
     return null;
   };
 
@@ -545,20 +493,21 @@ export async function updateOnboardingStep3(userId: string, data: OnboardingStep
     if (inferred) updateData.reg_type = inferred;
   }
 
-    // If registration still wasn't set by the explicit portfolio lookup, but we
-    // have a professionalRole in descriptionData then set a conservative
-    // default registration id so the DB matches the test user approach.
-    if (!updateData.registration && descriptionData && descriptionData.professionalRole) {
-      const roleKeyFromDesc = normalizeRoleKey(String(descriptionData.professionalRole));
-      const defaultMap: Record<string, number> = {
-        nurse: 4,
-        doctor: 10,
-        pharmacist: 13,
-      };
-      if (defaultMap[roleKeyFromDesc]) {
-        updateData.registration = String(defaultMap[roleKeyFromDesc]);
-      }
+  // If registration still wasn't set by the explicit portfolio lookup, but we
+  // have a professionalRole in descriptionData then set a conservative
+  // default registration id so the DB matches the test user approach.
+  if (!updateData.registration && descriptionData && descriptionData.professionalRole) {
+    const roleKeyFromDesc = normalizeRoleKey(String(descriptionData.professionalRole));
+    const defaultMap: Record<string, number> = {
+      nurse: 4,
+      doctor: 10,
+      pharmacist: 13,
+      other_healthcare: 15,
+    };
+    if (defaultMap[roleKeyFromDesc]) {
+      updateData.registration = String(defaultMap[roleKeyFromDesc]);
     }
+  }
 
   // Use raw SQL update to avoid Prisma enum parsing errors for legacy/invalid enum values
   const setClauses3: string[] = [];

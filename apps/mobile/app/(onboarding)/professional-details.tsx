@@ -130,10 +130,10 @@ export default function ProfessionalDetails() {
                     };
                 }>(API_ENDPOINTS.USERS.ONBOARDING.DATA, token);
 
-                    if (response?.data?.step3) {
+                if (response?.data?.step3) {
                     const step3 = response.data.step3;
-                    const revalidationDate = step3.revalidationDate 
-                        ? new Date(step3.revalidationDate) 
+                    const revalidationDate = step3.revalidationDate
+                        ? new Date(step3.revalidationDate)
                         : undefined;
 
                     // coerce numeric/string values to proper types and normalize registrations
@@ -252,7 +252,8 @@ export default function ProfessionalDetails() {
                             })
                             .map((ws: any) => {
                                 const name = (ws.name ?? ws.label ?? '').toString().trim();
-                                return { value: name, label: name };
+                                const id = (ws.id ?? '').toString();
+                                return { value: id, label: name };
                             });
 
                         // Deduplicate by `value` (name) to avoid repeated items
@@ -275,29 +276,30 @@ export default function ProfessionalDetails() {
                 try {
                     const scopeResp = await apiService.get<any>('/api/v1/profile/scope', token as string);
                     const items = Array.isArray(scopeResp) ? scopeResp : scopeResp?.data ?? [];
-                        if (Array.isArray(items)) {
-                            const mapped = items
-                                .filter((s: any) => {
-                                    const st = s.status ?? s.active ?? s.enabled ?? 'one';
-                                    return String(st) === 'one' || String(st) === '1' || st === 1;
-                                })
-                                .map((s: any) => {
-                                    const name = (s.name ?? s.label ?? '').toString().trim();
-                                    return { value: name, label: name };
-                                });
+                    if (Array.isArray(items)) {
+                        const mapped = items
+                            .filter((s: any) => {
+                                const st = s.status ?? s.active ?? s.enabled ?? 'one';
+                                return String(st) === 'one' || String(st) === '1' || st === 1;
+                            })
+                            .map((s: any) => {
+                                const name = (s.name ?? s.label ?? '').toString().trim();
+                                const id = (s.id ?? '').toString();
+                                return { value: id, label: name };
+                            });
 
-                            // Deduplicate by `value` (name) to avoid repeated items
-                            const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
-                            setScopeOptions(unique);
-                            // Replace raw scope value in summary with friendly label if present
-                            try {
-                                const rawScope = response?.data?.step3?.scope;
-                                if (rawScope && unique.length) {
-                                    const label = unique.find((u: any) => u.value === rawScope)?.label || rawScope;
-                                    setOnboardingSummary((prev) => prev ? prev.replace(new RegExp(`Scope of Practice:\s*.*`), `Scope of Practice: ${label}`) : prev);
-                                }
-                            } catch (e) { /* ignore */ }
-                        }
+                        // Deduplicate by `value` (name) to avoid repeated items
+                        const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
+                        setScopeOptions(unique);
+                        // Replace raw scope value in summary with friendly label if present
+                        try {
+                            const rawScope = response?.data?.step3?.scope;
+                            if (rawScope && unique.length) {
+                                const label = unique.find((u: any) => u.value === rawScope)?.label || rawScope;
+                                setOnboardingSummary((prev) => prev ? prev.replace(new RegExp(`Scope of Practice:\s*.*`), `Scope of Practice: ${label}`) : prev);
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
                 } catch (err) {
                     // ignore and keep defaults
                 }
@@ -306,7 +308,7 @@ export default function ProfessionalDetails() {
                 try {
                     const regResp = await apiService.get<any>('/api/v1/profile/registration', token as string);
                     const items = Array.isArray(regResp) ? regResp : regResp?.data ?? [];
-                        if (Array.isArray(items)) {
+                    if (Array.isArray(items)) {
                         const mapped = items
                             .filter((r: any) => {
                                 const st = r.status ?? r.active ?? r.enabled ?? 'one';
@@ -314,13 +316,14 @@ export default function ProfessionalDetails() {
                             })
                             .map((r: any) => {
                                 const name = (r.name ?? r.label ?? '').toString().trim();
-                                return { value: name, label: name };
+                                const id = (r.id ?? '').toString();
+                                return { value: id, label: name };
                             });
 
                         // Deduplicate by `value` (name) to avoid duplicate keys/entries
                         const unique = Array.from(new Map(mapped.map((m) => [m.value, m])).values());
                         setRegistrationOptions(unique);
-                    
+
                         // If professional registrations exist in the summary, replace raw values with labels
                         try {
                             const rawRegs = Array.isArray(response?.data?.step3?.professionalRegistrations)
@@ -506,22 +509,20 @@ export default function ProfessionalDetails() {
                 <Pressable
                     key={day}
                     onPress={() => handleDateSelect(day)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        isSelected
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${isSelected
                             ? "bg-primary"
                             : isDark
-                            ? "bg-slate-700/50"
-                            : "bg-transparent"
-                    }`}
+                                ? "bg-slate-700/50"
+                                : "bg-transparent"
+                        }`}
                 >
                     <Text
-                        className={`text-sm font-medium ${
-                            isSelected
+                        className={`text-sm font-medium ${isSelected
                                 ? "text-white"
                                 : isDark
-                                ? "text-white"
-                                : "text-gray-900"
-                        }`}
+                                    ? "text-white"
+                                    : "text-gray-900"
+                            }`}
                     >
                         {day}
                     </Text>
@@ -635,11 +636,10 @@ export default function ProfessionalDetails() {
                                             />
                                         </View>
                                         <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                     ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                     : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.registrationNumber ? "border-red-500" : ""}`}
+                                                } ${errors.registrationNumber ? "border-red-500" : ""}`}
                                             style={{
                                                 shadowColor: isDark ? "#000" : "#000",
                                                 shadowOffset: { width: 0, height: 2 },
@@ -687,11 +687,10 @@ export default function ProfessionalDetails() {
                                     }
                                     setShowDatePicker(true);
                                 }}
-                                className={`w-full pl-12 pr-4 py-4 rounded-2xl flex-row items-center ${
-                                    isDark
+                                className={`w-full pl-12 pr-4 py-4 rounded-2xl flex-row items-center ${isDark
                                         ? "bg-slate-800/90 border border-slate-700/50"
                                         : "bg-white border border-gray-200 shadow-sm"
-                                } ${errors.revalidationDate ? "border-red-500" : ""}`}
+                                    } ${errors.revalidationDate ? "border-red-500" : ""}`}
                                 style={{
                                     shadowColor: isDark ? "#000" : "#000",
                                     shadowOffset: { width: 0, height: 2 },
@@ -708,15 +707,14 @@ export default function ProfessionalDetails() {
                                     />
                                 </View>
                                 <Text
-                                    className={`flex-1 ${
-                                        watchedDate
+                                    className={`flex-1 ${watchedDate
                                             ? isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
                                             : isDark
-                                            ? "text-gray-400"
-                                            : "text-gray-400"
-                                    }`}
+                                                ? "text-gray-400"
+                                                : "text-gray-400"
+                                        }`}
                                 >
                                     {watchedDate ? formatDate(watchedDate) : "Select date (DD/MM/YYYY)"}
                                 </Text>
@@ -742,11 +740,10 @@ export default function ProfessionalDetails() {
                             </Text>
                             <Pressable
                                 onPress={() => setShowWorkSettingModal(true)}
-                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${
-                                    isDark
+                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${isDark
                                         ? "bg-slate-800/90 border border-slate-700/50"
                                         : "bg-white border border-gray-200 shadow-sm"
-                                } ${errors.workSetting ? "border-red-500" : ""}`}
+                                    } ${errors.workSetting ? "border-red-500" : ""}`}
                                 style={{
                                     shadowColor: isDark ? "#000" : "#000",
                                     shadowOffset: { width: 0, height: 2 },
@@ -763,15 +760,14 @@ export default function ProfessionalDetails() {
                                     />
                                 </View>
                                 <Text
-                                    className={`flex-1 ${
-                                        watchedWorkSetting
+                                    className={`flex-1 ${watchedWorkSetting
                                             ? isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
                                             : isDark
-                                            ? "text-gray-400"
-                                            : "text-gray-400"
-                                    }`}
+                                                ? "text-gray-400"
+                                                : "text-gray-400"
+                                        }`}
                                 >
                                     {selectedWorkSetting}
                                 </Text>
@@ -797,11 +793,10 @@ export default function ProfessionalDetails() {
                             </Text>
                             <Pressable
                                 onPress={() => setShowScopeModal(true)}
-                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${
-                                    isDark
+                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${isDark
                                         ? "bg-slate-800/90 border border-slate-700/50"
                                         : "bg-white border border-gray-200 shadow-sm"
-                                } ${errors.scope ? "border-red-500" : ""}`}
+                                    } ${errors.scope ? "border-red-500" : ""}`}
                                 style={{
                                     shadowColor: isDark ? "#000" : "#000",
                                     shadowOffset: { width: 0, height: 2 },
@@ -818,15 +813,14 @@ export default function ProfessionalDetails() {
                                     />
                                 </View>
                                 <Text
-                                    className={`flex-1 ${
-                                        watchedScope
+                                    className={`flex-1 ${watchedScope
                                             ? isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
                                             : isDark
-                                            ? "text-gray-400"
-                                            : "text-gray-400"
-                                    }`}
+                                                ? "text-gray-400"
+                                                : "text-gray-400"
+                                        }`}
                                 >
                                     {selectedScope}
                                 </Text>
@@ -855,11 +849,10 @@ export default function ProfessionalDetails() {
                             </View>
                             <Pressable
                                 onPress={() => setShowProfessionalRegistrationsModal(true)}
-                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${
-                                    isDark
+                                className={`w-full pl-12 pr-10 py-4 rounded-2xl flex-row items-center ${isDark
                                         ? "bg-slate-800/90 border border-slate-700/50"
                                         : "bg-white border border-gray-200 shadow-sm"
-                                } ${errors.professionalRegistrations ? "border-red-500" : ""}`}
+                                    } ${errors.professionalRegistrations ? "border-red-500" : ""}`}
                                 style={{
                                     shadowColor: isDark ? "#000" : "#000",
                                     shadowOffset: { width: 0, height: 2 },
@@ -876,15 +869,14 @@ export default function ProfessionalDetails() {
                                     />
                                 </View>
                                 <Text
-                                    className={`flex-1 ${
-                                        watchedProfessionalRegistrations.length > 0
+                                    className={`flex-1 ${watchedProfessionalRegistrations.length > 0
                                             ? isDark
                                                 ? "text-white"
                                                 : "text-gray-900"
                                             : isDark
-                                            ? "text-gray-400"
-                                            : "text-gray-400"
-                                    }`}
+                                                ? "text-gray-400"
+                                                : "text-gray-400"
+                                        }`}
                                 >
                                     {getSelectedRegistrationsLabel()}
                                 </Text>
@@ -921,11 +913,10 @@ export default function ProfessionalDetails() {
                                             />
                                         </View>
                                         <TextInput
-                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                isDark
+                                            className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                     ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                     : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.registrationPin ? "border-red-500" : ""}`}
+                                                } ${errors.registrationPin ? "border-red-500" : ""}`}
                                             style={{
                                                 shadowColor: isDark ? "#000" : "#000",
                                                 shadowOffset: { width: 0, height: 2 },
@@ -976,7 +967,7 @@ export default function ProfessionalDetails() {
                                     const [displayValue, setDisplayValue] = useState(
                                         value !== undefined && value !== null ? value.toString() : ""
                                     );
-                                    
+
                                     // Sync display value when form value changes externally (e.g., from saved data)
                                     useEffect(() => {
                                         if (value !== undefined && value !== null) {
@@ -994,11 +985,10 @@ export default function ProfessionalDetails() {
                                                 />
                                             </View>
                                             <TextInput
-                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                    isDark
+                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                         ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                         : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                                } ${errors.hourlyRate ? "border-red-500" : ""}`}
+                                                    } ${errors.hourlyRate ? "border-red-500" : ""}`}
                                                 style={{
                                                     shadowColor: isDark ? "#000" : "#000",
                                                     shadowOffset: { width: 0, height: 2 },
@@ -1014,7 +1004,7 @@ export default function ProfessionalDetails() {
                                                     const cleaned = text.replace(/[^0-9.]/g, '');
                                                     // Only allow one decimal point
                                                     const parts = cleaned.split('.');
-                                                    const formatted = parts.length > 2 
+                                                    const formatted = parts.length > 2
                                                         ? parts[0] + '.' + parts.slice(1).join('')
                                                         : cleaned;
                                                     setDisplayValue(formatted);
@@ -1067,7 +1057,7 @@ export default function ProfessionalDetails() {
                                     const [displayValue, setDisplayValue] = useState(
                                         value !== undefined && value !== null ? value.toString() : ""
                                     );
-                                    
+
                                     // Sync display value when form value changes externally (e.g., from saved data)
                                     useEffect(() => {
                                         if (value !== undefined && value !== null) {
@@ -1085,11 +1075,10 @@ export default function ProfessionalDetails() {
                                                 />
                                             </View>
                                             <TextInput
-                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                    isDark
+                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                         ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                         : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                                } ${errors.workHoursCompleted ? "border-red-500" : ""}`}
+                                                    } ${errors.workHoursCompleted ? "border-red-500" : ""}`}
                                                 style={{
                                                     shadowColor: isDark ? "#000" : "#000",
                                                     shadowOffset: { width: 0, height: 2 },
@@ -1105,7 +1094,7 @@ export default function ProfessionalDetails() {
                                                     const cleaned = text.replace(/[^0-9.]/g, '');
                                                     // Only allow one decimal point
                                                     const parts = cleaned.split('.');
-                                                    const formatted = parts.length > 2 
+                                                    const formatted = parts.length > 2
                                                         ? parts[0] + '.' + parts.slice(1).join('')
                                                         : cleaned;
                                                     setDisplayValue(formatted);
@@ -1158,7 +1147,7 @@ export default function ProfessionalDetails() {
                                     const [displayValue, setDisplayValue] = useState(
                                         value !== undefined && value !== null ? value.toString() : ""
                                     );
-                                    
+
                                     // Sync display value when form value changes externally (e.g., from saved data)
                                     useEffect(() => {
                                         if (value !== undefined && value !== null) {
@@ -1176,11 +1165,10 @@ export default function ProfessionalDetails() {
                                                 />
                                             </View>
                                             <TextInput
-                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                    isDark
+                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                         ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                         : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                                } ${errors.trainingHoursCompleted ? "border-red-500" : ""}`}
+                                                    } ${errors.trainingHoursCompleted ? "border-red-500" : ""}`}
                                                 style={{
                                                     shadowColor: isDark ? "#000" : "#000",
                                                     shadowOffset: { width: 0, height: 2 },
@@ -1196,7 +1184,7 @@ export default function ProfessionalDetails() {
                                                     const cleaned = text.replace(/[^0-9.]/g, '');
                                                     // Only allow one decimal point
                                                     const parts = cleaned.split('.');
-                                                    const formatted = parts.length > 2 
+                                                    const formatted = parts.length > 2
                                                         ? parts[0] + '.' + parts.slice(1).join('')
                                                         : cleaned;
                                                     setDisplayValue(formatted);
@@ -1249,7 +1237,7 @@ export default function ProfessionalDetails() {
                                     const [displayValue, setDisplayValue] = useState(
                                         value !== undefined && value !== null ? value.toString() : ""
                                     );
-                                    
+
                                     // Sync display value when form value changes externally (e.g., from saved data)
                                     useEffect(() => {
                                         if (value !== undefined && value !== null) {
@@ -1267,11 +1255,10 @@ export default function ProfessionalDetails() {
                                                 />
                                             </View>
                                             <TextInput
-                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${
-                                                    isDark
+                                                className={`w-full pl-12 pr-4 py-4 rounded-2xl ${isDark
                                                         ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                         : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                                } ${errors.earningsCurrentYear ? "border-red-500" : ""}`}
+                                                    } ${errors.earningsCurrentYear ? "border-red-500" : ""}`}
                                                 style={{
                                                     shadowColor: isDark ? "#000" : "#000",
                                                     shadowOffset: { width: 0, height: 2 },
@@ -1287,7 +1274,7 @@ export default function ProfessionalDetails() {
                                                     const cleaned = text.replace(/[^0-9.]/g, '');
                                                     // Only allow one decimal point
                                                     const parts = cleaned.split('.');
-                                                    const formatted = parts.length > 2 
+                                                    const formatted = parts.length > 2
                                                         ? parts[0] + '.' + parts.slice(1).join('')
                                                         : cleaned;
                                                     setDisplayValue(formatted);
@@ -1330,11 +1317,10 @@ export default function ProfessionalDetails() {
                                 </Text>
                             </View>
                             <View
-                                className={`w-full px-4 py-4 rounded-2xl min-h-[120px] ${
-                                    isDark
+                                className={`w-full px-4 py-4 rounded-2xl min-h-[120px] ${isDark
                                         ? "bg-slate-800/90 text-white border border-slate-700/50"
                                         : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                }`}
+                                    }`}
                                 style={{ justifyContent: 'flex-start' }}
                             >
                                 {onboardingSummary ? (
@@ -1364,11 +1350,10 @@ export default function ProfessionalDetails() {
                                 render={({ field: { value, onChange, onBlur } }) => (
                                     <View className="relative">
                                         <TextInput
-                                            className={`w-full px-4 py-4 rounded-2xl min-h-[120px] text-align-top ${
-                                                isDark
+                                            className={`w-full px-4 py-4 rounded-2xl min-h-[120px] text-align-top ${isDark
                                                     ? "bg-slate-800/90 text-white border border-slate-700/50"
                                                     : "bg-white text-gray-900 border border-gray-200 shadow-sm"
-                                            } ${errors.notepad ? "border-red-500" : ""}`}
+                                                } ${errors.notepad ? "border-red-500" : ""}`}
                                             style={{
                                                 shadowColor: isDark ? "#000" : "#000",
                                                 shadowOffset: { width: 0, height: 2 },
@@ -1407,9 +1392,8 @@ export default function ProfessionalDetails() {
                 <Pressable
                     onPress={handleCompleteSetup}
                     disabled={isLoading}
-                    className={`w-full py-4 rounded-2xl flex-row items-center justify-center active:opacity-90 ${
-                        isLoading ? "bg-primary/50" : "bg-primary"
-                    }`}
+                    className={`w-full py-4 rounded-2xl flex-row items-center justify-center active:opacity-90 ${isLoading ? "bg-primary/50" : "bg-primary"
+                        }`}
                     style={{
                         shadowColor: "#1E5AF3",
                         shadowOffset: { width: 0, height: 8 },
@@ -1422,8 +1406,8 @@ export default function ProfessionalDetails() {
                         <Text className="text-white font-semibold text-base">Saving...</Text>
                     ) : (
                         <>
-                    <Text className="text-white font-semibold text-base">Complete Setup</Text>
-                    <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
+                            <Text className="text-white font-semibold text-base">Complete Setup</Text>
+                            <MaterialIcons name="arrow-forward" size={20} color="white" style={{ marginLeft: 8 }} />
                         </>
                     )}
                 </Pressable>
@@ -1441,14 +1425,12 @@ export default function ProfessionalDetails() {
                     onPress={() => setShowWorkSettingModal(false)}
                 >
                     <View
-                        className={`${
-                            isDark ? "bg-slate-800" : "bg-white"
-                        } rounded-t-3xl p-6 max-h-[80%]`}
+                        className={`${isDark ? "bg-slate-800" : "bg-white"
+                            } rounded-t-3xl p-6 max-h-[80%]`}
                     >
                         <Text
-                            className={`text-lg font-bold mb-4 ${
-                                isDark ? "text-white" : "text-gray-900"
-                            }`}
+                            className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"
+                                }`}
                         >
                             Select Work Setting
                         </Text>
@@ -1457,22 +1439,20 @@ export default function ProfessionalDetails() {
                                 <TouchableOpacity
                                     key={`${setting.value}-${idx}`}
                                     onPress={() => handleWorkSettingSelect(setting.value)}
-                                    className={`py-4 px-4 rounded-xl mb-2 ${
-                                        watchedWorkSetting === setting.value
+                                    className={`py-4 px-4 rounded-xl mb-2 ${watchedWorkSetting === setting.value
                                             ? "bg-primary/10"
                                             : isDark
-                                            ? "bg-slate-700"
-                                            : "bg-gray-50"
-                                    }`}
+                                                ? "bg-slate-700"
+                                                : "bg-gray-50"
+                                        }`}
                                 >
                                     <Text
-                                        className={`${
-                                            watchedWorkSetting === setting.value
+                                        className={`${watchedWorkSetting === setting.value
                                                 ? "text-primary font-semibold"
                                                 : isDark
-                                                ? "text-white"
-                                                : "text-gray-900"
-                                        }`}
+                                                    ? "text-white"
+                                                    : "text-gray-900"
+                                            }`}
                                     >
                                         {setting.label}
                                     </Text>
@@ -1503,14 +1483,12 @@ export default function ProfessionalDetails() {
                     onPress={() => setShowScopeModal(false)}
                 >
                     <View
-                        className={`${
-                            isDark ? "bg-slate-800" : "bg-white"
-                        } rounded-t-3xl p-6 max-h-[80%]`}
+                        className={`${isDark ? "bg-slate-800" : "bg-white"
+                            } rounded-t-3xl p-6 max-h-[80%]`}
                     >
                         <Text
-                            className={`text-lg font-bold mb-4 ${
-                                isDark ? "text-white" : "text-gray-900"
-                            }`}
+                            className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"
+                                }`}
                         >
                             Select Scope of Practice
                         </Text>
@@ -1519,22 +1497,20 @@ export default function ProfessionalDetails() {
                                 <TouchableOpacity
                                     key={`${item.value}-${idx}`}
                                     onPress={() => handleScopeSelect(item.value)}
-                                    className={`py-4 px-4 rounded-xl mb-2 ${
-                                        watchedScope === item.value
+                                    className={`py-4 px-4 rounded-xl mb-2 ${watchedScope === item.value
                                             ? "bg-primary/10"
                                             : isDark
-                                            ? "bg-slate-700"
-                                            : "bg-gray-50"
-                                    }`}
+                                                ? "bg-slate-700"
+                                                : "bg-gray-50"
+                                        }`}
                                 >
                                     <Text
-                                        className={`${
-                                            watchedScope === item.value
+                                        className={`${watchedScope === item.value
                                                 ? "text-primary font-semibold"
                                                 : isDark
-                                                ? "text-white"
-                                                : "text-gray-900"
-                                        }`}
+                                                    ? "text-white"
+                                                    : "text-gray-900"
+                                            }`}
                                     >
                                         {item.label}
                                     </Text>
@@ -1565,14 +1541,12 @@ export default function ProfessionalDetails() {
                     onPress={() => setShowProfessionalRegistrationsModal(false)}
                 >
                     <View
-                        className={`${
-                            isDark ? "bg-slate-800" : "bg-white"
-                        } rounded-t-3xl p-6 max-h-[80%]`}
+                        className={`${isDark ? "bg-slate-800" : "bg-white"
+                            } rounded-t-3xl p-6 max-h-[80%]`}
                     >
                         <Text
-                            className={`text-lg font-bold mb-4 ${
-                                isDark ? "text-white" : "text-gray-900"
-                            }`}
+                            className={`text-lg font-bold mb-4 ${isDark ? "text-white" : "text-gray-900"
+                                }`}
                         >
                             Select Professional Registration(s)
                         </Text>
@@ -1583,22 +1557,20 @@ export default function ProfessionalDetails() {
                                     <TouchableOpacity
                                         key={`${option.value}-${idx}`}
                                         onPress={() => toggleProfessionalRegistration(option.value)}
-                                        className={`py-4 px-4 rounded-xl mb-2 flex-row items-center justify-between ${
-                                            isSelected
+                                        className={`py-4 px-4 rounded-xl mb-2 flex-row items-center justify-between ${isSelected
                                                 ? "bg-primary/10"
                                                 : isDark
-                                                ? "bg-slate-700"
-                                                : "bg-gray-50"
-                                        }`}
+                                                    ? "bg-slate-700"
+                                                    : "bg-gray-50"
+                                            }`}
                                     >
                                         <Text
-                                            className={`flex-1 ${
-                                                isSelected
+                                            className={`flex-1 ${isSelected
                                                     ? "text-primary font-semibold"
                                                     : isDark
-                                                    ? "text-white"
-                                                    : "text-gray-900"
-                                            }`}
+                                                        ? "text-white"
+                                                        : "text-gray-900"
+                                                }`}
                                         >
                                             {option.label}
                                         </Text>
@@ -1687,9 +1659,8 @@ export default function ProfessionalDetails() {
                             {dayNames.map((day) => (
                                 <View key={day} className="w-10 items-center">
                                     <Text
-                                        className={`text-xs font-semibold ${
-                                            isDark ? "text-gray-400" : "text-gray-500"
-                                        }`}
+                                        className={`text-xs font-semibold ${isDark ? "text-gray-400" : "text-gray-500"
+                                            }`}
                                     >
                                         {day}
                                     </Text>
@@ -1761,22 +1732,20 @@ export default function ProfessionalDetails() {
                                         setSelectedMonth(index);
                                         setShowMonthPicker(false);
                                     }}
-                                    className={`flex-1 min-w-[30%] py-3 px-4 rounded-xl ${
-                                        selectedMonth === index
+                                    className={`flex-1 min-w-[30%] py-3 px-4 rounded-xl ${selectedMonth === index
                                             ? "bg-primary"
                                             : isDark
-                                            ? "bg-slate-700"
-                                            : "bg-gray-100"
-                                    }`}
+                                                ? "bg-slate-700"
+                                                : "bg-gray-100"
+                                        }`}
                                 >
                                     <Text
-                                        className={`text-center font-medium ${
-                                            selectedMonth === index
+                                        className={`text-center font-medium ${selectedMonth === index
                                                 ? "text-white"
                                                 : isDark
-                                                ? "text-white"
-                                                : "text-gray-900"
-                                        }`}
+                                                    ? "text-white"
+                                                    : "text-gray-900"
+                                            }`}
                                     >
                                         {month.substring(0, 3)}
                                     </Text>
@@ -1824,22 +1793,20 @@ export default function ProfessionalDetails() {
                                             setSelectedYear(year);
                                             setShowYearPicker(false);
                                         }}
-                                        className={`w-[30%] py-3 px-4 rounded-xl ${
-                                            selectedYear === year
+                                        className={`w-[30%] py-3 px-4 rounded-xl ${selectedYear === year
                                                 ? "bg-primary"
                                                 : isDark
-                                                ? "bg-slate-700"
-                                                : "bg-gray-100"
-                                        }`}
+                                                    ? "bg-slate-700"
+                                                    : "bg-gray-100"
+                                            }`}
                                     >
                                         <Text
-                                            className={`text-center font-medium ${
-                                                selectedYear === year
+                                            className={`text-center font-medium ${selectedYear === year
                                                     ? "text-white"
                                                     : isDark
-                                                    ? "text-white"
-                                                    : "text-gray-900"
-                                            }`}
+                                                        ? "text-white"
+                                                        : "text-gray-900"
+                                                }`}
                                         >
                                             {year}
                                         </Text>
