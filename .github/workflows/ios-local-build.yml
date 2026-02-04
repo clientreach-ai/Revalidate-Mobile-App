@@ -1,0 +1,59 @@
+name: iOS Local Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Enable corepack and install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Login to EAS (via token)
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: |
+          echo "EAS_TOKEN is provided"
+
+      - name: Decode signing files (optional)
+        if: ${{ secrets.DIST_CERT != '' && secrets.PROVISIONING_PROFILE != '' }}
+        run: |
+          echo "Decoding signing artifacts"
+          echo "${{ secrets.DIST_CERT }}" | base64 --decode > dist.p12
+          echo "${{ secrets.PROVISIONING_PROFILE }}" | base64 --decode > profile.mobileprovision
+
+      - name: Run local EAS build
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
+        run: |
+          set -e
+          # Use the `ipa` profile (production/internal IPA) to avoid requiring expo-dev-client
+          eas build -p ios --profile ipa --local --non-interactive
+
+      - name: Upload IPA artifact (if produced)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: |
+            *.ipa
+            **/*.ipa
