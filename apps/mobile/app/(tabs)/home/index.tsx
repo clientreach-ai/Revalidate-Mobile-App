@@ -232,12 +232,14 @@ export default function DashboardScreen() {
         visible={showStartSessionModal}
         onClose={() => setShowStartSessionModal(false)}
         isDark={isDark}
+        isPremium={isPremium}
         title="Start Session"
         submitLabel="Start Session"
         submittingLabel="Starting..."
         isSubmitting={false}
         hoursEditable
         requireHours
+        hoursInputMode="duration"
         showEvidence={false}
         onSubmit={async () => {
           setShowStartSessionModal(false);

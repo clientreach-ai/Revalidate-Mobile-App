@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,8 @@ interface WorkSessionModalProps {
   hoursEditable?: boolean;
   requireHours?: boolean;
   showEvidence?: boolean;
+  isPremium?: boolean;
+  hoursInputMode?: 'text' | 'duration';
 
   // Form State
   workingMode: 'Full time' | 'Part time';
@@ -76,6 +78,8 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
     hoursEditable,
     requireHours,
     showEvidence = true,
+    isPremium,
+    hoursInputMode = 'text',
     workingMode,
     setWorkingMode,
     selectedDate,
@@ -109,6 +113,48 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
   const [showScopeModal, setShowScopeModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [durationHours, setDurationHours] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState('');
+
+  const accentColor = isPremium ? '#D4AF37' : '#2B5F9E';
+
+  const normalizeDuration = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return { h: '', m: '' };
+    if (trimmed.includes(':')) {
+      const [hStr, mStr] = trimmed.split(':');
+      const h = Number(hStr);
+      const m = Number(mStr);
+      return {
+        h: Number.isFinite(h) ? String(Math.max(0, Math.floor(h))) : '',
+        m: Number.isFinite(m) ? String(Math.max(0, Math.floor(m))) : '',
+      };
+    }
+    const val = Number(trimmed);
+    if (!Number.isFinite(val)) return { h: '', m: '' };
+    return { h: String(Math.max(0, Math.floor(val))), m: '' };
+  };
+
+  const setDurationAndHours = (hStr: string, mStr: string) => {
+    const h = Number(hStr);
+    const m = Number(mStr);
+    const safeH = Number.isFinite(h) ? Math.max(0, Math.floor(h)) : 0;
+    const safeM = Number.isFinite(m) ? Math.max(0, Math.floor(m)) : 0;
+    if (!hStr && !mStr) {
+      setHours('');
+      return;
+    }
+    const hh = String(safeH).padStart(2, '0');
+    const mm = String(safeM).padStart(2, '0');
+    setHours(`${hh}:${mm}:00`);
+  };
+
+  useEffect(() => {
+    if (hoursInputMode !== 'duration') return;
+    const { h, m } = normalizeDuration(hours);
+    setDurationHours(h);
+    setDurationMinutes(m);
+  }, [hours, hoursInputMode]);
 
   const showErrors = submitAttempted;
   const missing = {
@@ -160,8 +206,12 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                   : 'bg-blue-50 border-blue-100'
               }`}
             >
-              <MaterialIcons name="content-copy" size={20} color="#2B5F9E" />
-              <Text className="text-[#2B5F9E] font-bold">
+              <MaterialIcons
+                name="content-copy"
+                size={20}
+                color={accentColor}
+              />
+              <Text style={{ color: accentColor }} className="font-bold">
                 Copy Details From Previous Session
               </Text>
             </Pressable>
@@ -186,13 +236,21 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
                     onPress={() => setWorkingMode(mode)}
                     className={`flex-1 py-3 items-center rounded-2xl border ${
                       workingMode === mode
-                        ? 'bg-blue-500 border-blue-500'
+                        ? ''
                         : showErrors && missing.workingMode
                           ? 'bg-transparent border-red-500'
                           : isDark
                             ? 'bg-slate-800 border-slate-700'
                             : 'bg-slate-50 border-slate-200'
                     }`}
+                    style={
+                      workingMode === mode
+                        ? {
+                            backgroundColor: accentColor,
+                            borderColor: accentColor,
+                          }
+                        : undefined
+                    }
                   >
                     <Text
                       className={`font-bold ${
@@ -279,30 +337,75 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
             </View>
 
             {/* Hours and Rate */}
-            <View className="flex-row gap-4 mb-6">
+            <View className="flex-col flex gap-4 mb-6">
               <View className="flex-1">
                 <Text
                   className={`text-sm font-semibold mb-3 ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
                   }`}
                 >
-                  HOURS (HH:MM:SS)
+                  {hoursInputMode === 'duration'
+                    ? 'SHIFT DURATION (HOURS / MINUTES)'
+                    : 'HOURS (HH:MM:SS)'}
                 </Text>
-                <TextInput
-                  value={hours}
-                  onChangeText={setHours}
-                  keyboardType="numbers-and-punctuation"
-                  editable={!!hoursEditable}
-                  placeholder="00:00:00"
-                  placeholderTextColor="gray"
-                  className={`p-4 rounded-2xl border ${
-                    showErrors && missing.hours
-                      ? 'border-red-500'
-                      : isDark
-                        ? 'bg-slate-800 border-slate-700 text-white'
-                        : 'bg-slate-50 border-slate-200 text-slate-800'
-                  }`}
-                />
+                {hoursInputMode === 'duration' ? (
+                  <View className="flex-row gap-3">
+                    <View className="flex-1">
+                      <TextInput
+                        value={durationHours}
+                        onChangeText={(val) => {
+                          setDurationHours(val);
+                          setDurationAndHours(val, durationMinutes);
+                        }}
+                        keyboardType="numeric"
+                        placeholder="Hours"
+                        placeholderTextColor="gray"
+                        className={`p-4 rounded-2xl border ${
+                          showErrors && missing.hours
+                            ? 'border-red-500'
+                            : isDark
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <TextInput
+                        value={durationMinutes}
+                        onChangeText={(val) => {
+                          setDurationMinutes(val);
+                          setDurationAndHours(durationHours, val);
+                        }}
+                        keyboardType="numeric"
+                        placeholder="Minutes"
+                        placeholderTextColor="gray"
+                        className={`p-4 rounded-2xl border ${
+                          showErrors && missing.hours
+                            ? 'border-red-500'
+                            : isDark
+                              ? 'bg-slate-800 border-slate-700 text-white'
+                              : 'bg-slate-50 border-slate-200 text-slate-800'
+                        }`}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <TextInput
+                    value={hours}
+                    onChangeText={setHours}
+                    keyboardType="numbers-and-punctuation"
+                    editable={!!hoursEditable}
+                    placeholder="00:00:00"
+                    placeholderTextColor="gray"
+                    className={`p-4 rounded-2xl border ${
+                      showErrors && missing.hours
+                        ? 'border-red-500'
+                        : isDark
+                          ? 'bg-slate-800 border-slate-700 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-800'
+                    }`}
+                  />
+                )}
               </View>
               <View className="flex-1">
                 <Text
@@ -495,8 +598,11 @@ export const WorkSessionModal: React.FC<WorkSessionModalProps> = (props) => {
               }}
               disabled={isSubmitting}
               className={`py-4 rounded-2xl items-center shadow-lg ${
-                isSubmitting ? 'bg-slate-400' : 'bg-blue-600 shadow-blue-200'
+                isSubmitting ? 'bg-slate-400' : 'shadow-blue-200'
               }`}
+              style={
+                !isSubmitting ? { backgroundColor: accentColor } : undefined
+              }
             >
               <Text className="text-white text-lg font-bold">
                 {isSubmitting ? submittingLabel || submitLabel : submitLabel}
