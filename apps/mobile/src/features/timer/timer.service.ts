@@ -4,6 +4,7 @@ import { Platform, Alert, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { TIMER_BACKGROUND_TASK, TimerUtils } from './timer.utils';
+import { useTimerStore } from './timer.store';
 
 export const TimerService = {
   async registerBackgroundTask() {
@@ -133,6 +134,64 @@ export const TimerService = {
     } catch (err) {
       console.error('Failed to stop timer background task', err);
     }
+  },
+
+  async scheduleShiftEndNotification(params: {
+    startTime: string;
+    durationMinutes: number;
+    title?: string;
+    body?: string;
+  }) {
+    const { startTime, durationMinutes, title, body } = params;
+    if (!durationMinutes || durationMinutes <= 0) return null;
+
+    const hasPermission = await this.requestPermissions();
+    if (!hasPermission) return null;
+
+    const store = useTimerStore.getState();
+    if (store.shiftEndNotificationId) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(
+          store.shiftEndNotificationId
+        );
+      } catch (err) {
+        console.warn('Failed to cancel existing shift notification', err);
+      }
+    }
+
+    const startTs = this.parseSafeDate(startTime);
+    const triggerAt = new Date(startTs + durationMinutes * 60 * 1000);
+    const trigger = triggerAt.getTime() <= Date.now() ? null : triggerAt;
+
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: title || 'Shift time reached',
+        body: body || 'Your shift time has finished.',
+      },
+      trigger,
+    });
+
+    useTimerStore.getState().setShiftDurationMinutes(durationMinutes);
+    useTimerStore.getState().setShiftStartTime(startTime);
+    useTimerStore.getState().setShiftEndNotificationId(notificationId);
+
+    return notificationId;
+  },
+
+  async cancelShiftEndNotification() {
+    const { shiftEndNotificationId } = useTimerStore.getState();
+    if (shiftEndNotificationId) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(
+          shiftEndNotificationId
+        );
+      } catch (err) {
+        console.warn('Failed to cancel shift notification', err);
+      }
+    }
+    useTimerStore.getState().setShiftDurationMinutes(null);
+    useTimerStore.getState().setShiftStartTime(null);
+    useTimerStore.getState().setShiftEndNotificationId(null);
   },
 };
 
