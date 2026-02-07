@@ -50,6 +50,7 @@ export default function FeedbackScreen() {
 
   // Modal State
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showError, setShowError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form State
@@ -276,7 +277,8 @@ export default function FeedbackScreen() {
 
   // Submit
   const handleSubmit = async () => {
-    if (!form.title || !form.source || !form.method || !form.date) {
+    if (!form.title || !form.source || !form.method || !form.date || !form.text.trim()) {
+      setShowError(true);
       showToast.error('Please fill all required fields', 'Validation Error');
       return;
     }
@@ -329,6 +331,7 @@ export default function FeedbackScreen() {
 
       showToast.success('Feedback saved successfully', 'Success');
       setShowAddModal(false);
+      setShowError(false);
 
       // Clear form
       setForm({
@@ -441,60 +444,103 @@ export default function FeedbackScreen() {
             <SafeAreaView edges={['bottom']}>
               <View className="flex-row justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
                 <Text className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Log Feedback</Text>
-                <Pressable onPress={() => setShowAddModal(false)}><MaterialIcons name="close" size={24} color={isDark ? "#ccc" : "#666"} /></Pressable>
+                <Pressable onPress={() => { setShowAddModal(false); setShowError(false); }}><MaterialIcons name="close" size={24} color={isDark ? "#ccc" : "#666"} /></Pressable>
               </View>
 
               <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
                 {/* Title */}
                 <View>
                   <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Title</Text>
-                  <TextInput value={form.title} onChangeText={t => setForm({ ...form, title: t })} placeholder="e.g. Patient Thank You Card"
+                  <TextInput
+                    value={form.title}
+                    onChangeText={t => {
+                      setForm({ ...form, title: t });
+                      if (t.trim()) setShowError(false);
+                    }}
+                    placeholder="e.g. Patient Thank You Card"
                     placeholderTextColor={isDark ? "#666" : "#999"}
-                    className={`p-3 rounded-xl border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`} />
+                    className={`p-3 rounded-xl border ${showError && !form.title ? "border-red-500 bg-red-50/50" : (isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800")}`}
+                  />
+                  {showError && !form.title && (
+                    <Text className="text-red-500 text-xs mt-1 font-medium italic">
+                      * Title is required
+                    </Text>
+                  )}
                 </View>
 
                 {/* Date */}
                 <View>
                   <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Date</Text>
-                  <Pressable onPress={() => setShowDatePicker(true)}
-                    className={`p-3 rounded-xl border flex-row justify-between items-center ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200"}`}>
+                  <Pressable
+                    onPress={() => setShowDatePicker(true)}
+                    className={`p-3 rounded-xl border flex-row justify-between items-center ${showError && !form.date ? "border-red-500 bg-red-50/50" : (isDark ? "bg-slate-700 border-slate-600" : "bg-white border-gray-200")}`}
+                  >
                     <Text className={isDark ? "text-white" : "text-slate-800"}>{form.date || 'Select Date'}</Text>
                     <MaterialIcons name="event" size={20} color={isDark ? "#999" : "#666"} />
                   </Pressable>
+                  {showError && !form.date && (
+                    <Text className="text-red-500 text-xs mt-1 font-medium italic">
+                      * Date is required
+                    </Text>
+                  )}
                 </View>
 
                 {/* Source */}
                 <View>
                   <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Source of Feedback</Text>
-                  <View className="flex-row flex-wrap gap-2">
+                  <View className={`flex-row flex-wrap gap-2 p-1 rounded-xl ${showError && !form.source ? "border border-red-500 bg-red-50/50" : ""}`}>
                     {sourceOptions.map(opt => (
-                      <Pressable key={opt} onPress={() => setForm({ ...form, source: opt })}
+                      <Pressable key={opt} onPress={() => { setForm({ ...form, source: opt }); setShowError(false); }}
                         className={`px-3 py-2 rounded-lg border ${form.source === opt ? 'bg-[#2B5E9C] border-[#2B5E9C]' : (isDark ? 'bg-slate-700 border-slate-600' : 'bg-white border-gray-200')}`}>
                         <Text className={`text-xs font-medium ${form.source === opt ? 'text-white' : (isDark ? 'text-gray-300' : 'text-slate-700')}`}>{opt}</Text>
                       </Pressable>
                     ))}
                   </View>
+                  {showError && !form.source && (
+                    <Text className="text-red-500 text-xs mt-1 font-medium italic">
+                      * Source is required
+                    </Text>
+                  )}
                 </View>
 
                 {/* Method */}
                 <View>
                   <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Type of Feedback</Text>
-                  <View className="flex-row flex-wrap gap-2">
+                  <View className={`flex-row flex-wrap gap-2 p-1 rounded-xl ${showError && !form.method ? "border border-red-500 bg-red-50/50" : ""}`}>
                     {methodOptions.map(opt => (
-                      <Pressable key={opt} onPress={() => setForm({ ...form, method: opt })}
+                      <Pressable key={opt} onPress={() => { setForm({ ...form, method: opt }); setShowError(false); }}
                         className={`px-3 py-2 rounded-lg border ${form.method === opt ? 'bg-[#2B5E9C] border-[#2B5E9C]' : (isDark ? 'bg-slate-700 border-slate-600' : 'bg-white border-gray-200')}`}>
                         <Text className={`text-xs font-medium ${form.method === opt ? 'text-white' : (isDark ? 'text-gray-300' : 'text-slate-700')}`}>{opt}</Text>
                       </Pressable>
                     ))}
                   </View>
+                  {showError && !form.method && (
+                    <Text className="text-red-500 text-xs mt-1 font-medium italic">
+                      * Feedback type is required
+                    </Text>
+                  )}
                 </View>
 
                 {/* Content */}
                 <View>
                   <Text className={`mb-2 font-semibold ${isDark ? "text-gray-300" : "text-slate-700"}`}>Content</Text>
-                  <TextInput value={form.text} onChangeText={t => setForm({ ...form, text: t })} multiline numberOfLines={4}
-                    placeholder="Feedback details..." placeholderTextColor={isDark ? "#666" : "#999"}
-                    className={`p-3 rounded-xl border min-h-[100px] ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800"}`} />
+                  <TextInput
+                    value={form.text}
+                    onChangeText={t => {
+                      setForm({ ...form, text: t });
+                      if (t.trim()) setShowError(false);
+                    }}
+                    multiline
+                    numberOfLines={4}
+                    placeholder="Feedback details..."
+                    placeholderTextColor={isDark ? "#666" : "#999"}
+                    className={`p-3 rounded-xl border min-h-[100px] ${showError && !form.text.trim() ? "border-red-500 bg-red-50/50" : (isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-200 text-slate-800")}`}
+                  />
+                  {showError && !form.text.trim() && (
+                    <Text className="text-red-500 text-xs mt-1 font-medium italic">
+                      * Feedback content cannot be empty
+                    </Text>
+                  )}
                 </View>
 
                 {/* Rating */}

@@ -363,10 +363,9 @@ export default function WorkHistoryDetailScreen() {
     return `${h}h ${m}m ${s}s`;
   };
 
-  // Extract location and shift type from description or use defaults
-  const descriptionLines = session.workDescription?.split('\n') || [];
-  const location = descriptionLines[0] || 'Work Session';
-  const shiftType = descriptionLines[1] || 'General Work';
+  // Prioritize dedicated fields, fallback to description parsing for legacy support
+  const location = session.location || session.workDescription?.split('\n')[0] || 'Work Session';
+  const shiftType = session.shiftType || session.workDescription?.split('\n')[1] || 'General Work';
 
   // Format time range
   const startTime = new Date(session.startTime);

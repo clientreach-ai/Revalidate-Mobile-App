@@ -153,6 +153,7 @@ export const AddAppraisalModal = ({
 
     const handleHospitalSelect = (h: Hospital) => {
         setForm({ ...form, hospital_id: h.id as number, hospital_name: h.name });
+        setFormErrors({ ...formErrors, hospital: '' });
         setHospitalSearch('');
     };
 
@@ -182,14 +183,14 @@ export const AddAppraisalModal = ({
                                             setShowHospitalPicker(true);
                                             onLoadHospitals();
                                         }}
-                                        className={`border rounded-2xl px-4 py-4 flex-row items-center justify-between ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-slate-200"}`}
+                                        className={`border rounded-2xl px-4 py-4 flex-row items-center justify-between ${formErrors.hospital ? "border-red-500 bg-red-50/50" : (isDark ? "bg-slate-700 border-slate-600" : "bg-white border-slate-200")}`}
                                     >
                                         <Text className={`text-base flex-1 ${form.hospital_id ? (isDark ? "text-white" : "text-slate-800") : (isDark ? "text-gray-400" : "text-slate-400")}`} numberOfLines={1}>
                                             {form.hospital_name || "Select Hospital"}
                                         </Text>
                                         <MaterialIcons name="keyboard-arrow-right" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
                                     </Pressable>
-                                    {formErrors.hospital && <Text className="text-red-500 text-xs mt-1 font-medium">{formErrors.hospital}</Text>}
+                                    {formErrors.hospital && <Text className="text-red-500 text-xs mt-1 font-medium italic">* {formErrors.hospital}</Text>}
                                 </View>
 
                                 {/* Hospital Picker Modal */}
@@ -301,7 +302,7 @@ export const AddAppraisalModal = ({
                                     <Text className={`text-sm font-semibold mb-2 ${isDark ? "text-gray-300" : "text-slate-700"}`}>Date of Appraisal *</Text>
                                     <Pressable
                                         onPress={() => setShowDatePicker(true)}
-                                        className={`border rounded-2xl px-4 py-4 flex-row items-center justify-between ${isDark ? "bg-slate-700 border-slate-600" : "bg-white border-slate-200"}`}
+                                        className={`border rounded-2xl px-4 py-4 flex-row items-center justify-between ${formErrors.date ? "border-red-500 bg-red-50/50" : (isDark ? "bg-slate-700 border-slate-600" : "bg-white border-slate-200")}`}
                                     >
                                         <Text className={`text-base ${isDark ? "text-white" : "text-slate-800"}`}>{format(form.appraisal_date, 'MMMM d, yyyy')}</Text>
                                         <MaterialIcons name="calendar-today" size={20} color={isDark ? "#9CA3AF" : "#64748B"} />
@@ -313,11 +314,14 @@ export const AddAppraisalModal = ({
                                             display="default"
                                             onChange={(_event, selectedDate) => {
                                                 setShowDatePicker(false);
-                                                if (selectedDate) setForm({ ...form, appraisal_date: selectedDate });
+                                                if (selectedDate) {
+                                                    setForm({ ...form, appraisal_date: selectedDate });
+                                                    setFormErrors({ ...formErrors, date: '' });
+                                                }
                                             }}
                                         />
                                     )}
-                                    {formErrors.date && <Text className="text-red-500 text-xs mt-1">{formErrors.date}</Text>}
+                                    {formErrors.date && <Text className="text-red-500 text-xs mt-1 font-medium italic">* {formErrors.date}</Text>}
                                 </View>
 
                                 {/* Notes */}

@@ -127,6 +127,10 @@ export default function PlanChoose() {
             const { error } = await initPaymentSheet({
                 paymentIntentClientSecret: clientSecret,
                 merchantDisplayName: 'Revalidation Tracker',
+                returnURL: 'revalidation-tracker://(onboarding)/plan-choose',
+                applePay: {
+                    merchantCountryCode: 'GB',
+                },
             });
 
             if (error) {

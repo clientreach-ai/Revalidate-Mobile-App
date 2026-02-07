@@ -47,6 +47,7 @@ export default function ReflectionsScreen() {
     text: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showError, setShowError] = useState(false);
   const [fileUri, setFileUri] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<{ name: string, type: string } | null>(null);
 
@@ -247,6 +248,11 @@ export default function ReflectionsScreen() {
       return;
     }
 
+    if (!newReflection.text.trim()) {
+      setShowError(true);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const token = await AsyncStorage.getItem('authToken');
@@ -280,6 +286,7 @@ export default function ReflectionsScreen() {
 
       showToast.success('Reflection added', 'Success');
       setShowAddModal(false);
+      setShowError(false);
       setFileUri(null);
       setAttachment(null);
       loadReflections(true);
@@ -461,7 +468,7 @@ export default function ReflectionsScreen() {
           <View className={`rounded-t-3xl ${isDark ? "bg-slate-800" : "bg-white"}`}>
             <View className="p-6 border-b border-gray-200 flex-row justify-between items-center">
               <Text className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>Add Reflection</Text>
-              <Pressable onPress={() => setShowAddModal(false)}>
+              <Pressable onPress={() => { setShowAddModal(false); setShowError(false); }}>
                 <MaterialIcons name="close" size={24} color={isDark ? "#9CA3AF" : "#64748B"} />
               </Pressable>
             </View>
@@ -495,13 +502,21 @@ export default function ReflectionsScreen() {
                 <Text className={`mb-2 font-medium ${isDark ? "text-gray-300" : "text-slate-700"}`}>Reflection Content</Text>
                 <TextInput
                   value={newReflection.text}
-                  onChangeText={(t) => setNewReflection({ ...newReflection, text: t })}
-                  className={`p-3 rounded-lg border ${isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-300 text-slate-800"}`}
+                  onChangeText={(t) => {
+                    setNewReflection({ ...newReflection, text: t });
+                    if (t.trim()) setShowError(false);
+                  }}
+                  className={`p-3 rounded-lg border ${showError ? "border-red-500 bg-red-50/50" : isDark ? "bg-slate-700 border-slate-600 text-white" : "bg-white border-gray-300 text-slate-800"}`}
                   placeholder="Describe your reflective account..."
                   multiline
                   numberOfLines={6}
                   style={{ minHeight: 120 }}
                 />
+                {showError && (
+                  <Text className="text-red-500 text-xs mt-1 font-medium italic">
+                    * Reflection content cannot be empty
+                  </Text>
+                )}
               </View>
 
               <View>

@@ -3,29 +3,7 @@ import * as BackgroundFetch from 'expo-background-fetch';
 import { Platform, Alert, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { useTimerStore } from './timer.store';
-
-const TIMER_BACKGROUND_TASK = 'TIMER_BACKGROUND_TASK';
-
-// Define the background task
-TaskManager.defineTask(TIMER_BACKGROUND_TASK, async () => {
-  try {
-    const state = useTimerStore.getState();
-    if (state.status === 'running' && state.startTime) {
-      const start = TimerService.parseSafeDate(state.startTime);
-      const now = Date.now();
-      // Session Model: Elapsed = Now - T0 - TotalPaused
-      // accumulatedMs is now "Total Paused Time"
-      const elapsed = Math.max(0, now - start - state.accumulatedMs);
-
-      // Update store UI will reflect this when app foregrounds
-      useTimerStore.getState().setElapsedMs(elapsed);
-    }
-    return BackgroundFetch.BackgroundFetchResult.NewData;
-  } catch (error) {
-    return BackgroundFetch.BackgroundFetchResult.Failed;
-  }
-});
+import { TIMER_BACKGROUND_TASK, TimerUtils } from './timer.utils';
 
 export const TimerService = {
   async registerBackgroundTask() {
@@ -128,27 +106,10 @@ export const TimerService = {
     return true;
   },
 
-  parseSafeDate(dateStr: string | null | undefined): number {
-    if (!dateStr) return Date.now();
-    // Normalize date string: replace space with T and ensure it ends with Z if no offset is present
-    const normalized = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
-    const hasOffset = normalized.includes('Z') || normalized.includes('+') || (normalized.split('-').length > 3);
-    const safeStr = hasOffset ? normalized : `${normalized}Z`;
-    const timestamp = new Date(safeStr).getTime();
-    return isNaN(timestamp) ? Date.now() : timestamp;
-  },
-
-  calculateElapsedBetween(startTime: string | null, endTime: string | number | null, accumulatedMs: number): number {
-    if (!startTime) return Number.isFinite(accumulatedMs) ? accumulatedMs : 0;
-    const start = this.parseSafeDate(startTime);
-    const end = typeof endTime === 'number' ? endTime : this.parseSafeDate(endTime);
-    const safeAccum = Number.isFinite(accumulatedMs) ? accumulatedMs : 0;
-    return Math.max(0, end - start - safeAccum);
-  },
-
-  calculateElapsed(startTime: string | null, accumulatedMs: number): number {
-    return this.calculateElapsedBetween(startTime, Date.now(), accumulatedMs);
-  },
+  // Proxies to TimerUtils for backward compatibility within the service structure if needed
+  parseSafeDate: TimerUtils.parseSafeDate,
+  calculateElapsedBetween: TimerUtils.calculateElapsedBetween,
+  calculateElapsed: TimerUtils.calculateElapsed,
 
   async pauseTimer() {
     try {
@@ -174,3 +135,4 @@ export const TimerService = {
     }
   },
 };
+

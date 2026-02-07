@@ -4,6 +4,7 @@ import { useSubscriptionStore } from '@/features/subscription/subscription.store
 import { showToast } from '@/utils/toast';
 import { checkNetworkStatus } from './network-monitor';
 import { Platform } from 'react-native';
+import { sanitizeError } from '@/utils/error-handler';
 
 // Custom error to distinguish server responses from network failures
 class ServerError extends Error {
@@ -139,20 +140,24 @@ class ApiService {
   }
 
   private async parseErrorResponse(response: Response): Promise<string> {
+    let rawMessage = '';
     try {
       const json = await response.json() as any;
       if (json && (json.error || json.message || json.errors)) {
-        return json.error || json.message || JSON.stringify(json.errors);
+        rawMessage = json.error || json.message || JSON.stringify(json.errors);
+      } else {
+        rawMessage = JSON.stringify(json);
       }
-      return JSON.stringify(json);
     } catch (e) {
       try {
         const text = await response.text();
-        return text || `API Error: ${response.status} ${response.statusText}`;
+        rawMessage = text || `API Error: ${response.status} ${response.statusText}`;
       } catch {
-        return `API Error: ${response.status} ${response.statusText}`;
+        rawMessage = `API Error: ${response.status} ${response.statusText}`;
       }
     }
+
+    return sanitizeError(rawMessage, response.status);
   }
 
   private getUrl(endpoint: string): string {

@@ -309,6 +309,8 @@ export default function RootLayout() {
   return (
     <StripeProvider
       publishableKey={isStripeAvailable ? STRIPE_PUBLISHABLE_KEY : ''}
+      merchantIdentifier="merchant.com.revalidationtracker.app"
+      urlScheme="revalidation-tracker"
     >
       <ThemeProvider>
         <StatusBarWrapper />

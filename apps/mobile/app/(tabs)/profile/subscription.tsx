@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, Platform, Alert } from 'react-native';
 import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -160,7 +160,10 @@ function SubscriptionInner() {
         // directly to this screen instead of landing on the Splash route.
         // Use full tabs path to ensure the router resolves to the correct tree
         // (prevents navigation-context race on return from external flows)
-        returnURL: Linking.createURL('/(tabs)/profile/subscription'),
+        returnURL: 'revalidation-tracker://(tabs)/profile/subscription',
+        applePay: {
+          merchantCountryCode: 'GB',
+        },
       });
 
       if (error) {

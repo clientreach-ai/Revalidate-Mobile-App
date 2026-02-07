@@ -9,8 +9,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useState, useEffect, useRef } from 'react';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
@@ -84,9 +84,21 @@ export default function NotificationsScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    loadNotifications(true);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      // Initial load on focus
+      loadNotifications(true);
+
+      // Set up polling interval (every 30 seconds)
+      const interval = setInterval(() => {
+        loadNotifications(true);
+      }, 30000);
+
+      return () => {
+        clearInterval(interval);
+      };
+    }, [])
+  );
 
   useEffect(() => {
     if (loading) return;

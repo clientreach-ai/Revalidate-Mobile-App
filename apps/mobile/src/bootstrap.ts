@@ -1,6 +1,7 @@
 import { Platform, LogBox } from 'react-native';
 console.log('[Bootstrap] Initializing global error handlers...');
 import * as TaskManager from 'expo-task-manager';
+import './features/timer/timer.background';
 
 // Absolute silence for development overlays
 LogBox.ignoreAllLogs(true);
