@@ -1,15 +1,22 @@
-import React, { useEffect, useCallback } from 'react';
-import { ScrollView, RefreshControl, View, Pressable, Text } from 'react-native';
+import React, { useEffect, useCallback, useState } from 'react';
+import {
+  ScrollView,
+  RefreshControl,
+  View,
+  Pressable,
+  Text,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { useThemeStore } from '@/features/theme/theme.store';
 import { usePremium } from '@/hooks/usePremium';
-import { DiscoveryModal, useDiscoveryModal } from '@/features/auth/DiscoveryModal';
+import {
+  DiscoveryModal,
+  useDiscoveryModal,
+} from '@/features/auth/DiscoveryModal';
 import { TimerService } from '@/features/timer/timer.service';
-import { useTimerStore } from '@/features/timer/timer.store';
-import { useAuthStore } from '@/features/auth/auth.store';
 
 // Modular Imports
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData';
@@ -20,6 +27,7 @@ import { TimerCard } from '@/features/dashboard/components/TimerCard';
 import { StatsGrid } from '@/features/dashboard/components/StatsGrid';
 import { ActivitySection } from '@/features/dashboard/components/ActivitySection';
 import { WorkSessionModal } from '@/features/dashboard/components/WorkSessionModal';
+import { SessionSummaryModal } from '@/features/dashboard/components/SessionSummaryModal';
 
 import '../../global.css';
 
@@ -27,6 +35,8 @@ export default function DashboardScreen() {
   const { isDark } = useThemeStore();
   const { isPremium } = usePremium();
   const { showModal, showDiscoveryModal, hideModal } = useDiscoveryModal();
+  const [showStartSessionModal, setShowStartSessionModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   // Data Hook
   const {
@@ -88,12 +98,41 @@ export default function DashboardScreen() {
       loadDashboardStats(true);
       loadNotificationsCount(true);
       loadRecentActivities(true);
-    }, [loadUserData, loadActiveSession, loadDashboardStats, loadNotificationsCount, loadRecentActivities])
+    }, [
+      loadUserData,
+      loadActiveSession,
+      loadDashboardStats,
+      loadNotificationsCount,
+      loadRecentActivities,
+    ])
   );
 
   useEffect(() => {
     workForm.loadFormOptions();
   }, [workForm.loadFormOptions]);
+
+  const parseShiftDuration = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return { shiftHours: 0, shiftMinutes: 0 };
+
+    if (trimmed.includes(':')) {
+      const [hStr, mStr] = trimmed.split(':');
+      const h = Number(hStr);
+      const m = Number(mStr);
+      return {
+        shiftHours: Number.isFinite(h) ? Math.max(0, Math.floor(h)) : 0,
+        shiftMinutes: Number.isFinite(m) ? Math.max(0, Math.floor(m)) : 0,
+      };
+    }
+
+    const val = parseFloat(trimmed);
+    if (!Number.isFinite(val)) return { shiftHours: 0, shiftMinutes: 0 };
+    const totalMinutes = Math.round(val * 60);
+    return {
+      shiftHours: Math.floor(totalMinutes / 60),
+      shiftMinutes: totalMinutes % 60,
+    };
+  };
 
   return (
     <SafeAreaView
@@ -131,18 +170,29 @@ export default function DashboardScreen() {
               handleRestartSession={handleRestartSession}
               handlePauseSession={handlePauseSession}
               handleResumeSession={handleResumeSession}
-              handleStopSession={() => handleStopSession(() => workForm.openFormWithDefaults(`${timer.hours}:${timer.minutes}:${timer.seconds}`))}
+              handleStopSession={() =>
+                handleStopSession(() => {
+                  workForm.setHoursFromTimer(
+                    `${timer.hours}:${timer.minutes}:${timer.seconds}`
+                  );
+                  setShowSummaryModal(true);
+                })
+              }
             />
           ) : (
             <View
-              className={`p-6 rounded-[32px] shadow-lg border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-50'
-                }`}
+              className={`p-6 rounded-[32px] shadow-lg border ${
+                isDark
+                  ? 'bg-slate-900 border-slate-800'
+                  : 'bg-white border-slate-50'
+              }`}
             >
               <View className="flex-row items-center justify-between">
                 <View>
                   <Text
-                    className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'
-                      }`}
+                    className={`text-xl font-bold ${
+                      isDark ? 'text-white' : 'text-slate-800'
+                    }`}
                   >
                     Ready to track?
                   </Text>
@@ -151,7 +201,10 @@ export default function DashboardScreen() {
                   </Text>
                 </View>
                 <Pressable
-                  onPress={handleStartSession}
+                  onPress={() => {
+                    workForm.setSelectedDate(new Date());
+                    setShowStartSessionModal(true);
+                  }}
                   className="bg-emerald-500 w-16 h-16 rounded-full items-center justify-center shadow-emerald-200 shadow-md"
                 >
                   <MaterialIcons name="play-arrow" color="white" size={32} />
@@ -176,10 +229,51 @@ export default function DashboardScreen() {
       </ScrollView>
 
       <WorkSessionModal
-        visible={workForm.showWorkForm}
-        onClose={() => workForm.setShowWorkForm(false)}
+        visible={showStartSessionModal}
+        onClose={() => setShowStartSessionModal(false)}
         isDark={isDark}
+        title="Start Session"
+        submitLabel="Start Session"
+        submittingLabel="Starting..."
+        isSubmitting={false}
+        hoursEditable
+        requireHours
+        showEvidence={false}
+        onSubmit={async () => {
+          setShowStartSessionModal(false);
+          const duration = parseShiftDuration(workForm.hours);
+          await handleStartSession({
+            shiftHours: duration.shiftHours,
+            shiftMinutes: duration.shiftMinutes,
+            shiftType: workForm.workingMode,
+            location: workForm.selectedHospital?.name,
+            notes: workForm.description,
+          });
+        }}
         {...workForm}
+      />
+
+      <SessionSummaryModal
+        visible={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        onSave={async () => {
+          await workForm.handleSaveWorkSession();
+          setShowSummaryModal(false);
+        }}
+        isDark={isDark}
+        isSaving={workForm.isSavingWork}
+        workingMode={workForm.workingMode}
+        selectedDate={workForm.selectedDate}
+        selectedHospital={workForm.selectedHospital}
+        hours={workForm.hours}
+        rate={workForm.rate}
+        workSetting={workForm.workSetting}
+        scope={workForm.scope}
+        description={workForm.description}
+        documents={workForm.documents}
+        setDocuments={workForm.setDocuments}
+        handleDocumentPick={workForm.handleDocumentPick}
+        isUploading={workForm.isUploading}
       />
 
       <DiscoveryModal visible={showModal} onClose={hideModal} />
