@@ -7,7 +7,6 @@ import { TimerService } from '@/features/timer/timer.service';
 import { ActiveSession } from '../dashboard.types';
 import { formatTime } from '../dashboard.utils';
 
-
 const PulsingDot = () => {
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -41,7 +40,6 @@ const PulsingDot = () => {
   );
 };
 
-
 interface TimerCardProps {
   activeSession: ActiveSession | null;
   timer: { hours: number; minutes: number; seconds: number };
@@ -52,7 +50,6 @@ interface TimerCardProps {
   handleResumeSession: () => void;
   handleStopSession: () => void;
 }
-
 
 export const TimerCard: React.FC<TimerCardProps> = ({
   activeSession,
@@ -116,9 +113,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
   return (
     <View
       className={`p-6 rounded-[32px] shadow-2xl border ${
-        isDark
-          ? 'bg-slate-900 border-slate-700'
-          : 'bg-white border-slate-100'
+        isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-100'
       }`}
     >
       {/* Status */}
@@ -152,10 +147,6 @@ export const TimerCard: React.FC<TimerCardProps> = ({
         >
           {formatTime(timer.hours)}:{formatTime(timer.minutes)}:
           {formatTime(timer.seconds)}
-        </Text>
-
-        <Text className="text-sm text-slate-400 mt-2 font-medium">
-          {activeSession.workDescription || 'Clinical Session Tracking'}
         </Text>
       </View>
 
