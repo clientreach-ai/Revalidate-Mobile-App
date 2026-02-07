@@ -194,4 +194,3 @@ export const TimerService = {
     useTimerStore.getState().setShiftEndNotificationId(null);
   },
 };
-
